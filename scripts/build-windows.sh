@@ -15,7 +15,7 @@ npm run build --silent
 echo "2/4  Packaging the server into one file..."
 rm -rf "$BUILD" && mkdir -p "$BUILD/app" "$BUILD/node" "$CACHE"
 npx esbuild server/src/main.ts --bundle --platform=node --format=esm --target=node22 \
-  --outfile="$BUILD/app/server.mjs" --external:bufferutil --external:utf-8-validate --log-level=warning \
+  --minify --keep-names --legal-comments=none --outfile="$BUILD/app/server.mjs" --external:bufferutil --external:utf-8-validate --log-level=warning \
   "--banner:js=import { createRequire as __cr } from 'node:module'; const require = __cr(import.meta.url);"
 cp -r client/dist "$BUILD/app/client"
 

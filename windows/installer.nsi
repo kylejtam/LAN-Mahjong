@@ -17,6 +17,8 @@ OutFile "${OUTFILE}"
 InstallDir "$LOCALAPPDATA\Programs\LAN Mahjong"
 RequestExecutionLevel user
 SetCompressor /SOLID lzma
+; A bigger look-back window lets the compressor find more repeats in node.exe (smaller download).
+SetCompressorDictSize 64
 BrandingText "LAN Mahjong ${VERSION}"
 
 !include "MUI2.nsh"

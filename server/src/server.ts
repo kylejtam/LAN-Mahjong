@@ -13,6 +13,7 @@ import { createServer, IncomingMessage, ServerResponse } from 'node:http';
 import { existsSync, readFileSync, statSync } from 'node:fs';
 import { dirname, extname, join, normalize, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { gzipSync } from 'node:zlib';
 import { randomUUID, getRandomValues } from 'node:crypto';
 import QRCode from 'qrcode';
 import { WebSocketServer, WebSocket } from 'ws';
@@ -55,12 +56,50 @@ const CONTENT_TYPES: Record<string, string> = {
   '.woff2': 'font/woff2',
 };
 
+interface ClientFile {
+  body: Buffer;
+  /** The same file squeezed with gzip, if that makes it smaller (text files only). */
+  gzipped: Buffer | null;
+  type: string;
+}
+
+/** Built screen files kept in memory, so the disk is read once (re-read if the file changes). */
+const fileCache = new Map<string, { mtimeMs: number; size: number; file: ClientFile }>();
+const COMPRESSIBLE = new Set(['.html', '.js', '.css', '.svg', '.json', '.webmanifest']);
+
 /** Read a file from the built screens folder, refusing anything outside it. */
-function readClientFile(dir: string, urlPath: string): { body: Buffer; type: string } | null {
+function readClientFile(dir: string, urlPath: string): ClientFile | null {
   const full = normalize(join(dir, decodeURIComponent(urlPath)));
   if (!full.startsWith(dir + sep)) return null;
-  if (!existsSync(full) || !statSync(full).isFile()) return null;
-  return { body: readFileSync(full), type: CONTENT_TYPES[extname(full)] ?? 'application/octet-stream' };
+  if (!existsSync(full)) return null;
+  const stat = statSync(full);
+  if (!stat.isFile()) return null;
+  const cached = fileCache.get(full);
+  if (cached && cached.mtimeMs === stat.mtimeMs && cached.size === stat.size) return cached.file;
+  const body = readFileSync(full);
+  const ext = extname(full);
+  let gzipped: Buffer | null = null;
+  if (COMPRESSIBLE.has(ext) && body.length > 512) {
+    const gz = gzipSync(body, { level: 9 });
+    if (gz.length < body.length) gzipped = gz;
+  }
+  const file = { body, gzipped, type: CONTENT_TYPES[ext] ?? 'application/octet-stream' };
+  fileCache.set(full, { mtimeMs: stat.mtimeMs, size: stat.size, file });
+  return file;
+}
+
+/** Send a screen file, compressed when the browser accepts it (every modern browser does). */
+function sendClientFile(req: IncomingMessage, res: ServerResponse, file: ClientFile, cacheControl: string): void {
+  const headers: Record<string, string> = { 'content-type': file.type, 'cache-control': cacheControl };
+  if (file.gzipped) {
+    headers.vary = 'accept-encoding';
+    if (/\bgzip\b/.test(String(req.headers['accept-encoding'] ?? ''))) {
+      headers['content-encoding'] = 'gzip';
+      res.writeHead(200, headers).end(file.gzipped);
+      return;
+    }
+  }
+  res.writeHead(200, headers).end(file.body);
 }
 
 /** Is this connection from the server's own computer? */
@@ -314,7 +353,8 @@ export async function startServer(opts: ServerOptions): Promise<RunningServer> {
     }
     if (url.pathname === '/' || url.pathname === '/index.html') {
       const page = readClientFile(clientDir, '/index.html');
-      res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' }).end(page ? page.body : placeholderPage(urls, gameList()));
+      if (page) sendClientFile(req, res, page, 'no-cache');
+      else res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' }).end(placeholderPage(urls, gameList()));
       return;
     }
     if (url.pathname === '/info') {
@@ -325,7 +365,7 @@ export async function startServer(opts: ServerOptions): Promise<RunningServer> {
       const file = readClientFile(clientDir, url.pathname);
       if (file) {
         const cache = url.pathname.startsWith('/assets/') ? 'public, max-age=31536000, immutable' : 'no-cache';
-        res.writeHead(200, { 'content-type': file.type, 'cache-control': cache }).end(file.body);
+        sendClientFile(req, res, file, cache);
         return;
       }
     }

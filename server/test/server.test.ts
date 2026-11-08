@@ -2,6 +2,9 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { get as httpGet } from 'node:http';
+import type { IncomingHttpHeaders } from 'node:http';
+import { gunzipSync } from 'node:zlib';
 import { WebSocket } from 'ws';
 import { seededRng } from '@lan-mahjong/shared';
 import { RunningServer, startServer } from '../src/server.js';
@@ -166,6 +169,41 @@ describe('game server over the network', () => {
     expect((await fetch(`${base}/host.html`)).status).toBe(404); // only via /host (laptop check)
     expect((await fetch(`${base}/..%2F..%2Fpackage.json`)).status).toBe(404);
     expect((await fetch(`${base}/assets/..%2F..%2F..%2Fpackage.json`)).status).toBe(404);
+  });
+
+  it('compresses screen files when the browser accepts it, and they unpack to exactly the same file', async () => {
+    dir = mkdtempSync(join(tmpdir(), 'mahjong-client-'));
+    mkdirSync(join(dir, 'assets'));
+    const big = 'const tiles = ' + JSON.stringify(Array.from({ length: 400 }, (_, i) => `tile-${i % 34}`)) + ';\n';
+    writeFileSync(join(dir, 'index.html'), '<p>player screen</p>' + '<!-- padding -->'.repeat(100));
+    writeFileSync(join(dir, 'assets', 'app.js'), big);
+    writeFileSync(join(dir, 'icon.png'), Buffer.alloc(2000, 7));
+    server = await startServer({ port: 0, host: '127.0.0.1', dataFile: null, clientDir: dir, tickMs: 20 });
+    const raw = (path: string, gzip: boolean): Promise<{ headers: IncomingHttpHeaders; body: Buffer }> =>
+      new Promise((res, rej) => {
+        httpGet({ host: '127.0.0.1', port: server!.port, path, headers: gzip ? { 'accept-encoding': 'gzip, deflate' } : {} }, (r) => {
+          const parts: Buffer[] = [];
+          r.on('data', (c: Buffer) => parts.push(c));
+          r.on('end', () => res({ headers: r.headers, body: Buffer.concat(parts) }));
+        }).on('error', rej);
+      });
+    const zipped = await raw('/assets/app.js', true);
+    expect(zipped.headers['content-encoding']).toBe('gzip');
+    expect(zipped.body.length).toBeLessThan(big.length / 3);
+    expect(gunzipSync(zipped.body).toString()).toBe(big);
+    const plain = await raw('/assets/app.js', false);
+    expect(plain.headers['content-encoding']).toBeUndefined();
+    expect(plain.body.toString()).toBe(big);
+    const page = await raw('/', true);
+    expect(page.headers['content-encoding']).toBe('gzip');
+    expect(gunzipSync(page.body).toString()).toContain('player screen');
+    // Pictures are already compressed: sent as they are.
+    const png = await raw('/icon.png', true);
+    expect(png.headers['content-encoding']).toBeUndefined();
+    expect(png.body.length).toBe(2000);
+    // A rebuilt file is picked up straight away (not stuck in memory).
+    writeFileSync(join(dir, 'assets', 'app.js'), big + '// changed\n');
+    expect(gunzipSync((await raw('/assets/app.js', true)).body).toString()).toContain('// changed');
   });
 
   it('lists games on the start screen', async () => {
