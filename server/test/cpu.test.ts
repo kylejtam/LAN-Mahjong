@@ -80,19 +80,19 @@ describe('claims', () => {
     'dG dG s1 s2 s3 m5 m6 m7 p5 p6 wN wS m1',
     'm2 m5 m8 p1 p4 p7 s4 s7 wE wS wW wN dR',
   ];
-  it('easy never claims Pèng', () => {
+  it('easy never claims Pung', () => {
     let r = setupRound({ hands });
     r = discard(r, 0, idOf(r, 0, 'dG'), 0);
     expect(move(r, 2, 'easy')).toBeNull();
   });
-  it('medium and hard claim Pèng when it brings them closer to winning', () => {
+  it('medium and hard claim Pung when it brings them closer to winning', () => {
     for (const level of ['medium', 'hard'] as const) {
       let r = setupRound({ hands });
       r = discard(r, 0, idOf(r, 0, 'dG'), 0);
       expect(move(r, 2, level)).toEqual({ type: 'claim', claim: { kind: 'pong' } });
     }
   });
-  it('the next player can claim Shàng', () => {
+  it('the next player can claim Soeng', () => {
     // Dealer discards p6; seat 1 has p4 p5 and nothing else connected.
     const h: Setup['hands'] = [
       'm1 m2 m3 m4 m5 m6 m7 m8 m9 p1 p2 p3 s1 p6',

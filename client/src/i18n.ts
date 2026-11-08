@@ -10,9 +10,9 @@ import type { CelebrationStyle } from './celebrate';
 
 export type Lang = 'en' | 'zh';
 
-/** The 4 action buttons: pinyin in English, characters in Chinese. */
+/** The 4 action buttons: Cantonese romanization (Jyutping, without tone numbers) in English, characters in Chinese. */
 export const ACTION_LABELS: Record<Lang, { chow: string; pong: string; gong: string; win: string }> = {
-  en: { chow: 'Shàng', pong: 'Pèng', gong: 'Gàng', win: 'Hú' },
+  en: { chow: 'Soeng', pong: 'Pung', gong: 'Gong', win: 'Wu' },
   zh: { chow: '上', pong: '碰', gong: '槓', win: '胡' },
 };
 

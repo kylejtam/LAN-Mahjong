@@ -108,7 +108,7 @@ describe('3-second grace period after the next player draws', () => {
   });
 
   it('the player who drew can no longer claim the tile (others still can for 3 s)', () => {
-    // Dealer throws s1; seat 1 could Shàng it but draws instead.
+    // Dealer throws s1; seat 1 could Soeng it but draws instead.
     let r = dealerDiscards(table(), 's1', 0);
     expect(availableActions(r, 1, 0).chow).toHaveLength(1);
     r = draw(r, 1, 1000);

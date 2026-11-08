@@ -363,12 +363,12 @@ export function cpuMove(
 export const CPU_LEVEL_DESCRIPTIONS: Record<CpuDifficulty, string[]> = {
   easy: [
     'Sometimes throws away a tile at random (makes beginner mistakes).',
-    'Never claims Shàng 上, Pèng 碰 or Gàng 槓 from other players.',
+    'Never claims Soeng 上, Pung 碰 or Gong 槓 from other players.',
     'Wins whenever its hand is complete and reaches the minimum fan.',
   ],
   medium: [
     'Keeps the tiles that bring it closest to a winning hand.',
-    'Claims Shàng 上, Pèng 碰 and Gàng 槓 when that brings it closer to winning.',
+    'Claims Soeng 上, Pung 碰 and Gong 槓 when that brings it closer to winning.',
     'Wins whenever it can reach the minimum fan.',
   ],
   hard: [
