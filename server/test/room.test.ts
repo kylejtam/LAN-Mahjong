@@ -197,8 +197,53 @@ describe('playing through the room', () => {
     r = cmd(r, 'Cat', { type: 'confirmRound' });
     expect(r.people.amy!.balance).toBe(1032);
     expect(r.people.kyle!.balance).toBe(984);
-    expect(r.phase).toBe('betweenRounds');
+    // Everyone pressed Ready, so the next round starts straight away (dealer rolls).
+    expect(r.phase).toBe('rolling');
     expect(r.match.dealer).toBe(1); // someone other than the dealer won
+  });
+});
+
+describe('end of a round', () => {
+  function endWith(r: Room, isChicken: boolean): Room {
+    const round = r.match.round!;
+    // Record a real 'win' move so undo has something to undo.
+    const before = round.core;
+    return {
+      ...r,
+      match: {
+        ...r.match,
+        round: {
+          ...round,
+          history: [...round.history, { move: 'win', seat: 1, before, windowBefore: null }],
+          core: { ...before, phase: 'ended', result: { type: 'win', winner: 1, discarder: 0, fan: 1, items: [], capHand: false, isChicken, changes: isChicken ? [32, -96, 32, 32] : [-4, 8, -2, -2] } },
+        },
+      },
+    };
+  }
+
+  it('only a chicken win can be undone (everyone must agree)', () => {
+    expect(() => cmd(endWith(startedTable(), false), 'Amy', { type: 'undo' })).toThrow(/Only a chicken win/);
+    let r = endWith(startedTable(), true);
+    for (const n of ['Kyle', 'Amy', 'Ben']) r = cmd(r, n, { type: 'undo' });
+    expect(r.match.round!.core.phase).toBe('ended');
+    r = cmd(r, 'Cat', { type: 'undo' });
+    expect(r.match.round!.core.result).toBeNull();
+  });
+
+  it('Ready starts the next round once every seated player has pressed it', () => {
+    let r = endWith(startedTable(), false);
+    for (const n of ['Kyle', 'Amy', 'Ben']) r = cmd(r, n, { type: 'confirmRound' });
+    expect(r.phase).toBe('playing');
+    r = cmd(r, 'Cat', { type: 'confirmRound' });
+    expect(r.phase).toBe('rolling');
+  });
+
+  it('Leave seat at the end of a round: the round still closes, and the next waits for a full table', () => {
+    let r = endWith(startedTable(), false);
+    r = cmd(r, 'Cat', { type: 'dropOut', replacement: { none: true } });
+    for (const n of ['Kyle', 'Amy', 'Ben']) r = cmd(r, n, { type: 'confirmRound' });
+    expect(r.phase).toBe('betweenRounds');
+    expect(r.seats[3]).toBeNull();
   });
 });
 
@@ -308,7 +353,8 @@ describe('history, roll back and changing the current game (host page)', () => {
     return r;
   }
   function playAgain(r: Room): Room {
-    for (const n of ['Kyle', 'Amy', 'Ben', 'Cat']) r = cmd(r, n, { type: 'pressStart' });
+    // Ready at the end of the round already counted as Start.
+    if (r.phase === 'betweenRounds') for (const n of ['Kyle', 'Amy', 'Ben', 'Cat']) r = cmd(r, n, { type: 'pressStart' });
     const dealerName = r.people[r.seats[r.match.dealer]!]!.name;
     return cmd(r, dealerName, { type: 'rollDice' });
   }

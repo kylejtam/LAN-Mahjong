@@ -425,10 +425,14 @@ function maybeCloseRound(room: Room): void {
     const key = room.seats[seat];
     if (key) room.people[key]!.balance += c;
   });
+  // Pressing Ready at the end of a round also counts as Start for the next one.
+  const ready = room.confirmed.filter((k) => room.seats.includes(k));
   room.match = match;
   room.confirmed = [];
   room.undoWinVotes = [];
   room.phase = match.finished ? 'finished' : 'betweenRounds';
+  room.startPressed = ready;
+  maybeBeginRolling(room);
 }
 
 function maybeUndoWin(room: Room): void {
@@ -518,7 +522,8 @@ export function handleCommand(prev: Room, key: string, cmd: Command, now: number
       const s = requireSeated(room, key);
       const last = round.history[round.history.length - 1];
       if (last?.move === 'win') {
-        // Undoing a win needs every seated human to agree.
+        // Only a chicken win can be undone, and every seated human must agree.
+        if (round.core.result?.type !== 'win' || !round.core.result.isChicken) fail('Only a chicken win can be undone.');
         if (!room.undoWinVotes.includes(key)) room.undoWinVotes.push(key);
         maybeUndoWin(room);
       } else {

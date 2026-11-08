@@ -13,6 +13,8 @@ export type DragSource =
   | { kind: 'hand'; tileId: number; type: TileType }
   | { kind: 'wallFront' }
   | { kind: 'wallBack' }
+  /** The tile you can claim (上 碰 槓 胡), shown big in the middle. */
+  | { kind: 'offered' }
   | { kind: 'dice' };
 
 export interface DragState {

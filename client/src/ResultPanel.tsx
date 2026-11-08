@@ -106,18 +106,22 @@ export function ResultPanel({ view, lang, command, canClaimWin, onWin, winLabel 
             const isWinner = result.type === 'win' && result.winner === s.seat;
             return (
               <div key={s.seat} className={`result-row${isWinner ? ' result-winner' : ''}`}>
-                <span className="result-name">{personName(s.name, lang)}</span>
+                <span className="result-name">
+                  {personName(s.name, lang)}
+                  {/* Who is ready for the next round. */}
+                  {s.name && !s.cpu && <span className={`ready-dot${s.confirmed ? ' on' : ''}`}>{s.confirmed ? tr('ready') : '…'}</span>}
+                </span>
                 <span className="result-tiles">
                   {(isWinner ? groupWinningHand(s.hand ?? [], s.melds) : [sortHand(s.hand ?? [])]).map((g, gi) => (
                     <span key={`g${gi}`} className="meld">
-                      {g.map((t) => <TileView key={t.id} type={t.type} width="1.6rem" />)}
+                      {g.map((t) => <TileView key={t.id} type={t.type} width="var(--result-w)" />)}
                     </span>
                   ))}
                   {s.melds.map((m, i) => (
-                    <span key={i} className="meld">{m.tiles.map((t) => <TileView key={t.id} type={t.type} width="1.6rem" />)}</span>
+                    <span key={i} className="meld">{m.tiles.map((t) => <TileView key={t.id} type={t.type} width="var(--result-w)" />)}</span>
                   ))}
                   {s.flowers.length > 0 && (
-                    <span className="meld flowers">{s.flowers.map((t) => <TileView key={t.id} type={t.type} width="1.6rem" />)}</span>
+                    <span className="meld flowers">{s.flowers.map((t) => <TileView key={t.id} type={t.type} width="var(--result-w)" />)}</span>
                   )}
                 </span>
                 {result.type === 'win' && (
@@ -130,8 +134,14 @@ export function ResultPanel({ view, lang, command, canClaimWin, onWin, winLabel 
         <div className="row">
           {canClaimWin && <button className="act act-win" onClick={onWin}>{winLabel}</button>}
           {me && (
+            // Ready = pay out and start the next round once everyone is ready.
             <button className="btn primary big" disabled={me.confirmed} onClick={() => command({ type: 'confirmRound' })}>
-              {me.confirmed ? tr('waiting') : tr('confirm')}
+              {me.confirmed ? `${tr('ready')} ✓` : tr('ready')}
+            </button>
+          )}
+          {me && (
+            <button className="btn" onClick={() => command({ type: 'dropOut', replacement: { none: true } })}>
+              {tr('leaveSeat')}
             </button>
           )}
           {!me && view.spectatorsConfirm && (
@@ -140,9 +150,9 @@ export function ResultPanel({ view, lang, command, canClaimWin, onWin, winLabel 
               {tr('nextHand')}
             </button>
           )}
-          {me && result.type === 'win' && (
+          {me && result.type === 'win' && result.isChicken && (
             <button className="btn" disabled={me.votedUndoWin} onClick={() => command({ type: 'undo' })}>
-              {me.votedUndoWin ? tr('askedUndo') : tr('undoWin')}
+              {me.votedUndoWin ? tr('askedUndo') : tr('undoChickenWin')}
             </button>
           )}
         </div>

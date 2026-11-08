@@ -9,7 +9,7 @@ disagrees with those, the newest dated entry here wins.
 - Phase 1 (rules engine): **done**. Tile set and checks, shuffle, wall and dice
   break, dealing with flower replacement, winning-hand check, legal
   chow/pong/gong/win, two-winner rule, fan counting, payments.
-- Tests: 227 passing (`npm test`), including 60 rounds of random play that check no tile is ever lost or created.
+- Tests: 231 passing (`npm test`), including 60 rounds of random play that check no tile is ever lost or created.
 - Phase 2 (game server): **done**.
   - Step 1 round engine (`server/src/game/round.ts`): **done**.
   - Step 2 full 16-round game (`server/src/game/match.ts`): **done**.
@@ -118,6 +118,13 @@ disagrees with those, the newest dated entry here wins.
 | 2026-11-08 | **Wall picture:** a small square around the tiles-left count shows the remaining wall; stacks disappear in the real order (draws from the front, replacements from the back). | Kyle |
 | 2026-11-08 | **One language at a time:** top bar and winning conditions show only English or only Chinese; in English the winds are shown as E / S / W / N. (The Help tables still show the Chinese names next to the English ones.) | Kyle |
 | 2026-11-08 | **"Next round"** replaces "Confirm – next hand". **Theme:** Light or Dark only (Dark default); "System" removed. **Your name** (with chips and, for the dealer, the dice) is at the top left next to Undo. | Kyle |
+| 2026-11-08 | **New tile:** stays apart on the far right until you drag it into your hand; then it is part of your hand order. | Kyle |
+| 2026-11-08 | **Claim tile:** when you can Shàng / Pèng / Gàng / Hú, the tile shows big in the middle ("Take"), tap or drag it into your hand (a choice appears if more than one claim is possible). | Kyle |
+| 2026-11-08 | **After the next player draws:** buttons, flashing and the claim tile disappear for everyone, and the player who drew can no longer claim that tile. Others can still tap the discarded tile within 3 s (the earlier grace rule), without buttons. | Kyle (grace detail: Claude) |
+| 2026-11-08 | **Discards slide** in from the player who threw them. **Deal animation** (~5 s) at the start of each hand: tiles slide from the wall to each player 4 at a time, then 1 each, then the dealer's extra tile, then flower replacements; the wall picture empties in the real order. | Kyle |
+| 2026-11-08 | **Only chicken wins can be undone** ("Undo chicken win", everyone must agree). Normal wins cannot be undone. Replaces "undo can go back over any move, including wins". | Kyle |
+| 2026-11-08 | **End of a round:** only "Ready" and "Leave seat". Ready also counts as Start: when every seated player is Ready the next round begins (dealer rolls). Each player's row shows whether they are ready. | Kyle |
+| 2026-11-08 | Side players' name tags are one small line like the top player's; the wall picture has no outline. | Kyle |
 | 2026-11-08 | **First dealer** of a new game is seat 0 (East). | Claude (Kyle may change) |
 | 2026-11-08 | **Undo moves:** discard, 上, 碰, 槓, 胡. Draws are not separate moves. Undoing a discard puts the tile back in that player's hand and it is their turn again. | Kyle |
 | 2026-11-08 | **Several games at once:** one server can run many separate games, each with its own name. | Kyle |

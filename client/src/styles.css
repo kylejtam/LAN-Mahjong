@@ -506,3 +506,46 @@ input { font: inherit; }
 .opp-left .opp-tiles, .opp-right .opp-tiles { flex: 1 1 auto; min-height: 0; height: 0; align-self: stretch; justify-content: center; }
 .opp-left .melds-sideways, .opp-right .melds-sideways { height: 100%; max-height: none; }
 .opp-left, .opp-right { --public-w: min(2.4vw, 4.8vh); --opp-w: min(2.2vw, 4.4vh); }
+
+/* ---------- Kyle's next round of changes ---------- */
+/* Side players' name tags: one small line, like the player at the top. */
+.opp-left .nametag, .opp-right .nametag {
+  flex-wrap: nowrap; white-space: nowrap; border-radius: 999px; text-align: left;
+  font-size: 0.8em; max-width: 100%; padding: 0.1em 0.5em;
+}
+.opp-left .nametag-name, .opp-right .nametag-name { flex-basis: auto; min-width: 0; }
+/* The tile you can claim, big in the middle (tap or drag it into your hand). */
+.claim-pile {
+  display: inline-flex; flex-direction: column; align-items: center; gap: 0.15em; margin-right: 0.6em;
+  cursor: grab; touch-action: none; padding: 0.3em 0.5em; border-radius: 10px;
+  background: rgba(255, 212, 71, 0.18); outline: 3px solid #ffd447;
+  animation: pulse 0.6s ease-in-out infinite alternate;
+}
+.hub { display: flex; align-items: center; justify-content: center; }
+/* Discards slide in from the player who threw them. */
+.slide-in { animation: slide-in 0.35s ease-out; }
+.slide-from-bottom { --sx: 0px; --sy: 160px; }
+.slide-from-top { --sx: 0px; --sy: -160px; }
+.slide-from-left { --sx: -160px; --sy: 0px; }
+.slide-from-right { --sx: 160px; --sy: 0px; }
+@keyframes slide-in { from { transform: translate(var(--sx), var(--sy)); opacity: 0.3; } to { transform: none; opacity: 1; } }
+/* Deal animation: groups of tiles fly from the wall to each player. */
+.deal-flight {
+  position: fixed; z-index: 15; pointer-events: none; display: flex; gap: 1px;
+  transform: translate(-50%, -50%); animation: deal-fly linear forwards;
+}
+@keyframes deal-fly {
+  from { transform: translate(-50%, -50%); opacity: 1; }
+  to { transform: translate(calc(-50% + var(--dx)), calc(-50% + var(--dy))); opacity: 0.6; }
+}
+.me.dealing .me-row { visibility: hidden; }
+/* Ready marks in the round summary. */
+.ready-dot { margin-left: 0.4em; font-size: 0.75em; color: var(--muted); }
+.ready-dot.on { color: var(--good); font-weight: 700; }
+.result-row { grid-template-columns: 7.5em 1fr 4.5em; }
+/* Round summary on a phone: smaller tiles, and the buttons always visible at the bottom. */
+.result { --result-w: min(1.6rem, 3.2vw, 6.2vh); padding-bottom: 0; }
+.result .row { position: sticky; bottom: 0; background: var(--panel); padding: 0.5em 0 0.7em; margin-top: 0.4em; }
+.result-row { padding: 0.1em 0.3em; }
+.result h3 { margin-bottom: 0.3em; }
+.result .fan-items { margin-bottom: 0.3em; }

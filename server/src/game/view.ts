@@ -61,6 +61,9 @@ export interface RoomView {
     wallCount: number;
     /** The tile that can currently be claimed, if any. */
     offered: { tile: Tile; by: number } | null;
+    offeredDrawn: boolean;
+    /** Flowers each seat has set aside (face up, so public). Used by the deal animation. */
+    flowersDealt: number[];
     result: RoundResult | null;
   };
   /** Your buttons. Null if you are not seated or no round is on. */
@@ -166,6 +169,9 @@ export function viewFor(room: Room, viewerKey: string, now: number): RoomView {
           wall: round.core.wall.stacks.map((s) => ({ seat: s.seat, position: s.position, count: s.tiles.length })),
           wallCount: tilesLeft(round.core.wall),
           offered: round.window ? { tile: round.window.tile, by: round.window.by } : null,
+          /** The next player has drawn: claim buttons are hidden (a quick tap on the tile still works for 3 s). */
+          offeredDrawn: round.window?.status.type === 'drawn',
+          flowersDealt: round.core.flowers.map((f) => f.length),
           result: round.core.result,
         }
       : null,

@@ -85,26 +85,30 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
   const drawnId = mySeat !== null ? view.justDrawnId : null;
   const roundKey = `${view.match.handsPlayed}-${round?.dice.join('') ?? ''}`;
   const [manual, setManual] = useState<{ key: string; ids: number[] } | null>(null);
+  // The new tile stays apart until you drag it into your hand.
+  const drawnApart = drawnId !== null && !(manual?.key === roundKey && manual.ids.includes(drawnId));
   const hand: Tile[] = useMemo(() => {
     if (!serverHand) return [];
-    const rest = serverHand.filter((t) => t.id !== drawnId);
+    const rest = serverHand.filter((t) => !(drawnApart && t.id === drawnId));
     if (!manual || manual.key !== roundKey) return sortHand(rest);
     const byId = new Map(rest.map((t) => [t.id, t]));
     const ordered = manual.ids.map((id) => byId.get(id)).filter((t): t is Tile => !!t);
     const extra = rest.filter((t) => !manual.ids.includes(t.id)); // new tiles go on the right
     return [...ordered, ...extra];
-  }, [serverHand, manual, roundKey, drawnId]);
-  const drawnTile = drawnId !== null ? serverHand?.find((t) => t.id === drawnId) ?? null : null;
+  }, [serverHand, manual, roundKey, drawnId, drawnApart]);
+  const drawnTile = drawnApart ? serverHand?.find((t) => t.id === drawnId) ?? null : null;
 
   // Claim options on the offered tile (anything except your own turn moves).
-  const claimable = !!a && (a.win || a.pong || a.gong || a.chow.length > 0) && !!round?.offered && round.offered.by !== mySeat;
+  const claimOptions = !!a && (a.win || a.pong || a.gong || a.chow.length > 0) && !!round?.offered && round.offered.by !== mySeat;
+  // Buttons, flashing and the big claim tile stop once the next player has drawn.
+  const claimable = claimOptions && !round?.offeredDrawn;
   const ownGongs = a ? a.concealedGongs.length + a.addedGongs.length : 0;
 
   const onDrop = (src: DragSource, drop: Drop): void => {
     if (src.kind === 'hand') {
       if (drop.zone === 'discard' && a?.discard) {
         command({ type: 'discard', tileId: src.tileId });
-      } else if (drop.zone === 'hand' && src.tileId !== drawnId) {
+      } else if (drop.zone === 'hand') {
         // Reorder (on this device only): put the tile where it was dropped.
         const els = [...document.querySelectorAll<HTMLElement>('[data-hand-tile]')].filter(
           (el) => el.dataset.drawn !== 'true',
@@ -123,6 +127,8 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
       command({ type: 'draw' });
     } else if (src.kind === 'wallBack' && drop.zone === 'hand' && a?.drawReplacement) {
       command({ type: 'drawReplacement' });
+    } else if (src.kind === 'offered' && drop.zone === 'hand') {
+      onTapOffered();
     } else if (src.kind === 'dice' && (drop.zone === 'discard' || drop.zone === 'centre')) {
       command({ type: 'rollDice' });
     }
@@ -131,6 +137,7 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
   const onTap = (src: DragSource): void => {
     if (src.kind === 'wallFront' && a?.draw) command({ type: 'draw' });
     else if (src.kind === 'wallBack' && a?.drawReplacement) command({ type: 'drawReplacement' });
+    else if (src.kind === 'offered') onTapOffered();
   };
   const { drag, start } = useDrag(onDrop, onTap);
 
@@ -163,7 +170,7 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
   };
   /** Tapping the offered discard claims it (or shows the choices). */
   const onTapOffered = (): void => {
-    if (!a || !claimable) return;
+    if (!a || !claimOptions) return;
     const opts: string[] = [];
     if (a.win) opts.push('win');
     if (a.gong) opts.push('gong');
@@ -207,6 +214,14 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
       )}
     </div>
   );
+
+  // Discards slide in from the player who threw them (only tiles that are new on this screen).
+  const seenDiscards = useRef<{ key: string; ids: Set<number> }>({ key: '', ids: new Set() });
+  useEffect(() => {
+    const ids = new Set((round?.discards ?? []).map((d) => d.tile.id));
+    if (seenDiscards.current.key !== roundKey) seenDiscards.current = { key: roundKey, ids };
+    else ids.forEach((id) => seenDiscards.current.ids.add(id));
+  });
 
   // Discard size: as big as possible while every player's discards still fit in their area.
   const pondRef = useRef<HTMLDivElement | null>(null);
@@ -253,12 +268,17 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
   const renderDiscards = (side: Side): ReactElement => {
     const seat = seatAt(side);
     const tiles = round?.discards.filter((d) => d.by === seat) ?? [];
+    const isNew = (id: number): boolean => seenDiscards.current.key === roundKey && !seenDiscards.current.ids.has(id);
     return (
       <div className={`discards discards-${side}`}>
         {tiles.map((d) => {
           const offered = round?.offered?.tile.id === d.tile.id;
           return (
-            <span key={d.tile.id} onClick={offered ? onTapOffered : undefined} className={offered && claimable ? 'claimable' : ''}>
+            <span
+              key={d.tile.id}
+              onClick={offered ? onTapOffered : undefined}
+              className={`${offered && claimable ? 'claimable' : ''}${isNew(d.tile.id) ? ` slide-in slide-from-${side}` : ''}`}
+            >
               <TileView
                 type={d.tile.type}
                 width="var(--discard-w)"
@@ -319,6 +339,10 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
     );
   };
 
+  // ---------- deal animation (about 5 seconds at the start of each hand) ----------
+  const perWall = view.settings.flowersOn ? 18 : 17;
+  const dealAnim = useDealAnimation(round, roundKey, perWall, sideOf);
+
   const bottom = view.seats[bottomSeat]!;
   const winLabel = labels.win;
 
@@ -334,7 +358,7 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
   const showButtons = !!a && round?.phase !== 'ended';
   const dealerSeat = round ? view.seats.findIndex((s) => s.isDealer) : view.match.dealer;
   const iAmDealer = mySeat !== null && mySeat === view.match.dealer;
-  const lastWin = round?.result?.type === 'win';
+  const lastWin = round?.result?.type === 'win' && round.result.isChicken;
   const canUndo = !!a?.undo || (!!lastWin && mySeat !== null);
 
   return (
@@ -389,6 +413,13 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
             {renderDiscards('top')}
             {renderDiscards('left')}
             <div className="hub">
+              {round && claimable && round.offered && (
+                // The tile you can claim: tap it, or drag it into your hand.
+                <span className="claim-pile" onPointerDown={start({ kind: 'offered' })}>
+                  <TileView type={round.offered.tile.type} width="var(--draw-w)" />
+                  <span className="draw-label">{tr('take')}</span>
+                </span>
+              )}
               {round ? (
                 a?.draw || a?.drawReplacement ? (
                   // Big glowing tile to tap or drag into your hand, next to the wall picture.
@@ -403,7 +434,7 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
                   </span>
                   </span>
                 ) : (
-                  <WallBox round={round} sideOf={sideOf} perWall={view.settings.flowersOn ? 18 : 17} label={tr('tilesLeft')} />
+                  <WallBox round={round} sideOf={sideOf} perWall={perWall} label={tr('tilesLeft')} override={dealAnim?.wall} />
                 )
               ) : view.phase === 'rolling' ? (
                 iAmDealer ? <div className="hub-sub">{tr('swipeDiceHere')}</div> : <div className="hub-sub">{tr('waitingRoll', { name: personName(view.seats[view.match.dealer]?.name, lang) })}</div>
@@ -416,7 +447,16 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
         {renderOpponent('right')}
       </main>
 
-      <footer className="me" style={rowSizes}>
+      {dealAnim?.flight && (
+        <div
+          key={dealAnim.flight.key}
+          className="deal-flight"
+          style={{ left: dealAnim.flight.from.x, top: dealAnim.flight.from.y, '--dx': `${dealAnim.flight.dx}px`, '--dy': `${dealAnim.flight.dy}px`, animationDuration: `${dealAnim.flight.ms}ms` } as CSSProperties}
+        >
+          {Array.from({ length: dealAnim.flight.n }, (_, i) => <TileView key={i} back width="var(--opp-w)" />)}
+        </div>
+      )}
+      <footer className={`me${dealAnim ? ' dealing' : ''}`} style={rowSizes}>
         <div className="me-row">
           {/* Your public tiles (shown sets and flowers) sit to the left of your hand. */}
           {renderMelds(bottom.melds, bottom.flowers, 'var(--mine-w)')}
@@ -448,10 +488,10 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
           </div>
         </div>
         <div className={`actions${claimable ? ' actions-claim' : ''}`}>
-          {showButtons && a.chow.length > 0 && <button className="act act-chow" onClick={onChow}>{labels.chow}</button>}
-          {showButtons && a.pong && <button className="act act-pong" onClick={onPong}>{labels.pong}</button>}
-          {showButtons && (a.gong || ownGongs > 0) && <button className="act act-gong" onClick={onGong}>{labels.gong}</button>}
-          {a && (a.win || a.selfDrawWin) && <button className="act act-win" onClick={onWin}>{winLabel}</button>}
+          {showButtons && claimable && a.chow.length > 0 && <button className="act act-chow" onClick={onChow}>{labels.chow}</button>}
+          {showButtons && claimable && a.pong && <button className="act act-pong" onClick={onPong}>{labels.pong}</button>}
+          {showButtons && ((claimable && a.gong) || ownGongs > 0) && <button className="act act-gong" onClick={onGong}>{labels.gong}</button>}
+          {a && (a.selfDrawWin || (a.win && (claimable || round?.phase === 'ended'))) && <button className="act act-win" onClick={onWin}>{winLabel}</button>}
         </div>
         <div className="me-bottom">
           {mySeat === null && nameTag(bottom)}
@@ -755,16 +795,21 @@ function WallBox({
   sideOf,
   perWall,
   label,
+  override,
 }: {
   round: NonNullable<RoomView['round']>;
   sideOf: (seat: number) => Side;
   perWall: number;
   label: string;
+  /** During the deal animation: the wall as it was part-way through dealing. */
+  override?: { stacks: WallStack[]; count: number };
 }): ReactElement {
+  const stacks = override?.stacks ?? round.wall;
+  const count = override?.count ?? round.wallCount;
   const S = 100;
   const T = 7; // thickness of the wall line
   const seg = (S - 2 * T) / perWall;
-  const rects = round.wall.map((st) => {
+  const rects = stacks.filter((st) => st.count > 0).map((st) => {
     const side = sideOf(st.seat);
     // Position 0 is the right-hand end of that player's wall (as they see it).
     let x = 0, y = 0, w = seg, h = T;
@@ -777,15 +822,123 @@ function WallBox({
   return (
     <span className="wall-box">
       <svg viewBox={`0 0 ${S} ${S}`} preserveAspectRatio="none" aria-hidden>
-        <rect x={T / 2} y={T / 2} width={S - T} height={S - T} fill="none" stroke="rgba(255,255,255,0.12)" strokeWidth={1} />
         {rects.map((r) => (
           <rect key={r.key} x={r.x} y={r.y} width={r.w + 0.4} height={r.h + 0.4} fill={r.full ? 'var(--tile-back)' : 'var(--tile-back-light)'} />
         ))}
       </svg>
       <span className="wall-box-text">
-        <span className="hub-count">{round.wallCount}</span>
+        <span className="hub-count">{count}</span>
         <span className="hub-sub">{label}</span>
       </span>
     </span>
   );
+}
+
+type WallStack = { seat: number; position: number; count: number };
+
+interface DealAnim {
+  wall: { stacks: WallStack[]; count: number };
+  flight: { key: string; n: number; from: { x: number; y: number }; dx: number; dy: number; ms: number } | null;
+}
+
+const DEAL_MS = 5000;
+
+/**
+ * At the start of each hand, replay the deal in about 5 seconds: tiles slide from
+ * the wall to each player (4 at a time, then 1 each, then the dealer's extra
+ * tile, then flower replacements), and the wall picture empties in the real order.
+ * Purely visual: the real tiles were dealt by the server.
+ */
+function useDealAnimation(
+  round: RoomView['round'],
+  roundKey: string,
+  perWall: number,
+  sideOf: (seat: number) => Side,
+): DealAnim | null {
+  const done = useRef<string>('');
+  const [plan, setPlan] = useState<null | {
+    key: string;
+    start: number;
+    steps: { seat: number; n: number; from: 'front' | 'back' }[];
+    order: { seat: number; position: number }[];
+    total: number;
+    from: { x: number; y: number };
+    to: Record<Side, { x: number; y: number }>;
+  }>(null);
+  const [, setTick] = useState(0);
+
+  useEffect(() => {
+    if (!round || round.discards.length > 0 || done.current === roundKey || round.wall.length === 0) return;
+    done.current = roundKey;
+    // Rebuild the wall's full draw order from the stacks that are left.
+    const N = 4 * perWall;
+    const next = (st: { seat: number; position: number }) =>
+      st.position < perWall - 1 ? { seat: st.seat, position: st.position + 1 } : { seat: (st.seat + 3) % 4, position: 0 };
+    const F: { seat: number; position: number }[] = [];
+    let cur = { seat: round.wall[0]!.seat, position: round.wall[0]!.position };
+    for (let i = 0; i < N; i++) {
+      F.push(cur);
+      cur = next(cur);
+    }
+    const frontFull = 26; // 53 tiles dealt from the front = 26 whole stacks + 1 tile
+    const order = [...F.slice(N - frontFull), ...F.slice(0, N - frontFull)];
+    const dealer = round.turn; // the dealer is to move at the start of a hand
+    const seats = [0, 1, 2, 3].map((i) => (dealer + i) % 4);
+    const steps: { seat: number; n: number; from: 'front' | 'back' }[] = [];
+    for (let r = 0; r < 3; r++) for (const s of seats) steps.push({ seat: s, n: 4, from: 'front' });
+    for (const s of seats) steps.push({ seat: s, n: 1, from: 'front' });
+    steps.push({ seat: dealer, n: 1, from: 'front' });
+    // Flower replacements came from the back of the wall.
+    const total = round.wallCount + 53 + round.flowersDealt.reduce((a, b) => a + b, 0);
+    for (const s of seats) for (let i = 0; i < round.flowersDealt[s]!; i++) steps.push({ seat: s, n: 1, from: 'back' });
+    // Where tiles fly from (the wall picture) and to (each player).
+    const centre = (el: Element | null): { x: number; y: number } => {
+      const r = el?.getBoundingClientRect();
+      return r ? { x: r.left + r.width / 2, y: r.top + r.height / 2 } : { x: innerWidth / 2, y: innerHeight / 2 };
+    };
+    const to = {
+      bottom: centre(document.querySelector('.me-row')),
+      top: centre(document.querySelector('.opp-top .nametag')),
+      left: centre(document.querySelector('.opp-left .nametag')),
+      right: centre(document.querySelector('.opp-right .nametag')),
+    };
+    setPlan({ key: roundKey, start: performance.now(), steps, order, total, from: centre(document.querySelector('.hub')), to });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [roundKey, !!round]);
+
+  useEffect(() => {
+    if (!plan) return;
+    let raf = 0;
+    const loop = (): void => {
+      if (performance.now() - plan.start >= DEAL_MS) {
+        setPlan(null);
+        return;
+      }
+      setTick((t) => t + 1);
+      raf = requestAnimationFrame(loop);
+    };
+    raf = requestAnimationFrame(loop);
+    return () => cancelAnimationFrame(raf);
+  }, [plan]);
+
+  if (!plan || plan.key !== roundKey) return null;
+  const elapsed = performance.now() - plan.start;
+  const stepMs = DEAL_MS / plan.steps.length;
+  const index = Math.min(plan.steps.length - 1, Math.floor(elapsed / stepMs));
+  let f = 0;
+  let b = 0;
+  for (let i = 0; i <= index; i++) {
+    const st = plan.steps[i]!;
+    if (st.from === 'front') f += st.n;
+    else b += st.n;
+  }
+  const N = plan.order.length;
+  const clamp = (x: number): number => Math.max(0, Math.min(2, x));
+  const stacks = plan.order.map((st, i) => ({ ...st, count: Math.max(0, 2 - clamp(f - 2 * i) - clamp(b - 2 * (N - 1 - i))) }));
+  const step = plan.steps[index]!;
+  const target = plan.to[sideOf(step.seat)];
+  return {
+    wall: { stacks, count: plan.total - f - b },
+    flight: { key: `${plan.key}-${index}`, n: step.n, from: plan.from, dx: target.x - plan.from.x, dy: target.y - plan.from.y, ms: Math.max(120, stepMs * 0.9) },
+  };
 }

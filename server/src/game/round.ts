@@ -410,6 +410,8 @@ export function claimProblem(state: RoundState, seat: number, claim: Claim, now:
 
   // Timing.
   const s = w.status;
+  // The player who drew has chosen to draw: they can no longer claim that tile.
+  if (s.type === 'drawn' && w.source === 'discard' && seat === next(w.by)) return 'You have already drawn.';
   if (s.type === 'drawn' && now - s.at > GRACE_MS) return 'Too late to claim that tile.';
   if (s.type === 'claimed') {
     if (s.seat === seat) return 'You already claimed that tile.';
