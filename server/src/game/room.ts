@@ -40,9 +40,10 @@ import {
 import { cpuMove } from './cpu.js';
 
 export type CpuDifficulty = 'easy' | 'medium' | 'hard';
-export type CpuSpeed = 'fast' | 'normal' | 'slow';
-/** How long CPUs wait before each move, set on the host page. */
-export const CPU_DELAYS: Record<CpuSpeed, number> = { fast: 500, normal: 1000, slow: 2000 };
+/** How long CPUs wait before each move (seconds), set on the host page. Same for every level. */
+export const DEFAULT_CPU_SECONDS = 1;
+export const MIN_CPU_SECONDS = 0.2;
+export const MAX_CPU_SECONDS = 30;
 export type TableColour = 'green' | 'black' | 'white' | 'red' | 'blue';
 export const TABLE_COLOURS: readonly TableColour[] = ['green', 'black', 'white', 'red', 'blue'];
 
@@ -118,8 +119,8 @@ export interface Room {
   ended: boolean;
   /** Finished hands, oldest first (may be missing in old save files). */
   history?: HandRecord[];
-  /** How fast CPUs move (missing in old save files = normal). */
-  cpuSpeed?: CpuSpeed;
+  /** Seconds each CPU waits before a move (missing in old save files = default). */
+  cpuSeconds?: number;
 }
 
 export type Command =
@@ -159,7 +160,8 @@ export type HostCommand =
   | { type: 'hostSetBalance'; name: string; balance: number }
   /** Go back to just before hand `toHand` was played: chips, wind and dealer as they were then. */
   | { type: 'hostRollBack'; toHand: number }
-  | { type: 'hostSetCpuSpeed'; speed: CpuSpeed }
+  /** Seconds every CPU waits before each move (the same for all levels). */
+  | { type: 'hostSetCpuSeconds'; seconds: number }
   /** Jump to a wind (0 East ... 3 North) and game number (1-4). Chips are not changed. */
   | { type: 'hostSetPosition'; roundWind: number; gameNumber: number }
   | { type: 'hostUpdateSettings'; settings: Partial<GameSettings>; startingBalance?: number }
@@ -168,7 +170,7 @@ export type HostCommand =
 
 /** How long CPUs wait after the last change before they move (milliseconds). */
 export function cpuDelay(room: Room): number {
-  return CPU_DELAYS[room.cpuSpeed ?? 'normal'] ?? CPU_DELAYS.normal;
+  return Math.round((room.cpuSeconds ?? DEFAULT_CPU_SECONDS) * 1000);
 }
 export const MAX_NAME_LENGTH = 20;
 
@@ -239,7 +241,7 @@ export function createRoom(opts: {
     lastChangeAt: opts.now,
     ended: false,
     history: [],
-    cpuSpeed: 'normal',
+    cpuSeconds: DEFAULT_CPU_SECONDS,
   };
   return room;
 }
@@ -592,10 +594,14 @@ export function handleHostCommand(prev: Room, cmd: HostCommand, now: number): Ro
       person!.balance = cmd.balance;
       break;
     }
-    case 'hostSetCpuSpeed':
-      if (!(cmd.speed in CPU_DELAYS)) fail('Unknown CPU speed.');
-      room.cpuSpeed = cmd.speed;
+    case 'hostSetCpuSeconds': {
+      const sec = Number(cmd.seconds);
+      if (!Number.isFinite(sec) || sec < MIN_CPU_SECONDS || sec > MAX_CPU_SECONDS) {
+        fail(`CPU time must be between ${MIN_CPU_SECONDS} and ${MAX_CPU_SECONDS} seconds.`);
+      }
+      room.cpuSeconds = Math.round(sec * 10) / 10;
       break;
+    }
     case 'hostRollBack': {
       const history = room.history ?? [];
       const target = history[cmd.toHand];

@@ -422,16 +422,27 @@ describe('CPU players', () => {
     expect(r.match.handsPlayed).toBeGreaterThanOrEqual(16);
   });
 
-  it('the host page sets how fast CPUs move', () => {
+  it('the host page sets how many seconds CPUs take per move', () => {
     let r = emptyRoom();
     for (let seat = 0; seat < 4; seat++) r = host(r, { type: 'hostSetSeat', seat, cpu: 'easy' });
-    expect(hostViewOf(r).cpuSpeed).toBe('normal');
-    expect(cpuTick(r, r.lastChangeAt + 600, rng)).toBe(r); // normal: waits 1 s
-    r = host(r, { type: 'hostSetCpuSpeed', speed: 'fast' });
-    expect(cpuTick(r, r.lastChangeAt + 600, rng)).not.toBe(r); // fast: moves after ½ s
-    r = host(r, { type: 'hostSetCpuSpeed', speed: 'slow' });
-    expect(cpuTick(r, r.lastChangeAt + 1500, rng)).toBe(r); // slow: waits 2 s
-    expect(() => host(r, { type: 'hostSetCpuSpeed', speed: 'warp' as never })).toThrow();
+    expect(hostViewOf(r).cpuSeconds).toBe(1);
+    expect(cpuTick(r, r.lastChangeAt + 900, rng)).toBe(r); // default 1 s: still waiting
+    r = host(r, { type: 'hostSetCpuSeconds', seconds: 2.5 });
+    expect(hostViewOf(r).cpuSeconds).toBe(2.5);
+    expect(cpuTick(r, r.lastChangeAt + 2400, rng)).toBe(r);
+    expect(cpuTick(r, r.lastChangeAt + 2500, rng)).not.toBe(r);
+    expect(() => host(r, { type: 'hostSetCpuSeconds', seconds: 0.1 })).toThrow(/between/);
+    expect(() => host(r, { type: 'hostSetCpuSeconds', seconds: 31 })).toThrow(/between/);
+  });
+
+  it('every CPU level takes the same time per move', () => {
+    for (const level of ['easy', 'medium', 'hard'] as const) {
+      let r = emptyRoom();
+      for (let seat = 0; seat < 4; seat++) r = host(r, { type: 'hostSetSeat', seat, cpu: level });
+      r = host(r, { type: 'hostSetCpuSeconds', seconds: 1.5 });
+      expect(cpuTick(r, r.lastChangeAt + 1499, rng)).toBe(r);
+      expect(cpuTick(r, r.lastChangeAt + 1500, rng)).not.toBe(r);
+    }
   });
 
   it('CPUs wait a moment before moving', () => {

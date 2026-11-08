@@ -9,7 +9,7 @@ import type { GameSettings } from '@lan-mahjong/shared';
 import { DEFAULT_SETTINGS } from '@lan-mahjong/shared';
 import type { HostMessage, ServerHostMessage } from '../../server/src/protocol';
 import type { HostGameView } from '../../server/src/game/view';
-import type { CpuDifficulty, CpuSpeed, TableColour } from '../../server/src/game/room';
+import type { CpuDifficulty, TableColour } from '../../server/src/game/room';
 import { WIND_NAMES } from './i18n';
 
 const COLOURS: TableColour[] = ['green', 'black', 'white', 'red', 'blue'];
@@ -112,6 +112,27 @@ export function HostApp(): ReactElement {
       ))}
       {error && <div className="toast">{error}</div>}
     </div>
+  );
+}
+
+/** Seconds every CPU waits before each move (all levels). Type a number and press Set. */
+function CpuSecondsField({ seconds, onSet }: { seconds: number; onSet: (s: number) => void }): ReactElement {
+  const [value, setValue] = useState(String(seconds));
+  useEffect(() => setValue(String(seconds)), [seconds]);
+  const n = Number(value);
+  const valid = value.trim() !== '' && Number.isFinite(n) && n >= 0.2 && n <= 30;
+  return (
+    <form
+      className="cpu-seconds"
+      onSubmit={(e) => {
+        e.preventDefault();
+        if (valid && n !== seconds) onSet(n);
+      }}
+    >
+      <input type="number" min={0.2} max={30} step={0.1} value={value} onChange={(e) => setValue(e.target.value)} aria-label="CPU seconds per move" />
+      <span className="muted small">seconds per move (0.2–30, same for every level)</span>
+      <button className="btn primary" type="submit" disabled={!valid || n === seconds}>Set</button>
+    </form>
   );
 }
 
@@ -307,12 +328,8 @@ function GameCard({ game, send }: { game: HostGameView; send: (m: HostMessage) =
         </select>
         <label>Starting balance</label>
         <input disabled={!between} type="number" min={0} value={startBal} onChange={(e) => setStartBal(Number(e.target.value))} />
-        <label>CPU speed</label>
-        <select value={game.cpuSpeed} onChange={(e) => cmd({ type: 'hostSetCpuSpeed', speed: e.target.value as CpuSpeed })}>
-          <option value="fast">Fast (½ second per move)</option>
-          <option value="normal">Normal (1 second per move)</option>
-          <option value="slow">Slow (2 seconds per move)</option>
-        </select>
+        <label>CPU time per move</label>
+        <CpuSecondsField seconds={game.cpuSeconds} onSet={(seconds) => cmd({ type: 'hostSetCpuSeconds', seconds })} />
         <label>Table colour</label>
         <select value={game.tableColour} onChange={(e) => cmd({ type: 'hostSetTableColour', colour: e.target.value as TableColour })}>
           {COLOURS.map((c) => <option key={c} value={c}>{c[0]!.toUpperCase() + c.slice(1)}</option>)}

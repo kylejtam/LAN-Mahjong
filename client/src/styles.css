@@ -405,3 +405,6 @@ input { font: inherit; }
 .cpu-level h3 { margin: 0 0 0.3rem; }
 .cpu-level ul { margin: 0; padding-left: 1.1rem; }
 .cpu-level li { margin: 0.2rem 0; }
+
+.cpu-seconds { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
+.cpu-seconds input { width: 5.5rem; background: var(--input-bg); color: var(--fg); border: 1px solid var(--panel-border); border-radius: 6px; padding: 0.35em 0.5em; text-align: right; }
