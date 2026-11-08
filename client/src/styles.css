@@ -14,6 +14,8 @@
   --tile-back-edge: #1f5a40;
   --felt: #1f5e3b;
   --felt-line: rgba(255, 255, 255, 0.08);
+  --btn: #2a2f3a;
+  --input-bg: #11141a;
 
   /* Tile sizes scale with the screen so everything fits sideways on a phone. */
   --hand-w: min(5.9vw, 11vh);
@@ -46,7 +48,7 @@ input { font: inherit; }
 
 /* ---------- buttons ---------- */
 .btn {
-  background: #2a2f3a;
+  background: var(--btn);
   border: 1px solid var(--panel-border);
   border-radius: 8px;
   padding: 0.45em 0.9em;
@@ -259,7 +261,7 @@ input { font: inherit; }
 .panel td, .panel th { padding: 0.2em 0.6em; text-align: left; }
 .panel th { color: var(--muted); font-weight: 600; font-size: 0.9em; }
 .help-cols { display: flex; gap: 1.5em; flex-wrap: wrap; justify-content: center; text-align: left; font-size: 0.9em; }
-.chooser .choice { display: flex; gap: 2px; align-items: center; margin: 0.4em auto; background: #2a2f3a; border: 1px solid var(--panel-border); border-radius: 8px; padding: 0.3em; cursor: pointer; }
+.chooser .choice { display: flex; gap: 2px; align-items: center; margin: 0.4em auto; background: var(--btn); border: 1px solid var(--panel-border); border-radius: 8px; padding: 0.3em; cursor: pointer; }
 .chooser .act { margin: 0 0.3em; }
 
 .seat-picker { min-width: min(30em, 90vw); }
@@ -267,7 +269,7 @@ input { font: inherit; }
   display: grid; grid-template-areas: '. s2 .' 's3 mid s1' '. s0 .';
   grid-template-columns: 1fr 1fr 1fr; gap: 0.4em; margin: 0.5em 0;
 }
-.seat { display: flex; flex-direction: column; align-items: center; gap: 0.1em; padding: 0.5em; border-radius: 10px; background: #2a2f3a; border: 2px solid var(--panel-border); cursor: pointer; }
+.seat { display: flex; flex-direction: column; align-items: center; gap: 0.1em; padding: 0.5em; border-radius: 10px; background: var(--btn); border: 2px solid var(--panel-border); cursor: pointer; }
 .seat:disabled { cursor: default; }
 .seat-0 { grid-area: s0; } .seat-1 { grid-area: s1; } .seat-2 { grid-area: s2; } .seat-3 { grid-area: s3; }
 .seat-mine { border-color: var(--accent); }
@@ -309,11 +311,11 @@ input { font: inherit; }
 .card { background: var(--panel); border: 1px solid var(--panel-border); border-radius: 12px; padding: 1rem; margin: 1rem 0; }
 .form-grid { display: grid; grid-template-columns: auto 1fr; gap: 0.5rem 1rem; align-items: center; max-width: 34rem; }
 .form-grid input, .form-grid select {
-  background: #11141a; color: var(--fg); border: 1px solid var(--panel-border); border-radius: 6px; padding: 0.4em 0.6em;
+  background: var(--input-bg); color: var(--fg); border: 1px solid var(--panel-border); border-radius: 6px; padding: 0.4em 0.6em;
   -webkit-user-select: text; user-select: text;
 }
 .host-seats { display: grid; grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr)); gap: 0.6rem; margin: 0.7rem 0; }
-.host-seat { background: #11141a; border-radius: 8px; padding: 0.6rem; display: flex; flex-direction: column; gap: 0.35rem; }
+.host-seat { background: var(--input-bg); border-radius: 8px; padding: 0.6rem; display: flex; flex-direction: column; gap: 0.35rem; }
 .host-seat .btn { font-size: 0.85em; padding: 0.3em 0.6em; }
 
 /* Side players: let the name tag wrap so long names fit. */
@@ -339,3 +341,35 @@ input { font: inherit; }
 .all-hands-turn { background: rgba(255, 212, 71, 0.12); }
 .all-hands-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
 .all-hands-tiles { display: flex; flex-wrap: wrap; gap: 1px 0.5em; align-items: center; }
+
+/* ---------- light theme (each player chooses Light / Dark / System) ---------- */
+:root[data-theme='light'] {
+  --bg: #f3f4f6;
+  --fg: #1d2129;
+  --muted: #5f6773;
+  --panel: #ffffff;
+  --panel-border: #d6dae1;
+  --btn: #e9ecf1;
+  --input-bg: #f7f8fa;
+  color-scheme: light;
+}
+:root[data-theme='light'] .overlay { background: rgba(20, 24, 30, 0.35); }
+:root[data-theme='light'] .toast { background: #fdecec; }
+/* Name tags sit on the felt, so they stay light-on-dark in both themes. */
+.nametag { color: #fff; }
+.felt-white .nametag { background: rgba(0, 0, 0, 0.55); }
+
+/* A row of buttons where one is selected (language, theme slider). */
+.segmented { display: inline-flex; border: 1px solid var(--panel-border); border-radius: 999px; overflow: hidden; background: var(--btn); }
+.segmented button { border: none; background: transparent; padding: 0.4em 1em; cursor: pointer; }
+.segmented button.on { background: var(--accent); color: #fff; font-weight: 600; }
+
+.settings { min-width: min(30em, 92vw); }
+.settings-grid { display: grid; grid-template-columns: auto 1fr; gap: 0.7em 1em; align-items: center; text-align: left; margin: 0.6em 0; }
+.name-row { display: flex; gap: 0.5em; }
+.name-row input {
+  flex: 1; min-width: 0; background: var(--input-bg); color: var(--fg); border: 1px solid var(--panel-border);
+  border-radius: 8px; padding: 0.4em 0.6em; -webkit-user-select: text; user-select: text;
+}
+.lobby-head { display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap; margin-bottom: 1rem; }
+.lobby-head h1 { margin: 0; }

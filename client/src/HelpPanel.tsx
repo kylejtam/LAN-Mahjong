@@ -1,32 +1,34 @@
 /** The Help button: the fan table and the fan → chips table. */
 import type { ReactElement } from 'react';
 import { CHIPS_TABLE, FAN_TABLE, MAX_FAN } from '@lan-mahjong/shared';
+import { t } from './i18n';
 import type { Lang } from './i18n';
 
 export function HelpPanel({ lang, onClose }: { lang: Lang; onClose: () => void }): ReactElement {
+  const tr = (k: Parameters<typeof t>[1], v?: Record<string, string | number>): string => t(lang, k, v);
   return (
     <div className="overlay" onClick={onClose}>
       <div className="panel help" onClick={(e) => e.stopPropagation()}>
         <div className="help-cols">
           <div>
-            <h3>Fan table</h3>
+            <h3>{tr('fanTable')}</h3>
             <table>
               <tbody>
                 {FAN_TABLE.map((r) => (
                   <tr key={r.id}>
-                    <td className="num">{r.fan === MAX_FAN ? 'Max' : r.fan}{r.each ? ' each' : ''}</td>
-                    <td>{lang === 'en' ? r.en : r.zh}</td>
-                    <td className="zh">{r.zh}</td>
+                    <td className="num">{r.fan === MAX_FAN ? tr('max') : r.fan}{r.each ? tr('each') : ''}</td>
+                    <td className={lang === 'zh' ? 'zh' : ''}>{lang === 'en' ? r.en : r.zh}</td>
+                    {lang === 'en' && <td className="zh">{r.zh}</td>}
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
           <div>
-            <h3>Fan → chips</h3>
+            <h3>{tr('fanToChips')}</h3>
             <table>
               <thead>
-                <tr><th>Fan</th><th>Each pays</th><th>Discarder</th><th>Self-draw (each)</th></tr>
+                <tr><th>{tr('colFan')}</th><th>{tr('colEachPays')}</th><th>{tr('colDiscarder')}</th><th>{tr('colSelfDraw')}</th></tr>
               </thead>
               <tbody>
                 {CHIPS_TABLE.map((r) => (
@@ -39,10 +41,10 @@ export function HelpPanel({ lang, onClose }: { lang: Lang; onClose: () => void }
                 ))}
               </tbody>
             </table>
-            <p className="muted">Max = {MAX_FAN} fan. Below the minimum fan is a chicken win: the winner pays 32 to each other player.</p>
+            <p className="muted">{tr('helpNote', { n: MAX_FAN })}</p>
           </div>
         </div>
-        <button className="btn" onClick={onClose}>Close</button>
+        <button className="btn" onClick={onClose}>{tr('close')}</button>
       </div>
     </div>
   );

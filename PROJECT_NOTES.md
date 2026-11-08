@@ -25,7 +25,10 @@ disagrees with those, the newest dated entry here wins.
   screen, and the host page. Screenshots in `docs/screenshots/`.
 - Phase 4 (lobby, joining, spectators): **done**. Spectate button in the
   middle of the seat picker; "All hands" view for spectators.
-- Phase 5 (settings): next.
+- Phase 5 (player settings): **done**. Settings panel with name change,
+  language (English / Hong Kong Chinese) and theme slider (Light / Dark /
+  System). Host settings live on the host page (done in phase 3).
+- Phase 6 (win summary and manual payouts): next.
 
 ## Decisions
 
@@ -79,6 +82,8 @@ disagrees with those, the newest dated entry here wins.
 | 2026-11-08 | **8 bamboo:** outer sticks straight up; the middle four lean to make an M (top) over a W (bottom). | Kyle |
 | 2026-11-08 | **Flower and season tiles show pictures, not words.** Flowers (the "Four Gentlemen"): plum blossom, orchid, chrysanthemum, bamboo. Seasons have no standard picture, so: spring peach blossom, summer lotus, autumn maple leaf, winter snowflake. Each shows a big number 1–4 in the top-left corner (red for flowers, blue for seasons). Preview: `docs/screenshots/flower-tiles.png`. | Kyle (season pictures: Claude, Kyle may change) |
 | 2026-11-08 | **1 bamboo** is drawn as a flat peacock (crest, fanned tail with eye spots) instead of the earlier simple bird. | Kyle |
+| 2026-11-08 | **Chinese wording:** Traditional Chinese with Hong Kong (Cantonese) table wording, e.g. 食糊, 出銃, 自摸, 流局, 雞糊, 爆棚. Server messages are translated on the device. CPU names show as 電腦東/南/西/北. | Kyle |
+| 2026-11-08 | **Player settings panel** (⚙): change name (type + Save; chips, seat and settings move to the new name), language (English / 中文), theme slider (Light / Dark / System, default Dark), drop out, leave game. Language and theme are saved on the device AND under the player's name on the server, so they follow the name to another device. The language can also be chosen on the start screen. | Kyle |
 | 2026-11-08 | **First dealer** of a new game is seat 0 (East). | Claude (Kyle may change) |
 | 2026-11-08 | **Undo moves:** discard, 上, 碰, 槓, 胡. Draws are not separate moves. Undoing a discard puts the tile back in that player's hand and it is their turn again. | Kyle |
 | 2026-11-08 | **Several games at once:** one server can run many separate games, each with its own name. | Kyle |

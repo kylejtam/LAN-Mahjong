@@ -7,26 +7,29 @@ import type { ReactElement } from 'react';
 import type { ClientMessage } from '../../server/src/protocol';
 import type { RoomView } from '../../server/src/game/view';
 import { TileView } from './TileFace';
+import { Lang, personName, t } from './i18n';
 
 interface Props {
   view: RoomView;
+  lang: Lang;
   command: (c: Extract<ClientMessage, { type: 'command' }>['command']) => void;
   canClaimWin: boolean;
   onWin: () => void;
   winLabel: string;
 }
 
-export function ResultPanel({ view, command, canClaimWin, onWin, winLabel }: Props): ReactElement {
+export function ResultPanel({ view, lang, command, canClaimWin, onWin, winLabel }: Props): ReactElement {
+  const tr = (k: Parameters<typeof t>[1], v?: Record<string, string | number>): string => t(lang, k, v);
   if (view.phase === 'finished') {
     const ranked = [...view.seats].sort((a, b) => (b.balance ?? 0) - (a.balance ?? 0));
     return (
       <div className="overlay">
         <div className="panel">
-          <h3>Game finished</h3>
+          <h3>{tr('gameFinished')}</h3>
           <table>
             <tbody>
               {ranked.map((s) => (
-                <tr key={s.seat}><td>{s.name}</td><td className="num">{s.balance}</td></tr>
+                <tr key={s.seat}><td>{personName(s.name, lang)}</td><td className="num">{s.balance}</td></tr>
               ))}
             </tbody>
           </table>
@@ -42,17 +45,23 @@ export function ResultPanel({ view, command, canClaimWin, onWin, winLabel }: Pro
     <div className="overlay">
       <div className="panel result">
         {result.type === 'draw' ? (
-          <h3>Draw – the wall is empty</h3>
+          <h3>{tr('drawWallEmpty')}</h3>
         ) : (
           <>
             <h3>
-              {view.seats[result.winner]?.name} wins {result.discarder === null ? 'by self-draw' : `on ${view.seats[result.discarder]?.name}'s discard`}
-              {result.isChicken ? ' (chicken win)' : ''}
+              {result.discarder === null
+                ? tr('winsSelfDraw', { name: personName(view.seats[result.winner]?.name, lang) })
+                : tr('winsOnDiscard', { name: personName(view.seats[result.winner]?.name, lang), from: personName(view.seats[result.discarder]?.name, lang) })}
+              {result.isChicken ? tr('chickenWin') : ''}
             </h3>
-            <p className="fan-total">{result.fan} fan{result.capHand ? ' (max)' : ''}</p>
+            <p className="fan-total">{tr('fan', { n: result.fan })}{result.capHand ? tr('maxFan') : ''}</p>
             <ul className="fan-items">
               {result.items.map((i) => (
-                <li key={i.id}><span>{i.en}</span><span className="zh">{i.zh}</span><span className="num">{i.fan}</span></li>
+                <li key={i.id}>
+                  <span className={lang === 'zh' ? 'zh' : ''}>{lang === 'zh' ? i.zh : i.en}</span>
+                  {lang === 'en' && <span className="zh">{i.zh}</span>}
+                  <span className="num">{i.fan}</span>
+                </li>
               ))}
             </ul>
           </>
@@ -60,7 +69,7 @@ export function ResultPanel({ view, command, canClaimWin, onWin, winLabel }: Pro
         <div className="result-hands">
           {view.seats.map((s) => (
             <div key={s.seat} className="result-row">
-              <span className="result-name">{s.name}</span>
+              <span className="result-name">{personName(s.name, lang)}</span>
               <span className="result-tiles">
                 {(s.hand ?? []).map((t) => <TileView key={t.id} type={t.type} width="1.6rem" />)}
                 {s.melds.map((m, i) => (
@@ -79,16 +88,16 @@ export function ResultPanel({ view, command, canClaimWin, onWin, winLabel }: Pro
           {canClaimWin && <button className="act act-win" onClick={onWin}>{winLabel}</button>}
           {me && (
             <button className="btn primary big" disabled={me.confirmed} onClick={() => command({ type: 'confirmRound' })}>
-              {me.confirmed ? 'Waiting…' : 'Confirm'}
+              {me.confirmed ? tr('waiting') : tr('confirm')}
             </button>
           )}
           {me && result.type === 'win' && (
             <button className="btn" disabled={me.votedUndoWin} onClick={() => command({ type: 'undo' })}>
-              {me.votedUndoWin ? 'Asked to undo' : 'Undo win'}
+              {me.votedUndoWin ? tr('askedUndo') : tr('undoWin')}
             </button>
           )}
         </div>
-        {waitingFor.length > 0 && <p className="muted">Waiting for: {waitingFor.join(', ')}</p>}
+        {waitingFor.length > 0 && <p className="muted">{tr('waitingFor', { names: waitingFor.join(lang === 'zh' ? '、' : ', ') })}</p>}
       </div>
     </div>
   );

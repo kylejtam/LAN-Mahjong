@@ -94,6 +94,11 @@ export function useConnection(): Connection {
             break;
           case 'state':
             setView(msg.view);
+            // After a name change, rejoin later with the new name.
+            if (session.current && session.current.name !== msg.view.you.name) {
+              session.current = { gameId: msg.view.id, name: msg.view.you.name };
+              saveSession(session.current);
+            }
             break;
           case 'gameEnded':
             session.current = null;

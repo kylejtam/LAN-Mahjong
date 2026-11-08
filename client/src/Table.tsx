@@ -18,7 +18,8 @@ import type { ClientMessage } from '../../server/src/protocol';
 import type { RoomView, SeatView } from '../../server/src/game/view';
 import type { Claim } from '../../server/src/game/round';
 import { TileView } from './TileFace';
-import { ACTION_LABELS, WIND_CHARS, WIND_NAMES } from './i18n';
+import { ACTION_LABELS, Prefs, WIND_CHARS, WIND_NAMES, personName, t, useLang } from './i18n';
+import type { StringKey } from './i18n';
 import { DragSource, Drop, useDrag } from './drag';
 import { HelpPanel } from './HelpPanel';
 import { ResultPanel } from './ResultPanel';
@@ -30,6 +31,8 @@ interface Props {
   view: RoomView;
   send: (msg: ClientMessage) => void;
   onLeave: () => void;
+  prefs: Prefs;
+  setPrefs: (p: Prefs) => void;
 }
 
 type Chooser =
@@ -38,8 +41,9 @@ type Chooser =
   | { kind: 'claimTile'; options: string[] }
   | null;
 
-export function Table({ view, send, onLeave }: Props): ReactElement {
-  const lang = 'en' as const;
+export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactElement {
+  const lang = prefs.lang;
+  const tr = (key: StringKey, vars?: Record<string, string | number>): string => t(lang, key, vars);
   const labels = ACTION_LABELS[lang];
   const mySeat = view.you.seat;
   const [spectatorSeat, setSpectatorSeat] = useState(0);
@@ -132,17 +136,17 @@ export function Table({ view, send, onLeave }: Props): ReactElement {
   };
 
   // ---------- hints ----------
-  const turnName = round ? view.seats[round.turn]?.name ?? '' : '';
+  const turnName = round ? personName(view.seats[round.turn]?.name, lang) : '';
   const waitingOnEmptySeat = !!round && round.phase !== 'ended' && !turnName;
   let hint = '';
   if (view.phase === 'playing' && round && round.phase !== 'ended') {
-    if (a?.draw) hint = 'Your turn: drag the end tile of the wall into your hand.';
-    else if (a?.drawReplacement) hint = 'Drag the replacement tile from the back of the wall into your hand.';
-    else if (a?.discard) hint = 'Drag a tile to the middle of the table to discard it.';
-    else if (claimable) hint = 'You can claim the last discard. Tap a button or the tile.';
-    else if (waitingOnEmptySeat) hint = 'Waiting for the host to fill the empty seat.';
-    else if (mySeat === null) hint = `Watching. ${turnName}'s turn.`;
-    else hint = `${turnName}'s turn.`;
+    if (a?.draw) hint = tr('hintDraw');
+    else if (a?.drawReplacement) hint = tr('hintReplace');
+    else if (a?.discard) hint = tr('hintDiscard');
+    else if (claimable) hint = tr('hintClaim');
+    else if (waitingOnEmptySeat) hint = tr('hintWaitingSeat');
+    else if (mySeat === null) hint = tr('hintWatching', { name: turnName });
+    else hint = tr('hintTurn', { name: turnName });
   }
 
   // ---------- pieces ----------
@@ -212,14 +216,14 @@ export function Table({ view, send, onLeave }: Props): ReactElement {
   const nameTag = (sv: SeatView): ReactElement => (
     <div className={`nametag${round && round.turn === sv.seat && round.phase !== 'ended' ? ' nametag-turn' : ''}`}>
       <span className="wind-badge">{WIND_CHARS[sv.wind]}</span>
-      <span className="nametag-name">{sv.name ?? 'Empty'}</span>
-      {sv.cpu && <span className="cpu-badge">CPU</span>}
-      {sv.name && !sv.connected && !sv.cpu && <span className="offline">offline</span>}
+      <span className="nametag-name">{sv.name ? personName(sv.name, lang) : tr('empty')}</span>
+      {sv.cpu && !sv.name?.startsWith('CPU') && <span className="cpu-badge">{tr('cpu')}</span>}
+      {sv.name && !sv.connected && !sv.cpu && <span className="offline">{tr('offline')}</span>}
       {sv.balance !== null && <span className="chips">{sv.balance}</span>}
       {mySeat === null && sv.name && (
         <button
           className={`eye${sv.watched ? ' eye-on' : ''}`}
-          title={sv.watched ? 'Hide this hand' : 'Show this hand'}
+          title={sv.watched ? tr('hideHand') : tr('showHand')}
           onClick={() => command({ type: 'setWatchedSeat', seat: sv.seat, visible: !sv.watched })}
         >
           {sv.watched ? '👁' : '◌'}
@@ -257,23 +261,23 @@ export function Table({ view, send, onLeave }: Props): ReactElement {
         <div className="topbar-left">
           {mySeat !== null ? (
             <button className="btn undo" disabled={!canUndo} onClick={() => command({ type: 'undo' })}>
-              ↶ Undo{lastWin && view.seats.some((s) => s.votedUndoWin) ? ` (${view.seats.filter((s) => s.votedUndoWin).length} agreed)` : ''}
+              ↶ {tr('undo')}{lastWin && view.seats.some((s) => s.votedUndoWin) ? ` ${tr('undoAgreed', { n: view.seats.filter((s) => s.votedUndoWin).length })}` : ''}
             </button>
           ) : (
             <>
-              <span className="spectating-tag">Spectating</span>
+              <span className="spectating-tag">{tr('spectating')}</span>
               {round && (
-                <button className="btn" onClick={() => command({ type: 'setWatchAll', visible: true })}>All hands</button>
+                <button className="btn" onClick={() => command({ type: 'setWatchAll', visible: true })}>{tr('allHands')}</button>
               )}
               {view.phase === 'betweenRounds' && justWatching && (
-                <button className="btn" onClick={() => setJustWatching(false)}>Take a seat</button>
+                <button className="btn" onClick={() => setJustWatching(false)}>{tr('takeSeat')}</button>
               )}
             </>
           )}
         </div>
         <div className="topbar-centre">
           <span className="round-wind">{WIND_CHARS[view.match.roundWind]}</span>
-          <span className="round-label">{view.label.en}</span>
+          <span className="round-label">{view.label[lang]}</span>
           <span className="compass">
             {SIDES.map((side) => {
               const sv = view.seats[seatAt(side)]!;
@@ -289,13 +293,13 @@ export function Table({ view, send, onLeave }: Props): ReactElement {
           {me && (
             <span className="chip-total">
               {me.balance}
-              <button className="lock" title={locked ? 'Unlock (manual calculating)' : 'Lock'} onClick={() => setLocked(!locked)}>
+              <button className="lock" title={locked ? tr('lockOn') : tr('lockOff')} onClick={() => setLocked(!locked)}>
                 {locked ? '🔒' : '🔓'}
               </button>
             </span>
           )}
-          <button className="btn icon" title="Help" onClick={() => setPanel('help')}>?</button>
-          <button className="btn icon" title="Settings" onClick={() => setPanel('settings')}>⚙</button>
+          <button className="btn icon" title={tr('help')} onClick={() => setPanel('help')}>?</button>
+          <button className="btn icon" title={tr('settings')} onClick={() => setPanel('settings')}>⚙</button>
         </div>
       </header>
 
@@ -312,11 +316,11 @@ export function Table({ view, send, onLeave }: Props): ReactElement {
               {round ? (
                 <>
                   <div className="hub-count">{round.wallCount}</div>
-                  <div className="hub-sub">tiles left</div>
+                  <div className="hub-sub">{tr('tilesLeft')}</div>
                   <div className="dice">{round.dice.map((d, i) => <span key={i} className="die">{d}</span>)}</div>
                 </>
               ) : view.phase === 'rolling' ? (
-                iAmDealer ? <div className="hub-sub">Swipe the dice here</div> : <div className="hub-sub">Waiting for {view.seats[view.match.dealer]?.name} to roll</div>
+                iAmDealer ? <div className="hub-sub">{tr('swipeDiceHere')}</div> : <div className="hub-sub">{tr('waitingRoll', { name: personName(view.seats[view.match.dealer]?.name, lang) })}</div>
               ) : null}
             </div>
             {renderDiscards('right')}
@@ -361,13 +365,15 @@ export function Table({ view, send, onLeave }: Props): ReactElement {
           <span className="die">⚀</span>
           <span className="die">⚂</span>
           <span className="die">⚄</span>
-          <div className="dice-hint">Swipe the dice to the middle</div>
+          <div className="dice-hint">{tr('swipeDice')}</div>
         </div>
       )}
 
       {view.phase === 'betweenRounds' && !(mySeat === null && justWatching) && (
         <SeatPicker
           view={view}
+          tr={tr}
+          lang={lang}
           command={command}
           onSpectate={() => {
             if (mySeat !== null) command({ type: 'leaveSeat' });
@@ -376,16 +382,16 @@ export function Table({ view, send, onLeave }: Props): ReactElement {
         />
       )}
       {view.you.watchAll && mySeat === null && round && (
-        <AllHands view={view} onClose={() => command({ type: 'setWatchAll', visible: false })} />
+        <AllHands view={view} tr={tr} onClose={() => command({ type: 'setWatchAll', visible: false })} />
       )}
       {(round?.phase === 'ended' || view.phase === 'finished') && (
-        <ResultPanel view={view} command={command} canClaimWin={!!a?.win} onWin={onWin} winLabel={winLabel} />
+        <ResultPanel view={view} lang={lang} command={command} canClaimWin={!!a?.win} onWin={onWin} winLabel={winLabel} />
       )}
 
       {chooser && (
         <div className="overlay" onClick={() => setChooser(null)}>
           <div className="panel chooser" onClick={(e) => e.stopPropagation()}>
-            <h3>Choose</h3>
+            <h3>{tr('choose')}</h3>
             {chooser.kind === 'chow' &&
               chooser.options.map((ids) => {
                 const tiles = ids.map((id) => serverHand?.find((t) => t.id === id)).filter((t): t is Tile => !!t);
@@ -415,11 +421,11 @@ export function Table({ view, send, onLeave }: Props): ReactElement {
       {view.pendingSwap && view.pendingSwap.toName === view.you.name && (
         <div className="overlay">
           <div className="panel">
-            <h3>Swap in?</h3>
-            <p>{view.pendingSwap.fromName} would like you to take their seat.</p>
+            <h3>{tr('swapInTitle')}</h3>
+            <p>{tr('swapInText', { name: view.pendingSwap.fromName })}</p>
             <div className="row">
-              <button className="btn primary" onClick={() => command({ type: 'answerSwap', accept: true })}>Swap in</button>
-              <button className="btn" onClick={() => command({ type: 'answerSwap', accept: false })}>No thanks</button>
+              <button className="btn primary" onClick={() => command({ type: 'answerSwap', accept: true })}>{tr('swapIn')}</button>
+              <button className="btn" onClick={() => command({ type: 'answerSwap', accept: false })}>{tr('noThanks')}</button>
             </div>
           </div>
         </div>
@@ -427,38 +433,15 @@ export function Table({ view, send, onLeave }: Props): ReactElement {
 
       {panel === 'help' && <HelpPanel lang={lang} onClose={() => setPanel(null)} />}
       {panel === 'settings' && (
-        <div className="overlay" onClick={() => setPanel(null)}>
-          <div className="panel" onClick={(e) => e.stopPropagation()}>
-            <h3>Settings</h3>
-            <p className="muted">Playing as <b>{view.you.name}</b> in “{view.name}”. More settings arrive in phase 5.</p>
-            {mySeat !== null && (
-              <>
-                <h4>Drop out</h4>
-                <p className="muted">
-                  You become a spectator and keep your chips. During a round, your tiles wait at the seat until the host adds a CPU. To hand your seat to a spectator instead, use a Swap button below.
-                </p>
-                <div className="row">
-                  <button className="btn" onClick={() => { command({ type: 'dropOut', replacement: { none: true } }); setPanel(null); }}>
-                    Leave my seat
-                  </button>
-                </div>
-                {view.spectators.filter((s) => s.connected).length > 0 && (
-                  <div className="row">
-                    {view.spectators.filter((s) => s.connected).map((s) => (
-                      <button key={s.name} className="btn" onClick={() => { command({ type: 'dropOut', replacement: { spectator: s.name } }); setPanel(null); }}>
-                        Swap with {s.name}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </>
-            )}
-            <div className="row">
-              <button className="btn danger" onClick={onLeave}>Leave game</button>
-              <button className="btn" onClick={() => setPanel(null)}>Close</button>
-            </div>
-          </div>
-        </div>
+        <SettingsPanel
+          view={view}
+          tr={tr}
+          prefs={prefs}
+          setPrefs={setPrefs}
+          command={command}
+          onLeave={onLeave}
+          onClose={() => setPanel(null)}
+        />
       )}
 
       {drag?.moved && (
@@ -472,21 +455,22 @@ export function Table({ view, send, onLeave }: Props): ReactElement {
           )}
         </div>
       )}
-      <div className="rotate-hint">Please turn your device sideways.</div>
+      <div className="rotate-hint">{tr('rotate')}</div>
     </div>
   );
 }
 
 /** Spectators: every player's hand, flowers and shown sets, and nothing else. */
-function AllHands({ view, onClose }: { view: RoomView; onClose: () => void }): ReactElement {
+function AllHands({ view, tr, onClose }: { view: RoomView; tr: Tr; onClose: () => void }): ReactElement {
+  const lang = useLang();
   return (
     <div className="overlay all-hands-overlay">
       <div className="panel all-hands">
-        <h3>All hands</h3>
+        <h3>{tr('allHands')}</h3>
         {view.seats.map((s) => (
           <div key={s.seat} className={`all-hands-row${view.round?.turn === s.seat ? ' all-hands-turn' : ''}`}>
             <span className="all-hands-name">
-              <span className="wind-badge">{WIND_CHARS[s.wind]}</span> {s.name ?? 'Empty'}
+              <span className="wind-badge">{WIND_CHARS[s.wind]}</span> {s.name ? personName(s.name, lang) : tr('empty')}
             </span>
             <span className="all-hands-tiles">
               {(s.hand ?? []).map((t) => <TileView key={t.id} type={t.type} width="var(--allhands-w)" />)}
@@ -503,7 +487,7 @@ function AllHands({ view, onClose }: { view: RoomView; onClose: () => void }): R
             </span>
           </div>
         ))}
-        <button className="btn" onClick={onClose}>Back to the table</button>
+        <button className="btn" onClick={onClose}>{tr('backToTable')}</button>
       </div>
     </div>
   );
@@ -512,10 +496,14 @@ function AllHands({ view, onClose }: { view: RoomView; onClose: () => void }): R
 /** Between rounds: choose a seat and press Start, or tap Spectate in the middle to just watch. */
 function SeatPicker({
   view,
+  tr,
+  lang,
   command,
   onSpectate,
 }: {
   view: RoomView;
+  tr: Tr;
+  lang: Prefs['lang'];
   command: (c: Extract<ClientMessage, { type: 'command' }>['command']) => void;
   onSpectate: () => void;
 }): ReactElement {
@@ -525,7 +513,7 @@ function SeatPicker({
   return (
     <div className="overlay">
       <div className="panel seat-picker">
-        <h3>{view.name} · {view.label.en}</h3>
+        <h3>{view.name} · {view.label[lang]}</h3>
         <div className="seat-square">
           {view.seats.map((s) => {
             const mine = s.seat === mySeat;
@@ -537,28 +525,114 @@ function SeatPicker({
                 disabled={!canTake}
                 onClick={() => command({ type: 'takeSeat', seat: s.seat })}
               >
-                <span className="seat-wind">{WIND_NAMES.en[s.wind]}</span>
-                <span className="seat-name">{s.name ?? 'Empty'}{s.cpu ? ' (CPU)' : ''}</span>
-                {s.startPressed && <span className="seat-ready">Ready</span>}
+                <span className="seat-wind">{WIND_NAMES[lang][s.wind]}</span>
+                <span className="seat-name">{s.name ? personName(s.name, lang) : tr('empty')}</span>
+                {s.startPressed && <span className="seat-ready">{tr('ready')}</span>}
               </button>
             );
           })}
           <button className="seat seat-spectate" onClick={onSpectate}>
-            <span className="seat-name">Spectate</span>
-            <span className="seat-wind">Just watch</span>
+            <span className="seat-name">{tr('spectate')}</span>
+            <span className="seat-wind">{tr('justWatch')}</span>
           </button>
         </div>
         {me ? (
           <div className="row">
             <button className="btn primary big" disabled={me.startPressed} onClick={() => command({ type: 'pressStart' })}>
-              {me.startPressed ? 'Waiting for others…' : 'Start'}
+              {me.startPressed ? tr('waitingOthers') : tr('start')}
             </button>
-            <button className="btn" onClick={() => command({ type: 'leaveSeat' })}>Leave seat</button>
+            <button className="btn" onClick={() => command({ type: 'leaveSeat' })}>{tr('leaveSeat')}</button>
           </div>
         ) : (
-          <p className="muted">Tap an empty seat to sit down, or Spectate to just watch.</p>
+          <p className="muted">{tr('tapSeat')}</p>
         )}
-        {filled < 4 && <p className="muted">A round starts when all 4 seats are filled and everyone presses Start. The host can fill seats with CPUs.</p>}
+        {filled < 4 && <p className="muted">{tr('startRule')}</p>}
+      </div>
+    </div>
+  );
+}
+
+type Tr = (key: StringKey, vars?: Record<string, string | number>) => string;
+type Cmd = (c: Extract<ClientMessage, { type: 'command' }>['command']) => void;
+
+/** Each player's own settings: name, language, theme, drop out, leave. */
+function SettingsPanel({
+  view,
+  tr,
+  prefs,
+  setPrefs,
+  command,
+  onLeave,
+  onClose,
+}: {
+  view: RoomView;
+  tr: Tr;
+  prefs: Prefs;
+  setPrefs: (p: Prefs) => void;
+  command: Cmd;
+  onLeave: () => void;
+  onClose: () => void;
+}): ReactElement {
+  const [name, setName] = useState(view.you.name);
+  const mySeat = view.you.seat;
+  const nameChanged = name.trim() !== '' && name.trim() !== view.you.name;
+  const themes: Prefs['theme'][] = ['light', 'dark', 'system'];
+  const themeLabel: Record<Prefs['theme'], StringKey> = { light: 'themeLight', dark: 'themeDark', system: 'themeSystem' };
+  return (
+    <div className="overlay" onClick={onClose}>
+      <div className="panel settings" onClick={(e) => e.stopPropagation()}>
+        <h3>{tr('settings')}</h3>
+        <p className="muted">{tr('playingIn', { name: view.name })}</p>
+
+        <div className="settings-grid">
+          <label htmlFor="name-input">{tr('yourName')}</label>
+          <form
+            className="name-row"
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (nameChanged) command({ type: 'rename', newName: name.trim() });
+            }}
+          >
+            <input id="name-input" value={name} maxLength={20} onChange={(e) => setName(e.target.value)} />
+            <button className="btn primary" type="submit" disabled={!nameChanged}>{tr('save')}</button>
+          </form>
+
+          <span>{tr('language')}</span>
+          <div className="segmented">
+            <button className={prefs.lang === 'en' ? 'on' : ''} onClick={() => setPrefs({ ...prefs, lang: 'en' })}>English</button>
+            <button className={prefs.lang === 'zh' ? 'on' : ''} onClick={() => setPrefs({ ...prefs, lang: 'zh' })}>中文</button>
+          </div>
+
+          <span>{tr('theme')}</span>
+          <div className="segmented">
+            {themes.map((th) => (
+              <button key={th} className={prefs.theme === th ? 'on' : ''} onClick={() => setPrefs({ ...prefs, theme: th })}>
+                {tr(themeLabel[th])}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {mySeat !== null && (
+          <>
+            <h4>{tr('dropOut')}</h4>
+            <p className="muted">{tr('dropOutText')}</p>
+            <div className="row">
+              <button className="btn" onClick={() => { command({ type: 'dropOut', replacement: { none: true } }); onClose(); }}>
+                {tr('leaveMySeat')}
+              </button>
+              {view.spectators.filter((s) => s.connected).map((s) => (
+                <button key={s.name} className="btn" onClick={() => { command({ type: 'dropOut', replacement: { spectator: s.name } }); onClose(); }}>
+                  {tr('swapWith', { name: s.name })}
+                </button>
+              ))}
+            </div>
+          </>
+        )}
+        <div className="row">
+          <button className="btn danger" onClick={onLeave}>{tr('leaveGame')}</button>
+          <button className="btn" onClick={onClose}>{tr('close')}</button>
+        </div>
       </div>
     </div>
   );
