@@ -18,7 +18,139 @@ const CJK_FONT = "'Noto Serif TC','Songti TC','PMingLiU','Noto Serif CJK TC','No
 
 const NUMERALS = ['', '一', '二', '三', '四', '五', '六', '七', '八', '九'];
 const WIND_CHARS: Record<string, string> = { wE: '東', wS: '南', wW: '西', wN: '北' };
-const FLOWER_CHARS: Record<string, string> = { f1: '梅', f2: '蘭', f3: '菊', f4: '竹', n1: '春', n2: '夏', n3: '秋', n4: '冬' };
+const BRANCH = '#6b4a2b';
+const PINK = '#e05a7a';
+const YELLOW = '#f2c230';
+const LEAF = '#3c9a4e';
+
+/** A five-petal blossom (plum, peach). */
+function Blossom({ x, y, r, colour = PINK }: { x: number; y: number; r: number; colour?: string }): ReactElement {
+  return (
+    <g>
+      {[0, 1, 2, 3, 4].map((k) => {
+        const a = ((k * 72 - 90) * Math.PI) / 180;
+        return <circle key={k} cx={x + r * Math.cos(a)} cy={y + r * Math.sin(a)} r={r * 0.78} fill={colour} />;
+      })}
+      <circle cx={x} cy={y} r={r * 0.5} fill={YELLOW} />
+    </g>
+  );
+}
+
+/** A long pointed leaf, starting at (x, y) and pointing at `angle` degrees. */
+function Leaf({ x, y, angle, len = 16, colour = LEAF }: { x: number; y: number; angle: number; len?: number; colour?: string }): ReactElement {
+  return <path d={`M0 0 Q${len * 0.45} ${-len * 0.22} ${len} 0 Q${len * 0.45} ${len * 0.22} 0 0 Z`} fill={colour} transform={`translate(${x} ${y}) rotate(${angle})`} />;
+}
+
+/** Flowers 梅蘭菊竹 and seasons 春夏秋冬: simple flat pictures, no words. */
+const FLOWER_PICTURES: Record<string, () => ReactElement> = {
+  // Plum blossom 梅: a branch with blossoms.
+  f1: () => (
+    <g>
+      <path d="M8 72 Q22 56 28 42 T43 18" stroke={BRANCH} strokeWidth={3.2} fill="none" strokeLinecap="round" />
+      <path d="M28 44 Q38 42 46 50" stroke={BRANCH} strokeWidth={2.2} fill="none" strokeLinecap="round" />
+      <Blossom x={20} y={56} r={5.5} />
+      <Blossom x={38} y={26} r={6} />
+      <Blossom x={46} y={50} r={4.5} />
+      <circle cx={43} cy={18} r={2.5} fill={PINK} />
+      <circle cx={13} cy={67} r={2.2} fill={PINK} />
+    </g>
+  ),
+  // Orchid 蘭: long curved leaves and a purple flower.
+  f2: () => (
+    <g fill="none" strokeLinecap="round">
+      <path d="M30 74 Q14 54 7 30" stroke={LEAF} strokeWidth={3} />
+      <path d="M30 74 Q44 52 55 42" stroke={LEAF} strokeWidth={3} />
+      <path d="M30 74 Q24 58 18 50" stroke={LEAF} strokeWidth={2.4} />
+      <path d="M30 74 Q32 50 34 32" stroke={LEAF} strokeWidth={1.8} />
+      <g fill="#8e5bb5" stroke="none">
+        <ellipse cx={34} cy={18} rx={4} ry={9} />
+        <ellipse cx={34} cy={18} rx={4} ry={9} transform="rotate(-70 34 24)" />
+        <ellipse cx={34} cy={18} rx={4} ry={9} transform="rotate(70 34 24)" />
+        <ellipse cx={34} cy={30} rx={5} ry={3.5} fill="#b07ad6" />
+      </g>
+      <circle cx={34} cy={24} r={2.6} fill={YELLOW} stroke="none" />
+    </g>
+  ),
+  // Chrysanthemum 菊: a round flower of many petals on a stem.
+  f3: () => (
+    <g>
+      <path d="M30 44 Q27 60 30 76" stroke={LEAF} strokeWidth={2.6} fill="none" />
+      <Leaf x={29} y={60} angle={200} len={15} />
+      <Leaf x={30} y={66} angle={-20} len={14} />
+      {Array.from({ length: 16 }, (_, k) => (
+        <ellipse key={k} cx={30} cy={20} rx={3.2} ry={10} fill="#e89a1a" transform={`rotate(${k * 22.5} 30 30)`} />
+      ))}
+      {Array.from({ length: 12 }, (_, k) => (
+        <ellipse key={`i${k}`} cx={30} cy={24} rx={2.4} ry={6} fill={YELLOW} transform={`rotate(${k * 30 + 15} 30 30)`} />
+      ))}
+      <circle cx={30} cy={30} r={4} fill="#c9781a" />
+    </g>
+  ),
+  // Bamboo plant 竹: two stalks with leaves.
+  f4: () => (
+    <g>
+      <rect x={20} y={10} width={5} height={66} rx={2} fill={GREEN} />
+      <rect x={34} y={26} width={4} height={50} rx={2} fill={GREEN} />
+      {[24, 40, 58].map((y) => <rect key={y} x={19} y={y} width={7} height={2} fill="#14612f" />)}
+      {[40, 58].map((y) => <rect key={y} x={33} y={y} width={6} height={2} fill="#14612f" />)}
+      <Leaf x={25} y={24} angle={-25} len={18} />
+      <Leaf x={25} y={25} angle={10} len={15} />
+      <Leaf x={20} y={40} angle={200} len={16} />
+      <Leaf x={38} y={40} angle={-30} len={16} />
+      <Leaf x={38} y={41} angle={15} len={13} />
+      <Leaf x={20} y={58} angle={160} len={14} />
+    </g>
+  ),
+  // Spring 春: peach blossom.
+  n1: () => (
+    <g>
+      <path d="M10 70 Q24 60 30 40" stroke={BRANCH} strokeWidth={2.6} fill="none" strokeLinecap="round" />
+      <Leaf x={22} y={58} angle={200} len={14} />
+      <Leaf x={27} y={50} angle={-15} len={13} />
+      <Blossom x={31} y={32} r={10} colour="#f28aa8" />
+      {[0, 1, 2, 3, 4].map((k) => {
+        const a = ((k * 72 - 54) * Math.PI) / 180;
+        return <line key={k} x1={31} y1={32} x2={31 + 7 * Math.cos(a)} y2={32 + 7 * Math.sin(a)} stroke="#c94f73" strokeWidth={1} />;
+      })}
+      <circle cx={31} cy={32} r={3} fill={YELLOW} />
+    </g>
+  ),
+  // Summer 夏: lotus above a lily pad.
+  n2: () => (
+    <g>
+      <ellipse cx={30} cy={66} rx={22} ry={6} fill={LEAF} />
+      <path d="M30 66 L30 52" stroke="#2f7a3d" strokeWidth={2.4} />
+      {[-56, -28, 0, 28, 56].map((r) => (
+        <path key={r} d="M0 0 Q-7 -12 0 -26 Q7 -12 0 0 Z" fill={r === 0 ? '#f07fa0' : '#f4a3bb'} transform={`translate(30 52) rotate(${r})`} />
+      ))}
+      <circle cx={30} cy={50} r={3} fill={YELLOW} />
+    </g>
+  ),
+  // Autumn 秋: maple leaf.
+  n3: () => (
+    <g>
+      <polygon
+        points="30,10 34,23 44,17 41,30 53,29 44,38 49,48 35,44 32,56 30,58 28,56 25,44 11,48 16,38 7,29 19,30 16,17 26,23"
+        fill="#d2452b"
+      />
+      <path d="M30 26 L30 72" stroke={BRANCH} strokeWidth={2.2} strokeLinecap="round" />
+      <path d="M30 40 L42 30 M30 40 L18 30 M30 48 L40 46 M30 48 L20 46" stroke="#a8321c" strokeWidth={1.2} />
+    </g>
+  ),
+  // Winter 冬: snowflake.
+  n4: () => (
+    <g stroke="#3a7bd5" strokeWidth={2.6} strokeLinecap="round" fill="none">
+      {[0, 60, 120, 180, 240, 300].map((r) => (
+        <g key={r} transform={`rotate(${r} 30 40)`}>
+          <line x1={30} y1={40} x2={30} y2={18} />
+          <path d="M24 25 L30 30 L36 25" />
+          <path d="M26 19 L30 22 L34 19" />
+        </g>
+      ))}
+      <circle cx={30} cy={40} r={3} fill="#3a7bd5" />
+    </g>
+  ),
+};
 
 type Dot = [x: number, y: number, r: number, colour: string];
 
@@ -46,10 +178,11 @@ const STICKS: Record<number, Stick[]> = {
   5: [[16, 22, 22, GREEN], [44, 22, 22, BLUE], [30, 40, 22, RED], [16, 58, 22, BLUE], [44, 58, 22, GREEN]],
   6: [14, 30, 46].flatMap((x) => [[x, 22, 22, GREEN], [x, 58, 22, BLUE]] as Stick[]),
   7: [[30, 14, 18, RED], ...[14, 30, 46].flatMap((x) => [[x, 41, 18, GREEN], [x, 65, 18, GREEN]] as Stick[])],
-  8: [12, 24, 36, 48].flatMap((x, i) => [
-    [x, 22, 22, GREEN, i % 2 ? -14 : 14],
-    [x, 58, 22, GREEN, i % 2 ? 14 : -14],
-  ] as Stick[]),
+  // Outer sticks stand straight; the middle four lean to make an M over a W.
+  8: [
+    [11, 22, 22, GREEN], [24, 22, 22, GREEN, -22], [36, 22, 22, GREEN, 22], [49, 22, 22, GREEN],
+    [11, 58, 22, GREEN], [24, 58, 22, GREEN, 22], [36, 58, 22, GREEN, -22], [49, 58, 22, GREEN],
+  ],
   9: [14, 30, 46].flatMap((x, col) => [15, 40, 65].map((y): Stick => [x, y, 19, [BLUE, RED, GREEN][col]!])),
 };
 
@@ -133,12 +266,14 @@ function Face({ type }: { type: TileType }): ReactElement {
       </g>
     );
   }
-  if (FLOWER_CHARS[type]) {
+  const Picture = FLOWER_PICTURES[type];
+  if (Picture) {
+    // Picture plus the small number (1-4) that says which seat it belongs to.
     const isFlower = type[0] === 'f';
     return (
       <g>
-        {text(FLOWER_CHARS[type]!, 44, 34, isFlower ? RED : BLUE)}
-        {text(String(n), 11, 13, isFlower ? BLUE : RED, 50)}
+        <Picture />
+        {text(String(n), 10, 12, isFlower ? RED : BLUE, 52)}
       </g>
     );
   }
