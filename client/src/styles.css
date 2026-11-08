@@ -560,3 +560,12 @@ input { font: inherit; }
 .panel-close:hover { color: var(--fg); background: var(--btn); }
 /* Logo next to the title on the join screen. */
 .title-with-logo { display: flex; align-items: center; gap: 0.5em; }
+
+/* Tiles gliding from the wall to a player (deal and draws). Animated with the
+   browser's built-in animation feature, which also works on iPhones. */
+.fly-group { position: fixed; z-index: 15; pointer-events: none; display: flex; gap: 2px; transform: translate(-50%, -50%); }
+.fly-back {
+  display: block; width: clamp(20px, 3.4vw, 36px); aspect-ratio: 3 / 4;
+  background: var(--tile-back); border: 2px solid var(--tile-back-edge); border-radius: 3px;
+  box-shadow: 0 3px 6px rgba(0, 0, 0, 0.45);
+}

@@ -161,7 +161,6 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
   }, [drawnId]);
 
   // When other players draw, a tile glides from the middle to them.
-  const [otherFlights, setOtherFlights] = useState<{ key: string; from: { x: number; y: number }; dx: number; dy: number }[]>([]);
   const prevCounts = useRef<{ key: string; counts: number[] }>({ key: '', counts: [] });
 
   // Swap answers: tell the player who asked.
@@ -374,20 +373,13 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
     const hub = document.querySelector('.hub')?.getBoundingClientRect();
     if (!hub) return;
     const from = { x: hub.left + hub.width / 2, y: hub.top + hub.height / 2 };
-    const flights = view.seats
-      .filter((sv) => sv.seat !== mySeat && counts[sv.seat]! === (prev.counts[sv.seat] ?? 0) + 1)
-      .map((sv) => {
-        const side = sideOf(sv.seat);
-        const target = side === 'bottom' ? document.querySelector('.me-row') : document.querySelector(`.opp-${side} .nametag`);
-        const t = target?.getBoundingClientRect();
-        if (!t) return null;
-        return { key: `${roundKey}-${sv.seat}-${counts[sv.seat]}-${Date.now()}`, from, dx: t.left + t.width / 2 - from.x, dy: t.top + t.height / 2 - from.y };
-      })
-      .filter((f): f is NonNullable<typeof f> => !!f);
-    if (flights.length === 0) return;
-    setOtherFlights((list) => [...list, ...flights]);
-    const timer = setTimeout(() => setOtherFlights((list) => list.filter((f) => !flights.includes(f))), 450);
-    return () => clearTimeout(timer);
+    for (const sv of view.seats) {
+      if (sv.seat === mySeat || counts[sv.seat]! !== (prev.counts[sv.seat] ?? 0) + 1) continue;
+      const side = sideOf(sv.seat);
+      const target = side === 'bottom' ? document.querySelector('.me-row') : document.querySelector(`.opp-${side} .nametag`);
+      const t = target?.getBoundingClientRect();
+      if (t) flyBacks(from, { x: t.left + t.width / 2, y: t.top + t.height / 2 }, 1, 550);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [JSON.stringify(view.seats.map((sv) => sv.handCount)), roundKey]);
 
@@ -495,24 +487,6 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
         {renderOpponent('right')}
       </main>
 
-      {otherFlights.map((f) => (
-        <div
-          key={f.key}
-          className="deal-flight"
-          style={{ left: f.from.x, top: f.from.y, '--dx': `${f.dx}px`, '--dy': `${f.dy}px`, animationDuration: '400ms' } as CSSProperties}
-        >
-          <TileView back width="var(--opp-w)" />
-        </div>
-      ))}
-      {dealAnim?.flight && (
-        <div
-          key={dealAnim.flight.key}
-          className="deal-flight"
-          style={{ left: dealAnim.flight.from.x, top: dealAnim.flight.from.y, '--dx': `${dealAnim.flight.dx}px`, '--dy': `${dealAnim.flight.dy}px`, animationDuration: `${dealAnim.flight.ms}ms` } as CSSProperties}
-        >
-          {Array.from({ length: dealAnim.flight.n }, (_, i) => <TileView key={i} back width="var(--opp-w)" />)}
-        </div>
-      )}
       <footer className={`me${dealAnim ? ' dealing' : ''}`} style={rowSizes}>
         <div className="me-row">
           {/* Your public tiles (shown sets and flowers) sit to the left of your hand. */}
@@ -892,7 +866,36 @@ type WallStack = { seat: number; position: number; count: number };
 
 interface DealAnim {
   wall: { stacks: WallStack[]; count: number };
-  flight: { key: string; n: number; from: { x: number; y: number }; dx: number; dy: number; ms: number } | null;
+}
+
+/**
+ * Make `n` tile backs glide from one point to another, then disappear.
+ * Uses the browser's built-in animation feature (works on iPhones too).
+ */
+export function flyBacks(from: { x: number; y: number }, to: { x: number; y: number }, n: number, ms: number): void {
+  const group = document.createElement('div');
+  group.className = 'fly-group';
+  group.style.left = `${from.x}px`;
+  group.style.top = `${from.y}px`;
+  for (let i = 0; i < n; i++) {
+    const back = document.createElement('span');
+    back.className = 'fly-back';
+    group.appendChild(back);
+  }
+  document.body.appendChild(group);
+  const dx = to.x - from.x;
+  const dy = to.y - from.y;
+  const anim = group.animate(
+    [
+      { transform: 'translate(-50%, -50%) scale(1.15)', opacity: 1 },
+      { transform: `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px)) scale(0.9)`, opacity: 0.85 },
+    ],
+    { duration: ms, easing: 'ease-in-out', fill: 'forwards' },
+  );
+  const done = (): void => group.remove();
+  anim.onfinish = done;
+  anim.oncancel = done;
+  setTimeout(done, ms + 500); // safety net
 }
 
 const DEAL_MS = 5000;
@@ -920,6 +923,7 @@ function useDealAnimation(
     to: Record<Side, { x: number; y: number }>;
   }>(null);
   const [, setTick] = useState(0);
+  const lastFlown = useRef('');
 
   useEffect(() => {
     if (!round || round.discards.length > 0 || done.current === roundKey || round.wall.length === 0) return;
@@ -989,12 +993,13 @@ function useDealAnimation(
   const N = plan.order.length;
   const clamp = (x: number): number => Math.max(0, Math.min(2, x));
   const stacks = plan.order.map((st, i) => ({ ...st, count: Math.max(0, 2 - clamp(f - 2 * i) - clamp(b - 2 * (N - 1 - i))) }));
-  const step = plan.steps[index]!;
-  const target = plan.to[sideOf(step.seat)];
-  return {
-    wall: { stacks, count: plan.total - f - b },
-    flight: { key: `${plan.key}-${index}`, n: step.n, from: plan.from, dx: target.x - plan.from.x, dy: target.y - plan.from.y, ms: Math.max(120, stepMs * 0.9) },
-  };
+  // Each step of the deal sends its tiles gliding to that player (once per step).
+  if (lastFlown.current !== `${plan.key}-${index}`) {
+    lastFlown.current = `${plan.key}-${index}`;
+    const step = plan.steps[index]!;
+    flyBacks(plan.from, plan.to[sideOf(step.seat)], step.n, Math.max(150, stepMs * 0.9));
+  }
+  return { wall: { stacks, count: plan.total - f - b } };
 }
 
 /** Make an element glide from (dx, dy) away back to where it belongs. */
