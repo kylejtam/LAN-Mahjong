@@ -13,7 +13,7 @@ You need Node.js installed (version 20 or newer).
 
 ```
 npm install     # download the tools (first time only)
-npm start       # start the game server
+npm start       # build the screens and start the game server
 ```
 
 The window shows an address such as `http://192.168.1.20:3000`. Open that
@@ -44,4 +44,5 @@ npm run typecheck   # check the code for type mistakes
 
 - `shared/` – the rules engine: tiles, wall, dealing, legal moves, winning hands, payments.
 - `server/` – the game server: rounds, full games, rooms, CPU players, network, saving.
-- `client/` – the screens (phase 3, not built yet).
+- `client/` – the screens: the game table (players) and the host page (laptop).
+- `docs/screenshots/` – pictures of the screens.

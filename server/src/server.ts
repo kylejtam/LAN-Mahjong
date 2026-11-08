@@ -10,6 +10,9 @@
  *   refused, so players can only join games.
  */
 import { createServer, IncomingMessage, ServerResponse } from 'node:http';
+import { existsSync, readFileSync, statSync } from 'node:fs';
+import { dirname, extname, join, normalize, resolve, sep } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { randomUUID, getRandomValues } from 'node:crypto';
 import QRCode from 'qrcode';
 import { WebSocketServer, WebSocket } from 'ws';
@@ -31,8 +34,32 @@ export interface ServerOptions {
   rng?: Rng;
   /** How often CPUs and timers are checked (milliseconds). */
   tickMs?: number;
+  /** Folder with the built screens (client/dist). */
+  clientDir?: string;
   /** Which connections may use the host page. Default: only this computer. */
   isHostAddress?: (address: string | undefined) => boolean;
+}
+
+const DEFAULT_CLIENT_DIR = resolve(dirname(fileURLToPath(import.meta.url)), '../../client/dist');
+
+const CONTENT_TYPES: Record<string, string> = {
+  '.html': 'text/html; charset=utf-8',
+  '.js': 'text/javascript; charset=utf-8',
+  '.css': 'text/css; charset=utf-8',
+  '.svg': 'image/svg+xml',
+  '.png': 'image/png',
+  '.ico': 'image/x-icon',
+  '.json': 'application/json',
+  '.webmanifest': 'application/manifest+json',
+  '.woff2': 'font/woff2',
+};
+
+/** Read a file from the built screens folder, refusing anything outside it. */
+function readClientFile(dir: string, urlPath: string): { body: Buffer; type: string } | null {
+  const full = normalize(join(dir, decodeURIComponent(urlPath)));
+  if (!full.startsWith(dir + sep)) return null;
+  if (!existsSync(full) || !statSync(full).isFile()) return null;
+  return { body: readFileSync(full), type: CONTENT_TYPES[extname(full)] ?? 'application/octet-stream' };
 }
 
 /** Is this connection from the server's own computer? */
@@ -64,6 +91,7 @@ export async function startServer(opts: ServerOptions): Promise<RunningServer> {
   const clients = new Map<WebSocket, Client>();
   const hostSockets = new Set<WebSocket>();
   const isHostAddress = opts.isHostAddress ?? isLoopback;
+  const clientDir = resolve(opts.clientDir ?? DEFAULT_CLIENT_DIR);
   const lastSent = new Map<string, number>(); // roomId → last broadcast time
   let lastGameList = '';
 
@@ -264,7 +292,8 @@ export async function startServer(opts: ServerOptions): Promise<RunningServer> {
         res.writeHead(403, { 'content-type': 'text/plain; charset=utf-8' }).end('The host page only opens on the laptop running the server.');
         return;
       }
-      res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' }).end(hostPlaceholderPage(urls));
+      const page = readClientFile(clientDir, '/host.html');
+      res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' }).end(page ? page.body : hostPlaceholderPage(urls));
       return;
     }
     if (url.pathname === '/api/info') {
@@ -281,9 +310,22 @@ export async function startServer(opts: ServerOptions): Promise<RunningServer> {
       res.writeHead(200, { 'content-type': 'image/svg+xml' }).end(svg);
       return;
     }
-    if (url.pathname === '/') {
+    if (url.pathname === '/' || url.pathname === '/index.html') {
+      const page = readClientFile(clientDir, '/index.html');
+      res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' }).end(page ? page.body : placeholderPage(urls, gameList()));
+      return;
+    }
+    if (url.pathname === '/info') {
       res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' }).end(placeholderPage(urls, gameList()));
       return;
+    }
+    if (url.pathname !== '/host.html') {
+      const file = readClientFile(clientDir, url.pathname);
+      if (file) {
+        const cache = url.pathname.startsWith('/assets/') ? 'public, max-age=31536000, immutable' : 'no-cache';
+        res.writeHead(200, { 'content-type': file.type, 'cache-control': cache }).end(file.body);
+        return;
+      }
     }
     res.writeHead(404, { 'content-type': 'text/plain' }).end('Not found');
   };

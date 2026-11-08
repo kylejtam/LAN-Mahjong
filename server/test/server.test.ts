@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { WebSocket } from 'ws';
@@ -149,6 +149,23 @@ describe('game server over the network', () => {
     const qr = await fetch(`${base}/api/qr.svg`);
     expect(qr.headers.get('content-type')).toBe('image/svg+xml');
     expect(await qr.text()).toContain('<svg');
+  });
+
+  it('sends the built screens, but never files outside the screens folder', async () => {
+    dir = mkdtempSync(join(tmpdir(), 'mahjong-client-'));
+    mkdirSync(join(dir, 'assets'));
+    writeFileSync(join(dir, 'index.html'), '<p>player screen</p>');
+    writeFileSync(join(dir, 'host.html'), '<p>host screen</p>');
+    writeFileSync(join(dir, 'assets', 'app.js'), 'console.log(1)');
+    server = await startServer({ port: 0, host: '127.0.0.1', dataFile: null, clientDir: dir, tickMs: 20 });
+    const base = `http://127.0.0.1:${server.port}`;
+    expect(await (await fetch(`${base}/`)).text()).toContain('player screen');
+    expect(await (await fetch(`${base}/host`)).text()).toContain('host screen');
+    const js = await fetch(`${base}/assets/app.js`);
+    expect(js.headers.get('content-type')).toContain('javascript');
+    expect((await fetch(`${base}/host.html`)).status).toBe(404); // only via /host (laptop check)
+    expect((await fetch(`${base}/..%2F..%2Fpackage.json`)).status).toBe(404);
+    expect((await fetch(`${base}/assets/..%2F..%2F..%2Fpackage.json`)).status).toBe(404);
   });
 
   it('lists games on the start screen', async () => {
