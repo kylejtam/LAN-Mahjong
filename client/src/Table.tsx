@@ -23,6 +23,7 @@ import { ACTION_LABELS, Prefs, WIND_CHARS, WIND_NAMES, WIND_SHORT, personName, t
 import type { StringKey } from './i18n';
 import { DragSource, Drop, useDrag } from './drag';
 import { HelpPanel } from './HelpPanel';
+import { ChipIcon } from './ChipIcon';
 import { ResultPanel } from './ResultPanel';
 
 /** The window size, kept up to date when the device turns or the window changes. */
@@ -466,7 +467,7 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
         </div>
         <div className="topbar-right">
           {me && (
-            <span className="chip-total">{me.balance}</span>
+            <span className="chip-total"><ChipIcon size="1.05em" />{me.balance}</span>
           )}
           <button className="btn icon" title={tr('help')} onClick={() => setPanel('help')}>?</button>
           <button className="btn icon" title={tr('settings')} onClick={() => setPanel('settings')}>⚙</button>
