@@ -205,3 +205,4 @@ Discarder pays double the base.
 | Cap | Earthly hand (win on dealer's first discard) | 地胡 |
 | Cap | All 8 flowers | 八仙過海 |
 | — | Seven pairs: **not allowed** (not standard HK) | 七對子 |
+| 2026-11-08 | **Merged into main.** Everything is now in the main version (pull request #1). Download link is now .../archive/refs/heads/main.zip. | Kyle |
