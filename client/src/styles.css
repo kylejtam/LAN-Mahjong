@@ -603,3 +603,7 @@ input { font: inherit; }
   from { box-shadow: 0 0 0 2px #f5c542, 0 0 4px 2px rgba(245, 197, 66, 0.4); }
   to { box-shadow: 0 0 0 3px #f5c542, 0 0 16px 6px rgba(245, 197, 66, 0.9); }
 }
+
+/* Host page: "Stop this hand" above the settings. */
+.stop-hand { display: flex; align-items: center; gap: 0.8em; flex-wrap: wrap; margin: 0 0 0.8em; }
+.stop-hand .small { max-width: 34em; }

@@ -414,6 +414,47 @@ describe('history, roll back and changing the current game (host page)', () => {
     expect(r.people.amelia!.balance).toBe(1000);
   });
 
+  it('the host can stop the hand being played: nobody pays, and the same game is dealt again', () => {
+    let r = finishWith(startedTable(), 1, 0, [-16, 32, -8, -8]); // East 1 won by Amy: Amy deals East 2
+    r = playAgain(r); // East 2 in progress
+    const before = { match: { roundWind: r.match.roundWind, dealer: r.match.dealer, dealerIndex: r.match.dealerIndex, handsPlayed: r.match.handsPlayed } };
+    const chips = Object.values(r.people).map((p) => p.balance);
+    r = cmd(r, 'Amy', { type: 'discard', tileId: r.match.round!.core.hands[1]![0]!.id });
+    r = host(r, { type: 'hostStopRound' });
+    expect(r.phase).toBe('betweenRounds');
+    expect(r.match.round).toBeNull();
+    expect(r.match).toMatchObject(before.match);
+    expect(Object.values(r.people).map((p) => p.balance)).toEqual(chips);
+    expect(r.history).toHaveLength(1);
+    expect(viewFor(r, 'kyle', tick()).roundStoppedAt).toBe(r.roundStoppedAt);
+    // Settings can change now, then everyone presses Start and the same game is dealt.
+    r = host(r, { type: 'hostUpdateSettings', settings: { minFan: 3 } });
+    expect(r.match.settings.minFan).toBe(3);
+    for (const n of ['Kyle', 'Amy', 'Ben', 'Cat']) r = cmd(r, n, { type: 'pressStart' });
+    expect(r.phase).toBe('rolling');
+    r = cmd(r, 'Amy', { type: 'rollDice' });
+    expect(r.phase).toBe('playing');
+    expect(hostViewOf(r).label.en).toBe('East, game 2');
+    expect(r.match.round!.core.hands[1]).toHaveLength(14); // Amy deals again
+  });
+
+  it('stopping also works during the dice roll, but not between hands or on the win summary', () => {
+    let r = fullTable();
+    expect(() => host(r, { type: 'hostStopRound' })).toThrow(/no hand/);
+    for (const n of ['Kyle', 'Amy', 'Ben', 'Cat']) r = cmd(r, n, { type: 'pressStart' });
+    expect(r.phase).toBe('rolling');
+    r = host(r, { type: 'hostStopRound' });
+    expect(r.phase).toBe('betweenRounds');
+    // A finished hand waiting on the win summary: the result must not be thrown away.
+    const playing = startedTable();
+    const round = playing.match.round!;
+    const won: Room = {
+      ...playing,
+      match: { ...playing.match, round: { ...round, core: { ...round.core, phase: 'ended', result: { type: 'win', winner: 1, discarder: 0, fan: 3, items: [], capHand: false, isChicken: false, changes: [-16, 32, -8, -8] } } } },
+    };
+    expect(() => host(won, { type: 'hostStopRound' })).toThrow(/no hand/);
+  });
+
   it('can jump to any wind and game number without touching chips', () => {
     let r = finishWith(startedTable(), 1, 0, [-16, 32, -8, -8]);
     r = playAgain(r);

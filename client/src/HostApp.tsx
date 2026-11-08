@@ -289,6 +289,8 @@ function GameCard({ game, send }: { game: HostGameView; send: (m: HostMessage) =
   const [startBal, setStartBal] = useState(game.startingBalance);
   useEffect(() => setSettings(game.settings), [JSON.stringify(game.settings)]);
   const between = game.phase === 'betweenRounds';
+  // A hand being played (or its dice roll) can be stopped; a finished hand (win summary) can't.
+  const inHand = game.phase === 'rolling' || (game.phase === 'playing' && !!game.round && game.round.phase !== 'ended');
   const dealer = game.match.dealer;
   const phaseText = { betweenRounds: 'Between rounds', rolling: 'Rolling dice', playing: 'Playing', finished: 'Finished' }[game.phase];
 
@@ -348,7 +350,15 @@ function GameCard({ game, send }: { game: HostGameView; send: (m: HostMessage) =
 
       <PositionAndHistory game={game} cmd={cmd} />
 
-      <h3>Settings {between ? '' : <span className="muted small">(can change between rounds)</span>}</h3>
+      <h3>Settings {between ? '' : <span className="muted small">(can change between rounds{inHand ? ', or stop this hand first' : ''})</span>}</h3>
+      {inHand && (
+        <div className="stop-hand">
+          <TwoTapButton label="Stop this hand" confirmLabel="Tap again to stop this hand" onConfirm={() => cmd({ type: 'hostStopRound' })} />
+          <span className="muted small">
+            Nobody pays and chips stay as they are. Then change the settings and press Save; when everyone presses Start, the same game is dealt again.
+          </span>
+        </div>
+      )}
       <div className="form-grid">
         <label>Flower tiles</label>
         <select disabled={!between} value={settings.flowersOn ? 'on' : 'off'} onChange={(e) => setSettings({ ...settings, flowersOn: e.target.value === 'on' })}>

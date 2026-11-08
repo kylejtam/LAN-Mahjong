@@ -145,6 +145,7 @@ disagrees with those, the newest dated entry here wins.
 | 2026-11-08 | **Minimum fan in the top bar:** a small label next to the round name, "Min 3 fan" / "3番起糊". Seen by players and spectators; updates when the host changes it. | Kyle |
 | 2026-11-08 | **Flower draws are obvious:** when anyone draws a flower (not during the deal), a big pop-up in the middle shows the tile with "S CPU Easy drew a flower" / "南 電腦（易） 補花" ("You drew a flower" / "你補花" for your own) for about 2 s; the new flower then glows gold where it lands. Doesn't block taps or drags. | Kyle |
 | 2026-11-08 | **Chip symbol:** a plain yellow circle in front of your chip count in the top right. | Kyle |
+| 2026-11-08 | **Host: Stop this hand** (two taps, only while a hand or its dice roll is in progress; not on the win summary). Nobody pays, chips and dealer stay; settings unlock; when everyone presses Start the same game is dealt again with new tiles. Players see "The host stopped this hand. It will be dealt again." | Kyle |
 | 2026-11-08 | **Shàng sets are shown in order**, lowest number first. | Kyle |
 | 2026-11-08 | **After the win summary:** seated players press Continue, then a popup like the seat picker shows who is ready, with Ready / Leave seat (and Back to summary). | Kyle |
 | 2026-11-08 | **Chips appear once:** only at the top right; your top-left name tag has no chips. | Kyle |
