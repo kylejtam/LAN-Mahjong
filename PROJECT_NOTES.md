@@ -139,6 +139,7 @@ disagrees with those, the newest dated entry here wins.
 | 2026-11-08 | **Glides easier to see:** the gliding tile was green on a green table and small on a PC. It is now bigger on large screens, has a cream edge and a yellow glow, and takes about ¾ of a second. | Kyle |
 | 2026-11-08 | **Phase 9 – controls tutorial:** 7 pop-up cards with small moving pictures (draw, discard, arrange, take a discard, win, undo, help & settings). Shown by itself the first time someone sits down on a device; reopen from ? → Controls tutorial. | Kyle |
 | 2026-11-08 | **Phase 9 – home screen:** "📲 Add to home screen" button on the join screen shows the steps for the device (iPhone/iPad Safari, Android Chrome, Samsung Internet); hidden when already opened from the home screen. Icon: the bird on a dark square, named "Mahjong". Android on a home network may still show the address bar (needs https to hide; accepted). | Kyle |
+| 2026-11-08 | **Merged into main.** Everything is now in the main version (pull request #1). Download link is now .../archive/refs/heads/main.zip. | Kyle |
 | 2026-11-08 | **Shàng sets are shown in order**, lowest number first. | Kyle |
 | 2026-11-08 | **After the win summary:** seated players press Continue, then a popup like the seat picker shows who is ready, with Ready / Leave seat (and Back to summary). | Kyle |
 | 2026-11-08 | **Chips appear once:** only at the top right; your top-left name tag has no chips. | Kyle |
@@ -205,4 +206,3 @@ Discarder pays double the base.
 | Cap | Earthly hand (win on dealer's first discard) | 地胡 |
 | Cap | All 8 flowers | 八仙過海 |
 | — | Seven pairs: **not allowed** (not standard HK) | 七對子 |
-| 2026-11-08 | **Merged into main.** Everything is now in the main version (pull request #1). Download link is now .../archive/refs/heads/main.zip. | Kyle |
