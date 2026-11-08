@@ -71,6 +71,13 @@ describe('claims', () => {
     expect(r.core.hands[2]).toHaveLength(11);
   });
 
+  it('上: the shown set is in order, lowest number first', () => {
+    // Dealer throws s1; seat 1 uses s2 s3 (the claimed tile is the lowest).
+    let r = dealerDiscards(table(), 's1');
+    r = claim(r, 1, { kind: 'chow', tileIds: [idOf(r, 1, 's3'), idOf(r, 1, 's2')] }, 0);
+    expect(r.core.melds[1]![0]!.tiles.map((t) => t.type)).toEqual(['s1', 's2', 's3']);
+  });
+
   it('上: only the next player can chow', () => {
     let r = dealerDiscards(table(), 's1');
     const ids: [number, number] = [idOf(r, 1, 's2'), idOf(r, 1, 's3')];

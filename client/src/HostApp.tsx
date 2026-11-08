@@ -305,11 +305,11 @@ function GameCard({ game, send }: { game: HostGameView; send: (m: HostMessage) =
             </b>
             <span>
               {s.name ?? (game.round && game.round.phase !== 'ended' ? <span className="offline">Empty – the game is waiting for this seat</span> : <span className="muted">Empty</span>)}
-              {s.cpu ? ` · CPU (${s.cpu})` : ''}
+
               {s.name && !s.cpu && !s.connected ? <span className="offline"> · offline</span> : ''}
             </span>
             {s.name && s.balance !== null && (
-              <ChipRow label="Chips" name={s.name} balance={s.balance} onSet={(balance) => cmd({ type: 'hostSetBalance', name: s.name!, balance })} />
+              <ChipRow label="Chips" name={s.name} balance={s.balance} onSet={(balance) => cmd({ type: 'hostSetBalance', name: s.name!, key: s.key ?? undefined, balance })} />
             )}
             <div className="row" style={{ justifyContent: 'flex-start', marginTop: 0 }}>
               {(['easy', 'medium', 'hard'] as CpuDifficulty[]).map((d) => (
@@ -338,7 +338,7 @@ function GameCard({ game, send }: { game: HostGameView; send: (m: HostMessage) =
                 name={p.name}
                 label={`${p.name}${p.connected ? '' : ' (offline)'}`}
                 balance={p.balance}
-                onSet={(balance) => cmd({ type: 'hostSetBalance', name: p.name, balance })}
+                onSet={(balance) => cmd({ type: 'hostSetBalance', name: p.name, key: p.key, balance })}
               />
             ))}
           </div>

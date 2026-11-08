@@ -166,7 +166,7 @@ export type HostCommand =
   | { type: 'hostSetSeat'; seat: number; cpu: CpuDifficulty | null }
   | { type: 'hostResetBalances' }
   /** Type in a person's chip count (the only way to change chips by hand). */
-  | { type: 'hostSetBalance'; name: string; balance: number }
+  | { type: 'hostSetBalance'; name: string; key?: string; balance: number }
   /** Go back to just before hand `toHand` was played: chips, wind and dealer as they were then. */
   | { type: 'hostRollBack'; toHand: number }
   /** Seconds every CPU waits before each move (the same for all levels). */
@@ -200,7 +200,8 @@ export function cleanName(name: string): string {
   return n;
 }
 
-const CPU_NAMES = ['CPU East', 'CPU South', 'CPU West', 'CPU North'];
+/** CPU players are named by their level; two CPUs may share a name. */
+const CPU_LEVEL_NAMES: Record<CpuDifficulty, string> = { easy: 'CPU Easy', medium: 'CPU Medium', hard: 'CPU Hard' };
 
 /**
  * Copy a room so it can be changed. The round itself is never changed in
@@ -333,13 +334,13 @@ function setRound(room: Room, round: RoundState): void {
 }
 
 function makeCpu(room: Room, seat: number, difficulty: CpuDifficulty): string {
-  let name = CPU_NAMES[seat]!;
-  let n = 2;
-  while (room.people[nameKey(name)] && !room.people[nameKey(name)]!.cpu) name = `${CPU_NAMES[seat]} ${n++}`;
-  const key = nameKey(name);
+  // Each seat has its own CPU record (so names can repeat and the CPU keeps its chips).
+  const key = `cpu#${seat}`;
+  const name = CPU_LEVEL_NAMES[difficulty];
   const existing = room.people[key];
   if (existing) {
     existing.cpu = difficulty;
+    existing.name = name;
     return key;
   }
   room.people[key] = {
@@ -657,7 +658,7 @@ export function handleHostCommand(prev: Room, cmd: HostCommand, now: number): Ro
       for (const p of Object.values(room.people)) p.balance = room.startingBalance;
       break;
     case 'hostSetBalance': {
-      const person = room.people[nameKey(String(cmd.name ?? ''))];
+      const person = (cmd.key ? room.people[cmd.key] : undefined) ?? room.people[nameKey(String(cmd.name ?? ''))];
       if (!person) fail('There is nobody with that name in this game.');
       if (!Number.isInteger(cmd.balance) || Math.abs(cmd.balance) > 1_000_000_000) fail('Chips must be a whole number.');
       person!.balance = cmd.balance;

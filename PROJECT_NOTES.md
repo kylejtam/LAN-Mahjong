@@ -9,7 +9,7 @@ disagrees with those, the newest dated entry here wins.
 - Phase 1 (rules engine): **done**. Tile set and checks, shuffle, wall and dice
   break, dealing with flower replacement, winning-hand check, legal
   chow/pong/gong/win, two-winner rule, fan counting, payments.
-- Tests: 231 passing (`npm test`), including 60 rounds of random play that check no tile is ever lost or created.
+- Tests: 233 passing (`npm test`), including 60 rounds of random play that check no tile is ever lost or created.
 - Phase 2 (game server): **done**.
   - Step 1 round engine (`server/src/game/round.ts`): **done**.
   - Step 2 full 16-round game (`server/src/game/match.ts`): **done**.
@@ -133,6 +133,11 @@ disagrees with those, the newest dated entry here wins.
 | 2026-11-08 | **Logo:** the original 1 bamboo bird on a tile is the game's logo, shown next to "LAN Mahjong" on the join screen and used as the browser tab icon (`client/public/logo.svg`). | Kyle |
 | 2026-11-08 | **Connections heal themselves.** Phones ask for the game list every 10 s and check the connection whenever the page comes back into view (e.g. after scanning the QR code with the camera); a connection that stays silent for 25 s is replaced. The server pings every phone every 15 s and drops connections that died silently. So new games appear on a waiting phone automatically. | Kyle (fix for his report) |
 | 2026-11-08 | **Logo without a background:** just the bird (lighter legs so they show on the dark screen); same for the browser tab icon. Tiles in the game keep their white faces. | Kyle |
+| 2026-11-08 | **Glides:** tapping Draw makes the tile glide from the middle into your hand; when other players draw, a tile glides from the middle to them. | Kyle |
+| 2026-11-08 | **Shàng sets are shown in order**, lowest number first. | Kyle |
+| 2026-11-08 | **After the win summary:** seated players press Continue, then a popup like the seat picker shows who is ready, with Ready / Leave seat (and Back to summary). | Kyle |
+| 2026-11-08 | **Chips appear once:** only at the top right; your top-left name tag has no chips. | Kyle |
+| 2026-11-08 | **CPU names:** "CPU Easy", "CPU Medium", "CPU Hard" (names may repeat; each seat's CPU keeps its own chips). Shown as 電腦（易／中／難） in Chinese. | Kyle |
 | 2026-11-08 | **First dealer** of a new game is seat 0 (East). | Claude (Kyle may change) |
 | 2026-11-08 | **Undo moves:** discard, 上, 碰, 槓, 胡. Draws are not separate moves. Undoing a discard puts the tile back in that player's hand and it is their turn again. | Kyle |
 | 2026-11-08 | **Several games at once:** one server can run many separate games, each with its own name. | Kyle |

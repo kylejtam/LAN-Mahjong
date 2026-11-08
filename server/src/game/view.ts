@@ -205,9 +205,9 @@ export interface HostGameView {
   /** Seconds each CPU waits before a move. */
   cpuSeconds: number;
   match: RoomView['match'];
-  seats: { seat: number; name: string | null; cpu: CpuDifficulty | null; connected: boolean; balance: number | null }[];
+  seats: { seat: number; key: string | null; name: string | null; cpu: CpuDifficulty | null; connected: boolean; balance: number | null }[];
   /** Everyone in the game who is not seated (not CPUs). */
-  spectators: { name: string; connected: boolean; balance: number }[];
+  spectators: { key: string; name: string; connected: boolean; balance: number }[];
   /** Short summary of the round, with no hidden tiles. */
   round: null | { phase: Phase; turn: number; wallCount: number; result: RoundResult | null };
   /** Finished hands, oldest first, with chip changes by name. */
@@ -246,12 +246,12 @@ export function hostViewOf(room: Room): HostGameView {
     },
     seats: room.seats.map((key, seat) => {
       const p = key ? room.people[key]! : null;
-      return { seat, name: p?.name ?? null, cpu: p?.cpu ?? null, connected: p?.connected ?? false, balance: p?.balance ?? null };
+      return { seat, key: p?.key ?? null, name: p?.name ?? null, cpu: p?.cpu ?? null, connected: p?.connected ?? false, balance: p?.balance ?? null };
     }),
     spectators: Object.values(room.people)
       .filter((p) => !p.cpu && !seatedKeys.has(p.key))
       .sort((a, b) => a.joinOrder - b.joinOrder)
-      .map((p) => ({ name: p.name, connected: p.connected, balance: p.balance })),
+      .map((p) => ({ key: p.key, name: p.name, connected: p.connected, balance: p.balance })),
     round: round
       ? { phase: round.core.phase, turn: round.core.turn, wallCount: tilesLeft(round.core.wall), result: round.core.result }
       : null,

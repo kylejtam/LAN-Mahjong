@@ -49,6 +49,8 @@ const en = {
   hintReplace: 'Drag the glowing replacement tile in the middle into your hand.',
   drawHere: 'Draw',
   take: 'Take',
+  continue: 'Continue',
+  backToSummary: 'Back to summary',
   undoChickenWin: 'Undo chicken win',
   replacementHere: 'Replacement',
   hintDiscard: 'Drag a tile to the middle of the table to discard it.',
@@ -154,6 +156,8 @@ const zh: Strings = {
   hintReplace: '將枱中間發光嘅補牌拖入手。',
   drawHere: '摸牌',
   take: '要',
+  continue: '繼續',
+  backToSummary: '返去結算',
   undoChickenWin: '還原雞糊',
   replacementHere: '補牌',
   hintDiscard: '將一隻牌拖去枱中間打出。',
@@ -302,6 +306,8 @@ export function cleanPrefs(raw: unknown): Partial<Prefs> {
 /** CPU players are named "CPU East" etc. on the server; show them in the player's language. */
 export function personName(name: string | null | undefined, lang: Lang): string {
   if (!name) return '';
+  const level = /^CPU (Easy|Medium|Hard)$/.exec(name);
+  if (level && lang === 'zh') return `電腦（${{ Easy: '易', Medium: '中', Hard: '難' }[level[1] as 'Easy' | 'Medium' | 'Hard']}）`;
   const m = /^CPU (East|South|West|North)( \d+)?$/.exec(name);
   if (!m || lang === 'en') return name;
   return `電腦${WIND_NAMES.zh[WIND_NAMES.en.indexOf(m[1]!)]}${m[2] ?? ''}`;

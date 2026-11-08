@@ -41,9 +41,11 @@ interface Props {
   canClaimWin: boolean;
   onWin: () => void;
   winLabel: string;
+  /** Seated players go on to the "Ready / Leave seat" popup. */
+  onContinue: () => void;
 }
 
-export function ResultPanel({ view, lang, command, canClaimWin, onWin, winLabel }: Props): ReactElement {
+export function ResultPanel({ view, lang, command, canClaimWin, onWin, winLabel, onContinue }: Props): ReactElement {
   const tr = (k: Parameters<typeof t>[1], v?: Record<string, string | number>): string => t(lang, k, v);
   if (view.phase === 'finished') {
     const ranked = [...view.seats].sort((a, b) => (b.balance ?? 0) - (a.balance ?? 0));
@@ -134,15 +136,8 @@ export function ResultPanel({ view, lang, command, canClaimWin, onWin, winLabel 
         <div className="row">
           {canClaimWin && <button className="act act-win" onClick={onWin}>{winLabel}</button>}
           {me && (
-            // Ready = pay out and start the next round once everyone is ready.
-            <button className="btn primary big" disabled={me.confirmed} onClick={() => command({ type: 'confirmRound' })}>
-              {me.confirmed ? `${tr('ready')} ✓` : tr('ready')}
-            </button>
-          )}
-          {me && (
-            <button className="btn" onClick={() => command({ type: 'dropOut', replacement: { none: true } })}>
-              {tr('leaveSeat')}
-            </button>
+            // Next: the "Ready / Leave seat" popup.
+            <button className="btn primary big" onClick={onContinue}>{tr('continue')}</button>
           )}
           {!me && view.spectatorsConfirm && (
             // All-CPU table: a spectator moves the game on to the next hand.

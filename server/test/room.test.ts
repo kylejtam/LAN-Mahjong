@@ -271,6 +271,20 @@ describe('host controls (laptop host page only)', () => {
     expect(() => host(startedTable(), { type: 'hostUpdateSettings', settings: { minFan: 2 } })).toThrow(/between rounds/);
   });
 
+  it('CPUs are named by level (names may repeat) and each keeps its own chips', () => {
+    let r = emptyRoom();
+    r = host(r, { type: 'hostSetSeat', seat: 0, cpu: 'easy' });
+    r = host(r, { type: 'hostSetSeat', seat: 1, cpu: 'easy' });
+    r = host(r, { type: 'hostSetSeat', seat: 2, cpu: 'hard' });
+    const names = hostViewOf(r).seats.map((s) => s.name);
+    expect(names).toEqual(['CPU Easy', 'CPU Easy', 'CPU Hard', null]);
+    const key1 = hostViewOf(r).seats[1]!.key!;
+    r = host(r, { type: 'hostSetBalance', name: 'CPU Easy', key: key1, balance: 123 });
+    expect(hostViewOf(r).seats.map((s) => s.balance)).toEqual([1000, 123, 1000, null]);
+    r = host(r, { type: 'hostSetSeat', seat: 1, cpu: 'medium' }); // same seat, new level, same chips
+    expect(hostViewOf(r).seats[1]).toMatchObject({ name: 'CPU Medium', balance: 123 });
+  });
+
   it('the host page can type in any person\'s chip count (players cannot)', () => {
     let r = join(startedTable(), 'Spec');
     r = host(r, { type: 'hostSetBalance', name: 'AMY', balance: 1450 });

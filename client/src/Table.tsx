@@ -11,7 +11,7 @@
  * Your own seat is always at the bottom. The next player in turn order is on
  * your right, the opposite player at the top, the previous player on your left.
  */
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties, ReactElement } from 'react';
 import type { Meld, NormalType, Tile } from '@lan-mahjong/shared';
 import { sortHand } from '@lan-mahjong/shared';
@@ -73,6 +73,8 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
 
   const [panel, setPanel] = useState<'help' | 'settings' | null>(null);
   const screen = useScreenSize();
+  /** After the win summary, players continue to the "Ready / Leave seat" popup. */
+  const [showReady, setShowReady] = useState<string | null>(null);
   /** Spectators can close the seat picker and just watch. */
   const [justWatching, setJustWatching] = useState(false);
   const [chooser, setChooser] = useState<Chooser>(null);
@@ -135,11 +137,32 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
   };
   /** Tapping the Draw / Replacement tile draws it too (dragging also works). */
   const onTap = (src: DragSource): void => {
+    if ((src.kind === 'wallFront' && a?.draw) || (src.kind === 'wallBack' && a?.drawReplacement)) {
+      // Remember where the tile starts, so it can glide into your hand.
+      const r = document.querySelector('.draw-pile')?.getBoundingClientRect();
+      if (r) drawFlyFrom.current = { x: r.left + r.width / 2, y: r.top + r.height / 2, at: Date.now() };
+    }
     if (src.kind === 'wallFront' && a?.draw) command({ type: 'draw' });
     else if (src.kind === 'wallBack' && a?.drawReplacement) command({ type: 'drawReplacement' });
     else if (src.kind === 'offered') onTapOffered();
   };
   const { drag, start } = useDrag(onDrop, onTap);
+
+  // A tapped draw glides from the middle into its place on the right of your hand.
+  const drawFlyFrom = useRef<{ x: number; y: number; at: number } | null>(null);
+  const drawnRef = useRef<HTMLSpanElement | null>(null);
+  useLayoutEffect(() => {
+    const from = drawFlyFrom.current;
+    const el = drawnRef.current;
+    if (!from || !el || Date.now() - from.at > 3000) return;
+    drawFlyFrom.current = null;
+    const r = el.getBoundingClientRect();
+    glide(el, from.x - (r.left + r.width / 2), from.y - (r.top + r.height / 2));
+  }, [drawnId]);
+
+  // When other players draw, a tile glides from the middle to them.
+  const [otherFlights, setOtherFlights] = useState<{ key: string; from: { x: number; y: number }; dx: number; dy: number }[]>([]);
+  const prevCounts = useRef<{ key: string; counts: number[] }>({ key: '', counts: [] });
 
   // Swap answers: tell the player who asked.
   const [swapToast, setSwapToast] = useState<string | null>(null);
@@ -292,13 +315,13 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
     );
   };
 
-  const nameTag = (sv: SeatView): ReactElement => (
+  const nameTag = (sv: SeatView, hideChips = false): ReactElement => (
     <div className={`nametag${round && round.turn === sv.seat && round.phase !== 'ended' ? ' nametag-turn' : ''}`}>
       <span className="wind-badge">{WIND_SHORT[lang][sv.wind]}</span>
       <span className="nametag-name">{sv.name ? personName(sv.name, lang) : tr('empty')}</span>
       {sv.cpu && !sv.name?.startsWith('CPU') && <span className="cpu-badge">{tr('cpu')}</span>}
       {sv.name && !sv.connected && !sv.cpu && <span className="offline">{tr('offline')}</span>}
-      {sv.balance !== null && <span className="chips">{sv.balance}</span>}
+      {sv.balance !== null && !hideChips && <span className="chips">{sv.balance}</span>}
       {round && sv.isDealer && (
         <span className="dice dice-small" title="dice">
           {round.dice.map((d, i) => <span key={i} className="die">{d}</span>)}
@@ -343,6 +366,31 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
   const perWall = view.settings.flowersOn ? 18 : 17;
   const dealAnim = useDealAnimation(round, roundKey, perWall, sideOf);
 
+  useEffect(() => {
+    const counts = view.seats.map((sv) => sv.handCount);
+    const prev = prevCounts.current;
+    prevCounts.current = { key: roundKey, counts };
+    if (prev.key !== roundKey || dealAnim || !round || round.phase === 'ended') return;
+    const hub = document.querySelector('.hub')?.getBoundingClientRect();
+    if (!hub) return;
+    const from = { x: hub.left + hub.width / 2, y: hub.top + hub.height / 2 };
+    const flights = view.seats
+      .filter((sv) => sv.seat !== mySeat && counts[sv.seat]! === (prev.counts[sv.seat] ?? 0) + 1)
+      .map((sv) => {
+        const side = sideOf(sv.seat);
+        const target = side === 'bottom' ? document.querySelector('.me-row') : document.querySelector(`.opp-${side} .nametag`);
+        const t = target?.getBoundingClientRect();
+        if (!t) return null;
+        return { key: `${roundKey}-${sv.seat}-${counts[sv.seat]}-${Date.now()}`, from, dx: t.left + t.width / 2 - from.x, dy: t.top + t.height / 2 - from.y };
+      })
+      .filter((f): f is NonNullable<typeof f> => !!f);
+    if (flights.length === 0) return;
+    setOtherFlights((list) => [...list, ...flights]);
+    const timer = setTimeout(() => setOtherFlights((list) => list.filter((f) => !flights.includes(f))), 450);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [JSON.stringify(view.seats.map((sv) => sv.handCount)), roundKey]);
+
   const bottom = view.seats[bottomSeat]!;
   const winLabel = labels.win;
 
@@ -365,7 +413,7 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
     <div className={`table-screen felt-${view.tableColour}`}>
       <header className="topbar">
         <div className="topbar-left">
-          {me && nameTag(me)}
+          {me && nameTag(me, true)}
           {mySeat === null && <span className="nametag"><span className="nametag-name">{view.you.name}</span></span>}
           {mySeat !== null ? (
             <button className="btn undo" disabled={!canUndo} onClick={() => command({ type: 'undo' })}>
@@ -447,6 +495,15 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
         {renderOpponent('right')}
       </main>
 
+      {otherFlights.map((f) => (
+        <div
+          key={f.key}
+          className="deal-flight"
+          style={{ left: f.from.x, top: f.from.y, '--dx': `${f.dx}px`, '--dy': `${f.dy}px`, animationDuration: '400ms' } as CSSProperties}
+        >
+          <TileView back width="var(--opp-w)" />
+        </div>
+      ))}
       {dealAnim?.flight && (
         <div
           key={dealAnim.flight.key}
@@ -477,6 +534,7 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
             // The tile you just drew, a little apart on the far right.
             <span
               key={drawnTile.id}
+              ref={drawnRef}
               data-hand-tile={drawnTile.id}
               data-drawn="true"
               className={`hand-tile drawn-tile${drag?.moved && drag.src.kind === 'hand' && drag.src.tileId === drawnTile.id ? ' dragging' : ''}`}
@@ -524,7 +582,19 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
         <AllHands view={view} tr={tr} onClose={() => command({ type: 'setWatchAll', visible: false })} />
       )}
       {(round?.phase === 'ended' || view.phase === 'finished') && (
-        <ResultPanel view={view} lang={lang} command={command} canClaimWin={!!a?.win} onWin={onWin} winLabel={winLabel} />
+        showReady === roundKey && mySeat !== null && view.phase !== 'finished' ? (
+          <ReadyPanel view={view} tr={tr} lang={lang} command={command} onBack={() => setShowReady(null)} />
+        ) : (
+          <ResultPanel
+            view={view}
+            lang={lang}
+            command={command}
+            canClaimWin={!!a?.win}
+            onWin={onWin}
+            winLabel={winLabel}
+            onContinue={() => setShowReady(roundKey)}
+          />
+        )
       )}
 
       {chooser && (
@@ -925,4 +995,63 @@ function useDealAnimation(
     wall: { stacks, count: plan.total - f - b },
     flight: { key: `${plan.key}-${index}`, n: step.n, from: plan.from, dx: target.x - plan.from.x, dy: target.y - plan.from.y, ms: Math.max(120, stepMs * 0.9) },
   };
+}
+
+/** Make an element glide from (dx, dy) away back to where it belongs. */
+function glide(el: HTMLElement, dx: number, dy: number): void {
+  el.style.transition = 'none';
+  el.style.transform = `translate(${dx}px, ${dy}px)`;
+  void el.offsetWidth; // apply the starting position before animating
+  el.style.transition = 'transform 0.35s ease-out';
+  el.style.transform = '';
+  setTimeout(() => {
+    el.style.transition = '';
+  }, 400);
+}
+
+/**
+ * After the win summary: press Ready for the next round, or Leave seat to watch.
+ * The same square of seats as the seat picker shows who is ready.
+ */
+function ReadyPanel({
+  view,
+  tr,
+  lang,
+  command,
+  onBack,
+}: {
+  view: RoomView;
+  tr: Tr;
+  lang: Prefs['lang'];
+  command: Cmd;
+  onBack: () => void;
+}): ReactElement {
+  const me = view.you.seat !== null ? view.seats[view.you.seat]! : null;
+  return (
+    <div className="overlay">
+      <div className="panel seat-picker">
+        <h3>{view.name} · {view.label[lang]}</h3>
+        <div className="seat-square">
+          {view.seats.map((s) => (
+            <div key={s.seat} className={`seat seat-${s.seat}${s.seat === view.you.seat ? ' seat-mine' : ''}`}>
+              <span className="seat-wind">{WIND_NAMES[lang][s.wind]}</span>
+              <span className="seat-name">{s.name ? personName(s.name, lang) : tr('empty')}</span>
+              {s.cpu ? <span className="seat-ready">{tr('ready')}</span> : s.name && (s.confirmed ? <span className="seat-ready">{tr('ready')}</span> : <span className="seat-wind">…</span>)}
+            </div>
+          ))}
+        </div>
+        <div className="row">
+          {me && (
+            <button className="btn primary big" disabled={me.confirmed} onClick={() => command({ type: 'confirmRound' })}>
+              {me.confirmed ? `${tr('ready')} ✓` : tr('ready')}
+            </button>
+          )}
+          {me && (
+            <button className="btn" onClick={() => command({ type: 'dropOut', replacement: { none: true } })}>{tr('leaveSeat')}</button>
+          )}
+          <button className="btn" onClick={onBack}>{tr('backToSummary')}</button>
+        </div>
+      </div>
+    </div>
+  );
 }
