@@ -22,6 +22,12 @@ QR code that other devices can scan. Keep the window open while playing;
 press Ctrl+C to stop. Games are saved to `data/games.json` and carry on after
 a restart.
 
+**Host page:** on the laptop itself, open `http://localhost:3000/host` to
+create games and use host controls (CPU players, settings, table colour,
+balances, ending a game). It does not open on other devices. If you want to
+play on the laptop too, open the normal address in another browser tab and
+join like everyone else.
+
 Settings: `PORT=4000 npm start` uses a different port.
 
 ## Running the tests

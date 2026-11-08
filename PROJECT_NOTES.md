@@ -9,7 +9,7 @@ disagrees with those, the newest dated entry here wins.
 - Phase 1 (rules engine): **done**. Tile set and checks, shuffle, wall and dice
   break, dealing with flower replacement, winning-hand check, legal
   chow/pong/gong/win, two-winner rule, fan counting, payments.
-- Tests: 176 passing (`npm test`), including 60 rounds of random play that check no tile is ever lost or created.
+- Tests: 181 passing (`npm test`), including 60 rounds of random play that check no tile is ever lost or created.
 - Phase 2 (game server): **done**.
   - Step 1 round engine (`server/src/game/round.ts`): **done**.
   - Step 2 full 16-round game (`server/src/game/match.ts`): **done**.
@@ -43,8 +43,8 @@ disagrees with those, the newest dated entry here wins.
 | 2026-11-08 | Fan combining: 小三元 / 大三元 replace the separate dragon pong fan; 小四喜 replaces seat/round wind fan; 一台花 (2) replaces the 正花 from that set; 清一色 replaces 混一色; cap hands score 10 and nothing is added. When a hand can be split more than one way, the highest-scoring split is used. | Kyle (confirmed) |
 | 2026-11-08 | 坑坑胡 (all concealed pongs): no claimed sets; on a discard win the discard must finish the pair. 門前清 still counts with a concealed gong. | Claude (standard HK) |
 | 2026-11-08 | **New feature: Help button** in the top bar, immediately left of the settings button. Opens a screen showing the fan table and the fan to chips table. Built in phase 3; table contents live in `shared/src/fanTable.ts` and a test checks they match the scoring code. | Kyle |
-| 2026-11-08 | **Hosting (option a):** a laptop runs the game server in the background. Any player on any device (phone, tablet, laptop) can create a game and hold host controls. The server's laptop does not have to be a player. No app install. Replaces plan section 1 option C. An iPhone/iPad host app may be added later. | Kyle |
-| 2026-11-08 | **Host disconnects:** the game keeps going; host controls wait for the host to return. Replaces "game pauses for everyone" in the notes (that was only needed when the host's phone held the game). | Kyle |
+| 2026-11-08 | **Hosting (option a):** a laptop runs the game server in the background. (Host controls later moved to the laptop's host page, see below.) The server's laptop does not have to be a player. No app install. Replaces plan section 1 option C. An iPhone/iPad host app may be added later. | Kyle |
+| 2026-11-08 | **Host disconnects:** (superseded by the host page decision) the game never pauses for the host. | Kyle |
 | 2026-11-08 | **Drawing is manual:** a player drags a tile from the end of the wall into their hand. | Kyle |
 | 2026-11-08 | **Claiming a discard:** no pass button. 上 碰 槓 胡 buttons stay available until the next player draws. They are big and flashing. A player can also claim by tapping the discarded tile. | Kyle |
 | 2026-11-08 | **3-second grace period:** for 3 seconds after the next player draws, another player can still claim the discard. The draw is undone (tile goes back to the wall) and the claim happens. | Kyle |
@@ -53,8 +53,11 @@ disagrees with those, the newest dated entry here wins.
 | 2026-11-08 | **Replacement draws are manual** (drag from the back end of the wall) and forced: you cannot discard until you have drawn it. Flowers drawn during play go to the flower area automatically. | Kyle |
 | 2026-11-08 | Round engine details: a draw game happens when the next player tries to draw from an empty wall (so the 3 s grace still applies to the last discard). Robbing a gong 搶槓: others may 胡 on an added gong tile until 3 s after the gong player draws the replacement. Self-draw 胡 is only allowed straight after drawing. The full tile set is re-checked after every single move. | Claude |
 | 2026-11-08 | **Name already in use:** joining with a name that is currently connected is refused ("choose another name"). The same name while that person is disconnected reconnects them. | Claude (from plan section 7) |
-| 2026-11-08 | **Spectator hand view:** a player's hand is hidden from spectators unless that player turns "show my hand to spectators" on. CPU hands are shown by default. All hands are shown to everyone when a round ends. | Claude (Kyle may change) |
-| 2026-11-08 | **Leaving the game:** the person keeps their seat (shown as disconnected) until they come back or the host fills it with a CPU. If the host leaves, the earliest-joined connected human becomes host. | Claude (from notes) |
+| 2026-11-08 | **Spectator hand view (updated):** all hands are hidden from spectators at first. Each SPECTATOR chooses which players' hands they see (players do not control this). All hands are shown to everyone when a round ends. | Kyle |
+| 2026-11-08 | **Host page on the laptop (replaces the "host player"):** all host controls live on a host page that only opens on the laptop running the server (`http://localhost:3000/host`). It creates games and does: CPU seats, replace players, settings, table colour, reset balances, end game. Devices on the network are refused. Every player, including the laptop owner if they want to play, simply joins a game the same way. There is no host among the players, so "host leaves → first player becomes host" no longer applies. | Kyle |
+| 2026-11-08 | **Start screen:** no "Create game" button for players; they see the game list and join. | Kyle (follows from host page) |
+| 2026-11-08 | **Taking over a CPU seat:** between rounds a player may sit in a CPU's seat (the CPU leaves). This is how a player rejoins an all-CPU game. The host page can also replace any player with a CPU; that player becomes a spectator. | Claude (Kyle may change) |
+| 2026-11-08 | **Leaving the game:** the person keeps their seat (shown as disconnected) until they come back or the host page fills it with a CPU. | Claude (from notes) |
 | 2026-11-08 | **Round end:** balances change only after every seated human presses confirm. CPUs never hold up a round. The host can only empty a seat between rounds. | Claude |
 | 2026-11-08 | **Server start:** `npm start` on the laptop. It prints the address(es) to open; the start page shows a QR code. Port 3000 by default. Games are saved within half a second of every change. | Claude |
 | 2026-11-08 | **First dealer** of a new game is seat 0 (East). | Claude (Kyle may change) |

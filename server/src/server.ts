@@ -4,7 +4,10 @@
  * - talks to each device over a WebSocket and sends each one only its own view,
  * - lets CPU players move,
  * - saves games to a file so they survive a restart,
- * - serves a small web page with the join address and a QR code.
+ * - serves a small web page with the join address and a QR code,
+ * - runs the HOST PAGE (/host): creating games and all host controls. The
+ *   host page only works on the laptop itself; devices on the network are
+ *   refused, so players can only join games.
  */
 import { createServer, IncomingMessage, ServerResponse } from 'node:http';
 import { randomUUID, getRandomValues } from 'node:crypto';
@@ -12,10 +15,10 @@ import QRCode from 'qrcode';
 import { WebSocketServer, WebSocket } from 'ws';
 import { Rng } from '@lan-mahjong/shared';
 import { GRACE_MS, GameError, WIN_OVERRIDE_MS } from './game/round.js';
-import { Room, cpuTick, createRoom, disconnect, handleCommand, joinRoom, nameKey } from './game/room.js';
+import { Room, cpuTick, createRoom, disconnect, handleCommand, handleHostCommand, joinRoom, nameKey } from './game/room.js';
 import { matchLabel } from './game/match.js';
-import { viewFor } from './game/view.js';
-import { ClientMessage, GameListEntry, ServerMessage } from './protocol.js';
+import { hostViewOf, viewFor } from './game/view.js';
+import { ClientMessage, GameListEntry, HostMessage, ServerHostMessage, ServerMessage } from './protocol.js';
 import { loadRooms, saveRooms } from './storage.js';
 import { lanAddresses } from './addresses.js';
 
@@ -28,6 +31,13 @@ export interface ServerOptions {
   rng?: Rng;
   /** How often CPUs and timers are checked (milliseconds). */
   tickMs?: number;
+  /** Which connections may use the host page. Default: only this computer. */
+  isHostAddress?: (address: string | undefined) => boolean;
+}
+
+/** Is this connection from the server's own computer? */
+export function isLoopback(address: string | undefined): boolean {
+  return address === '127.0.0.1' || address === '::1' || address === '::ffff:127.0.0.1';
 }
 
 export interface RunningServer {
@@ -52,6 +62,8 @@ export async function startServer(opts: ServerOptions): Promise<RunningServer> {
   for (const r of opts.dataFile ? loadRooms(opts.dataFile) : []) rooms.set(r.id, r);
 
   const clients = new Map<WebSocket, Client>();
+  const hostSockets = new Set<WebSocket>();
+  const isHostAddress = opts.isHostAddress ?? isLoopback;
   const lastSent = new Map<string, number>(); // roomId → last broadcast time
   let lastGameList = '';
 
@@ -74,7 +86,7 @@ export async function startServer(opts: ServerOptions): Promise<RunningServer> {
   };
 
   // ---------- sending ----------
-  const send = (ws: WebSocket, msg: ServerMessage): void => {
+  const send = (ws: WebSocket, msg: ServerMessage | ServerHostMessage): void => {
     if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(msg));
   };
 
@@ -86,7 +98,6 @@ export async function startServer(opts: ServerOptions): Promise<RunningServer> {
         id: r.id,
         name: r.name,
         label: { en: matchLabel(r.match, 'en'), zh: matchLabel(r.match, 'zh') },
-        hostName: r.people[r.hostKey]?.name ?? '',
         seats: r.seats.map((k) => (k ? r.people[k]!.name : null)),
         spectators: Object.values(r.people).filter((p) => !p.cpu && !r.seats.includes(p.key) && p.connected).length,
         phase: r.phase,
@@ -101,6 +112,17 @@ export async function startServer(opts: ServerOptions): Promise<RunningServer> {
     for (const [ws, c] of clients) if (!c.roomId) send(ws, { type: 'games', games });
   };
 
+  /** Send the host page(s) on the laptop the latest overview of every game. */
+  const sendHostState = (): void => {
+    if (hostSockets.size === 0) return;
+    const msg: ServerHostMessage = {
+      type: 'hostState',
+      games: [...rooms.values()].sort((a, b) => a.createdAt - b.createdAt).map(hostViewOf),
+      urls: urlsFor(actualPortOf()),
+    };
+    for (const ws of hostSockets) send(ws, msg);
+  };
+
   /** Send every device in a room its own view. */
   const broadcast = (roomId: string): void => {
     const room = rooms.get(roomId);
@@ -111,6 +133,7 @@ export async function startServer(opts: ServerOptions): Promise<RunningServer> {
       if (c.roomId === roomId && c.key && room.people[c.key]) send(ws, { type: 'state', view: viewFor(room, c.key, t) });
     }
     sendGameListIfChanged();
+    sendHostState();
     scheduleSave();
   };
 
@@ -125,6 +148,7 @@ export async function startServer(opts: ServerOptions): Promise<RunningServer> {
         }
       }
       sendGameListIfChanged();
+      sendHostState();
       scheduleSave();
       return;
     }
@@ -138,22 +162,6 @@ export async function startServer(opts: ServerOptions): Promise<RunningServer> {
       case 'listGames':
         send(ws, { type: 'games', games: gameList() });
         return;
-      case 'createGame': {
-        disconnectClient(c);
-        const room = createRoom({
-          id: randomUUID().slice(0, 8),
-          name: String(msg.gameName ?? ''),
-          hostName: String(msg.name ?? ''),
-          startingBalance: Number(msg.startingBalance),
-          settings: msg.settings,
-          now: now(),
-        });
-        c.roomId = room.id;
-        c.key = room.hostKey;
-        send(ws, { type: 'joined', gameId: room.id, name: room.people[room.hostKey]!.name });
-        setRoom(room);
-        return;
-      }
       case 'joinGame': {
         const room = rooms.get(String(msg.gameId));
         if (!room) throw new GameError('That game no longer exists.');
@@ -197,6 +205,33 @@ export async function startServer(opts: ServerOptions): Promise<RunningServer> {
     }
   };
 
+  // ---------- handling a message from the host page ----------
+  const handleHostMessage = (ws: WebSocket, msg: HostMessage): void => {
+    switch (msg.type) {
+      case 'hostCreateGame': {
+        const room = createRoom({
+          id: randomUUID().slice(0, 8),
+          name: String(msg.gameName ?? ''),
+          startingBalance: Number(msg.startingBalance),
+          settings: msg.settings,
+          now: now(),
+        });
+        setRoom(room);
+        send(ws, { type: 'hostCreated', gameId: room.id });
+        return;
+      }
+      case 'hostCommand': {
+        const room = rooms.get(String(msg.gameId));
+        if (!room) throw new GameError('That game no longer exists.');
+        if (!msg.command || typeof msg.command !== 'object') throw new GameError('Bad command.');
+        setRoom(handleHostCommand(room, msg.command, now()));
+        return;
+      }
+      default:
+        throw new GameError('Unknown message.');
+    }
+  };
+
   /** Mark this device's person as disconnected (they keep their seat). */
   const disconnectClient = (c: Client): void => {
     if (!c.roomId || !c.key) return;
@@ -218,10 +253,20 @@ export async function startServer(opts: ServerOptions): Promise<RunningServer> {
     });
   });
 
+  const actualPortOf = (): number => (http.address() as { port: number } | null)?.port ?? port;
+
   const handleHttp = async (req: IncomingMessage, res: ServerResponse): Promise<void> => {
     const url = new URL(req.url ?? '/', 'http://localhost');
-    const actualPort = (http.address() as { port: number }).port;
-    const urls = urlsFor(actualPort);
+    const urls = urlsFor(actualPortOf());
+    const actualPort = actualPortOf();
+    if (url.pathname === '/host') {
+      if (!isHostAddress(req.socket.remoteAddress)) {
+        res.writeHead(403, { 'content-type': 'text/plain; charset=utf-8' }).end('The host page only opens on the laptop running the server.');
+        return;
+      }
+      res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' }).end(hostPlaceholderPage(urls));
+      return;
+    }
     if (url.pathname === '/api/info') {
       res.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify({ app: 'LAN Mahjong', port: actualPort, urls }));
       return;
@@ -244,7 +289,35 @@ export async function startServer(opts: ServerOptions): Promise<RunningServer> {
   };
 
   // ---------- WebSocket ----------
-  const wss = new WebSocketServer({ server: http, path: '/ws', maxPayload: 64 * 1024 });
+  // Two WebSocket doors: /ws for players, /host-ws for the host page (laptop only).
+  const wss = new WebSocketServer({ noServer: true, maxPayload: 64 * 1024 });
+  const hostWss = new WebSocketServer({ noServer: true, maxPayload: 64 * 1024 });
+  http.on('upgrade', (req, socket, head) => {
+    const path = new URL(req.url ?? '/', 'http://localhost').pathname;
+    if (path === '/ws') {
+      wss.handleUpgrade(req, socket, head, (ws) => wss.emit('connection', ws, req));
+    } else if (path === '/host-ws' && isHostAddress(req.socket.remoteAddress)) {
+      hostWss.handleUpgrade(req, socket, head, (ws) => hostWss.emit('connection', ws, req));
+    } else {
+      socket.write('HTTP/1.1 403 Forbidden\r\n\r\n');
+      socket.destroy();
+    }
+  });
+
+  hostWss.on('connection', (ws) => {
+    hostSockets.add(ws);
+    sendHostState();
+    ws.on('message', (data) => {
+      try {
+        handleHostMessage(ws, JSON.parse(String(data)) as HostMessage);
+      } catch (err) {
+        if (!(err instanceof GameError)) console.error('Unexpected host page error:', err);
+        send(ws, { type: 'error', message: err instanceof GameError ? err.message : 'Something went wrong. Please try again.' });
+      }
+    });
+    ws.on('close', () => hostSockets.delete(ws));
+  });
+
   wss.on('connection', (ws) => {
     const c: Client = { roomId: null, key: null };
     clients.set(ws, c);
@@ -310,8 +383,9 @@ export async function startServer(opts: ServerOptions): Promise<RunningServer> {
       clearInterval(interval);
       if (saveTimer) clearTimeout(saveTimer);
       saveNow();
-      for (const ws of clients.keys()) ws.terminate();
+      for (const ws of [...clients.keys(), ...hostSockets]) ws.terminate();
       await new Promise<void>((resolve) => wss.close(() => resolve()));
+      await new Promise<void>((resolve) => hostWss.close(() => resolve()));
       await new Promise<void>((resolve) => http.close(() => resolve()));
     },
   };
@@ -336,4 +410,13 @@ img{background:#fff;padding:8px;width:220px;height:220px;border-radius:8px}code{
 <p>${urls.map((u) => `<code>${escapeHtml(u)}</code>`).join('<br>') || 'No network address found'}</p>
 <h2>Games</h2><ul style="list-style:none;padding:0">${list}</ul>
 <p style="opacity:.6">The game screens are added in phase 3.</p></body></html>`;
+}
+
+/** Temporary host page until the real one is built. */
+function hostPlaceholderPage(urls: string[]): string {
+  return `<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>LAN Mahjong host</title>
+<style>body{font-family:system-ui,sans-serif;background:#111;color:#eee;padding:24px;text-align:center}</style></head>
+<body><h1>LAN Mahjong host</h1><p>Players join at: ${urls.map(escapeHtml).join(', ') || 'no network address found'}</p>
+<p style="opacity:.6">Creating games and host controls appear here in a later phase.</p></body></html>`;
 }

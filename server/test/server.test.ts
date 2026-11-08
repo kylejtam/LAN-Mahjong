@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { WebSocket } from 'ws';
 import { seededRng } from '@lan-mahjong/shared';
 import { RunningServer, startServer } from '../src/server.js';
-import type { ClientMessage, ServerMessage } from '../src/protocol.js';
+import type { ClientMessage, HostMessage, ServerHostMessage, ServerMessage } from '../src/protocol.js';
 import type { RoomView } from '../src/game/view.js';
 
 /** A pretend device: connects, sends messages, and remembers what it receives. */
@@ -15,8 +15,8 @@ class Device {
   /** The newest game state this device has received. */
   latest: RoomView | null = null;
   private waiters: (() => void)[] = [];
-  constructor(port: number) {
-    this.ws = new WebSocket(`ws://127.0.0.1:${port}/ws`);
+  constructor(port: number, path = '/ws') {
+    this.ws = new WebSocket(`ws://127.0.0.1:${port}${path}`);
     this.ws.on('message', (d) => {
       const msg = JSON.parse(String(d)) as ServerMessage;
       if (msg.type === 'state') this.latest = msg.view;
@@ -66,9 +66,51 @@ afterEach(async () => {
   dir = null;
 });
 
-async function boot(dataFile: string | null = null): Promise<RunningServer> {
-  server = await startServer({ port: 0, host: '127.0.0.1', dataFile, rng: seededRng(7), tickMs: 20 });
+async function boot(dataFile: string | null = null, extra: { isHostAddress?: (a: string | undefined) => boolean } = {}): Promise<RunningServer> {
+  server = await startServer({ port: 0, host: '127.0.0.1', dataFile, rng: seededRng(7), tickMs: 20, ...extra });
   return server;
+}
+
+/** The host page on the laptop. */
+class HostPage {
+  ws: WebSocket;
+  inbox: ServerHostMessage[] = [];
+  constructor(port: number) {
+    this.ws = new WebSocket(`ws://127.0.0.1:${port}/host-ws`);
+    this.ws.on('message', (d) => this.inbox.push(JSON.parse(String(d)) as ServerHostMessage));
+  }
+  open(): Promise<void> {
+    return new Promise((res, rej) => {
+      this.ws.once('open', () => res());
+      this.ws.once('error', rej);
+    });
+  }
+  send(msg: HostMessage): void {
+    this.ws.send(JSON.stringify(msg));
+  }
+  async waitFor<T extends ServerHostMessage>(test: (m: ServerHostMessage) => m is T): Promise<T> {
+    const end = Date.now() + 3000;
+    for (;;) {
+      const i = this.inbox.findIndex(test);
+      if (i >= 0) return this.inbox.splice(0, i + 1).pop() as T;
+      if (Date.now() > end) throw new Error('Host page timed out.');
+      await new Promise((r) => setTimeout(r, 20));
+    }
+  }
+  async createGame(gameName: string, startingBalance = 500): Promise<string> {
+    this.send({ type: 'hostCreateGame', gameName, startingBalance });
+    const m = await this.waitFor((x): x is Extract<ServerHostMessage, { type: 'hostCreated' }> => x.type === 'hostCreated');
+    return m.gameId;
+  }
+  close(): void {
+    this.ws.close();
+  }
+}
+
+async function hostPage(port: number): Promise<HostPage> {
+  const h = new HostPage(port);
+  await h.open();
+  return h;
 }
 
 async function device(port: number): Promise<Device> {
@@ -77,15 +119,15 @@ async function device(port: number): Promise<Device> {
   return d;
 }
 
-/** Kyle creates a game; Amy, Ben and Cat join; everyone sits and presses Start; Kyle rolls. */
+/** The host page creates a game; Kyle, Amy, Ben and Cat join; everyone sits and presses Start; Kyle rolls. */
 async function fullGame(port: number): Promise<Device[]> {
-  const kyle = await device(port);
-  kyle.send({ type: 'createGame', name: 'Kyle', gameName: 'Test table', startingBalance: 500 });
-  const { gameId } = await kyle.waitFor((m): m is Extract<ServerMessage, { type: 'joined' }> => m.type === 'joined');
-  const others = await Promise.all(['Amy', 'Ben', 'Cat'].map(() => device(port)));
-  ['Amy', 'Ben', 'Cat'].forEach((name, i) => others[i]!.send({ type: 'joinGame', gameId, name }));
-  for (const d of others) await d.waitFor((m): m is ServerMessage => m.type === 'joined');
-  const all = [kyle, ...others];
+  const host = await hostPage(port);
+  const gameId = await host.createGame('Test table');
+  host.close();
+  const all = await Promise.all(['Kyle', 'Amy', 'Ben', 'Cat'].map(() => device(port)));
+  ['Kyle', 'Amy', 'Ben', 'Cat'].forEach((name, i) => all[i]!.send({ type: 'joinGame', gameId, name }));
+  for (const d of all) await d.waitFor((m): m is ServerMessage => m.type === 'joined');
+  const kyle = all[0]!;
   for (let seat = 0; seat < 4; seat++) {
     all[seat]!.send({ type: 'command', command: { type: 'takeSeat', seat } });
     await all[seat]!.state((v) => v.you.seat === seat);
@@ -113,12 +155,12 @@ describe('game server over the network', () => {
     const s = await boot();
     const lobby = await device(s.port);
     await lobby.waitFor((m): m is ServerMessage => m.type === 'games');
-    const host = await device(s.port);
-    host.send({ type: 'createGame', name: 'Kyle', gameName: 'Friday', startingBalance: 100 });
+    const host = await hostPage(s.port);
+    await host.createGame('Friday', 100);
     const list = await lobby.waitFor(
       (m): m is Extract<ServerMessage, { type: 'games' }> => m.type === 'games' && m.games.length === 1,
     );
-    expect(list.games[0]).toMatchObject({ name: 'Friday', hostName: 'Kyle', label: { en: 'East, game 1' } });
+    expect(list.games[0]).toMatchObject({ name: 'Friday', label: { en: 'East, game 1' }, seats: [null, null, null, null] });
     lobby.close();
     host.close();
   });
@@ -167,9 +209,12 @@ describe('game server over the network', () => {
 
   it('refuses a name that is already connected', async () => {
     const s = await boot();
+    const hp = await hostPage(s.port);
+    const gameId = await hp.createGame('T', 0);
+    hp.close();
     const host = await device(s.port);
-    host.send({ type: 'createGame', name: 'Kyle', gameName: 'T', startingBalance: 0 });
-    const { gameId } = await host.waitFor((m): m is Extract<ServerMessage, { type: 'joined' }> => m.type === 'joined');
+    host.send({ type: 'joinGame', gameId, name: 'Kyle' });
+    await host.state();
     const other = await device(s.port);
     other.send({ type: 'joinGame', gameId, name: 'kyle' });
     expect((await other.error()).message).toMatch(/already in use/);
@@ -189,13 +234,47 @@ describe('game server over the network', () => {
     d.close();
   });
 
-  it('ending the game tells every device and removes it from the list', async () => {
+  it('ending the game (host page) tells every device and removes it from the list', async () => {
     const s = await boot();
     const devices = await fullGame(s.port);
-    devices[0]!.send({ type: 'command', command: { type: 'hostEndGame' } });
+    const gameId = (await devices[0]!.state()).id;
+    const host = await hostPage(s.port);
+    host.send({ type: 'hostCommand', gameId, command: { type: 'hostEndGame' } });
     for (const d of devices) await d.waitFor((m): m is ServerMessage => m.type === 'gameEnded');
     expect(s.rooms.size).toBe(0);
     devices.forEach((d) => d.close());
+    host.close();
+  });
+
+  it('players cannot create games or use host controls', async () => {
+    const s = await boot();
+    const devices = await fullGame(s.port);
+    devices[0]!.send({ type: 'createGame', name: 'X', gameName: 'Y', startingBalance: 1 } as unknown as ClientMessage);
+    expect((await devices[0]!.error()).message).toMatch(/Unknown message/);
+    devices[0]!.send({ type: 'command', command: { type: 'hostEndGame' } } as unknown as ClientMessage);
+    await devices[0]!.error();
+    expect(s.rooms.size).toBe(1);
+    devices.forEach((d) => d.close());
+  });
+
+  it('the host page refuses devices on the network', async () => {
+    const s = await boot(null, { isHostAddress: () => false });
+    const page = await fetch(`http://127.0.0.1:${s.port}/host`);
+    expect(page.status).toBe(403);
+    await expect(hostPage(s.port)).rejects.toThrow();
+  });
+
+  it('the host page opens on the laptop and gets an overview without hidden tiles', async () => {
+    const s = await boot();
+    expect((await fetch(`http://127.0.0.1:${s.port}/host`)).status).toBe(200);
+    const devices = await fullGame(s.port);
+    const host = await hostPage(s.port);
+    const state = await host.waitFor((m): m is Extract<ServerHostMessage, { type: 'hostState' }> => m.type === 'hostState');
+    expect(state.games).toHaveLength(1);
+    expect(state.games[0]!.seats.map((x) => x.name)).toEqual(['Kyle', 'Amy', 'Ben', 'Cat']);
+    expect(JSON.stringify(state)).not.toMatch(/"hand"/);
+    devices.forEach((d) => d.close());
+    host.close();
   });
 
   it('saves games and loads them again after a restart', async () => {
@@ -220,16 +299,17 @@ describe('game server over the network', () => {
 
   it('CPU players move by themselves', async () => {
     const s = await boot();
-    const host = await device(s.port);
-    host.send({ type: 'createGame', name: 'Kyle', gameName: 'Bots', startingBalance: 100 });
-    await host.waitFor((m): m is ServerMessage => m.type === 'joined');
+    const host = await hostPage(s.port);
+    const gameId = await host.createGame('Bots', 100);
     for (let seat = 0; seat < 4; seat++) {
-      host.send({ type: 'command', command: { type: 'hostSetSeat', seat, cpu: 'easy' } });
+      host.send({ type: 'hostCommand', gameId, command: { type: 'hostSetSeat', seat, cpu: 'easy' } });
     }
-    // Watch the all-CPU table get going: dice rolled and tiles discarded.
-    const v = await host.state((x) => (x.round?.discards.length ?? 0) >= 1);
+    // A spectator watches the all-CPU table get going: dice rolled and tiles discarded.
+    const watcher = await device(s.port);
+    watcher.send({ type: 'joinGame', gameId, name: 'Kyle' });
+    const v = await watcher.state((x) => (x.round?.discards.length ?? 0) >= 1);
     expect(v.you.seat).toBeNull();
-    expect(v.you.isHost).toBe(true);
     host.close();
+    watcher.close();
   }, 15000);
 });

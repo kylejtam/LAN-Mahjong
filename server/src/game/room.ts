@@ -1,18 +1,21 @@
 /**
  * A room: one game table with its people (players and spectators), seats,
- * host, settings and the full game.
+ * settings and the full game.
  *
- * Everything a device asks for comes in as a Command. handleCommand() checks
- * it is allowed and returns the new room (or throws a GameError).
+ * Everything a player's device asks for comes in as a Command;
+ * handleCommand() checks it is allowed and returns the new room (or throws a
+ * GameError). Host controls come ONLY from the host page on the laptop that
+ * runs the server, as a HostCommand handled by handleHostCommand().
  *
  * Decisions (see PROJECT_NOTES.md):
  * - The display name is the login. Names are matched ignoring capitals.
  * - Same name again while that person is disconnected = reconnect to the same
  *   seat and balance. Same name while they are still connected = "name in use".
  * - Balances belong to the person (the name), not the seat.
- * - Host disconnects: the game keeps going and host controls wait for them.
- *   Host leaves the game: the earliest-joined remaining human becomes host.
- * - Seat changes only between rounds. Swaps (drop out) can happen any time.
+ * - Games are created on the laptop's host page. Players only join.
+ * - Spectators choose which players' hands they see (all hidden at first).
+ * - Seat changes only between rounds (a player may take over a CPU's seat
+ *   between rounds). Swaps (drop out) can happen any time.
  */
 import { DEFAULT_SETTINGS, GameSettings, NormalType, Rng, SEATS, Tile } from '@lan-mahjong/shared';
 import { MatchState, beginRound, closeRound, newMatch } from './match.js';
@@ -47,8 +50,8 @@ export interface Person {
   connected: boolean;
   balance: number;
   cpu: CpuDifficulty | null;
-  /** Let spectators see this player's hand. */
-  showHandToSpectators: boolean;
+  /** As a spectator: the seats whose hands this person has chosen to see. */
+  watchingSeats: number[];
   /** Per-person preferences (language, theme ...), copied on rename. */
   prefs: Record<string, unknown>;
 }
@@ -71,7 +74,6 @@ export interface Room {
   id: string;
   name: string;
   createdAt: number;
-  hostKey: string;
   startingBalance: number;
   tableColour: TableColour;
   people: Record<string, Person>;
@@ -106,26 +108,21 @@ export type Command =
   | { type: 'reorderHand'; tileIds: number[] }
   | { type: 'undo' }
   | { type: 'confirmRound' }
-  | { type: 'setHandVisible'; visible: boolean }
+  | { type: 'setWatchedSeat'; seat: number; visible: boolean }
   | { type: 'setPrefs'; prefs: Record<string, unknown> }
   | { type: 'rename'; newName: string }
   | { type: 'dropOut'; replacement: { cpu: CpuDifficulty } | { spectator: string } }
   | { type: 'answerSwap'; accept: boolean }
-  | { type: 'leaveGame' }
-  // Host only:
+  | { type: 'leaveGame' };
+
+/** Host controls. These only come from the host page on the server laptop. */
+export type HostCommand =
+  /** Put a CPU in a seat (replacing whoever is there), or empty a CPU seat (cpu: null). */
   | { type: 'hostSetSeat'; seat: number; cpu: CpuDifficulty | null }
   | { type: 'hostResetBalances' }
   | { type: 'hostUpdateSettings'; settings: Partial<GameSettings>; startingBalance?: number }
   | { type: 'hostSetTableColour'; colour: TableColour }
   | { type: 'hostEndGame' };
-
-const HOST_ONLY = new Set<Command['type']>([
-  'hostSetSeat',
-  'hostResetBalances',
-  'hostUpdateSettings',
-  'hostSetTableColour',
-  'hostEndGame',
-]);
 
 /** How long CPUs wait after the last change before they move (milliseconds). */
 export const CPU_DELAY_MS = 900;
@@ -171,7 +168,6 @@ function cloneRoom(prev: Room): Room {
 export function createRoom(opts: {
   id: string;
   name: string;
-  hostName: string;
   startingBalance: number;
   settings?: Partial<GameSettings>;
   now: number;
@@ -185,7 +181,6 @@ export function createRoom(opts: {
     id: opts.id,
     name: gameName,
     createdAt: opts.now,
-    hostKey: '',
     startingBalance: Math.floor(opts.startingBalance),
     tableColour: 'green',
     people: {},
@@ -200,9 +195,7 @@ export function createRoom(opts: {
     lastChangeAt: opts.now,
     ended: false,
   };
-  const { room: joined, person } = joinRoom(room, opts.hostName, opts.now);
-  joined.hostKey = person.key;
-  return joined;
+  return room;
 }
 
 /**
@@ -229,7 +222,7 @@ export function joinRoom(prev: Room, rawName: string, now: number): { room: Room
     connected: true,
     balance: room.startingBalance,
     cpu: null,
-    showHandToSpectators: false,
+    watchingSeats: [],
     prefs: {},
   };
   room.people[key] = person;
@@ -297,7 +290,7 @@ function makeCpu(room: Room, seat: number, difficulty: CpuDifficulty): string {
     connected: true,
     balance: room.startingBalance,
     cpu: difficulty,
-    showHandToSpectators: true,
+    watchingSeats: [],
     prefs: {},
   };
   return key;
@@ -336,23 +329,13 @@ function maybeUndoWin(room: Room): void {
   setRound(room, undo(round, round.core.turn, true));
 }
 
-function becomeHostIfNeeded(room: Room): void {
-  const host = room.people[room.hostKey];
-  if (host && !host.cpu) return;
-  const next = Object.values(room.people)
-    .filter((p) => !p.cpu && p.key !== room.hostKey)
-    .sort((a, b) => a.joinOrder - b.joinOrder)[0];
-  if (next) room.hostKey = next.key;
-}
-
 // ---------- commands ----------
 
 export function handleCommand(prev: Room, key: string, cmd: Command, now: number, rng: Rng): Room {
   if (prev.ended) fail('This game has ended.');
   const actor = prev.people[key];
   if (!actor) fail('You are not in this game.');
-  if (HOST_ONLY.has(cmd.type) && prev.hostKey !== key) fail('Only the host can do that.');
-  if (prev.phase === 'finished' && !['hostEndGame', 'setPrefs', 'rename', 'leaveGame', 'hostResetBalances'].includes(cmd.type)) {
+  if (prev.phase === 'finished' && !['setPrefs', 'rename', 'leaveGame', 'setWatchedSeat'].includes(cmd.type)) {
     fail('The game is finished.');
   }
 
@@ -363,7 +346,9 @@ export function handleCommand(prev: Room, key: string, cmd: Command, now: number
     case 'takeSeat': {
       if (room.phase !== 'betweenRounds') fail('You can only change seats between rounds.');
       if (!Number.isInteger(cmd.seat) || cmd.seat < 0 || cmd.seat >= SEATS) fail('There is no such seat.');
-      if (room.seats[cmd.seat] !== null) fail('That seat is taken.');
+      const occupant = room.seats[cmd.seat];
+      // A free seat, or a CPU's seat (the CPU leaves), can be taken.
+      if (occupant !== null && occupant !== undefined && !room.people[occupant]!.cpu) fail('That seat is taken.');
       if (seat !== null) room.seats[seat] = null;
       room.seats[cmd.seat] = key;
       room.startPressed = room.startPressed.filter((k) => k !== key);
@@ -436,8 +421,10 @@ export function handleCommand(prev: Room, key: string, cmd: Command, now: number
       maybeCloseRound(room);
       break;
     }
-    case 'setHandVisible':
-      room.people[key]!.showHandToSpectators = cmd.visible;
+    case 'setWatchedSeat':
+      if (!Number.isInteger(cmd.seat) || cmd.seat < 0 || cmd.seat >= SEATS) fail('There is no such seat.');
+      room.people[key]!.watchingSeats = room.people[key]!.watchingSeats.filter((x) => x !== cmd.seat);
+      if (cmd.visible) room.people[key]!.watchingSeats.push(cmd.seat);
       break;
     case 'setPrefs':
       room.people[key]!.prefs = { ...room.people[key]!.prefs, ...cmd.prefs };
@@ -454,7 +441,6 @@ export function handleCommand(prev: Room, key: string, cmd: Command, now: number
       room.startPressed = room.startPressed.map(rekey);
       room.confirmed = room.confirmed.map(rekey);
       room.undoWinVotes = room.undoWinVotes.map(rekey);
-      if (room.hostKey === key) room.hostKey = newKey;
       if (room.pendingSwap) room.pendingSwap = { ...room.pendingSwap, fromKey: rekey(room.pendingSwap.fromKey), toKey: rekey(room.pendingSwap.toKey) };
       break;
     }
@@ -486,14 +472,20 @@ export function handleCommand(prev: Room, key: string, cmd: Command, now: number
       // The person keeps their seat (shown as disconnected) so the host can
       // wait for them or fill the seat with a CPU.
       room.people[key]!.connected = false;
-      if (room.hostKey === key) {
-        const next = Object.values(room.people)
-          .filter((p) => !p.cpu && p.key !== key && p.connected)
-          .sort((a, b) => a.joinOrder - b.joinOrder)[0];
-        if (next) room.hostKey = next.key;
-      }
       break;
     }
+    default:
+      fail('Unknown command.');
+  }
+  room.lastChangeAt = now;
+  return room;
+}
+
+/** Host controls from the laptop's host page. */
+export function handleHostCommand(prev: Room, cmd: HostCommand, now: number): Room {
+  if (prev.ended) fail('This game has ended.');
+  const room = cloneRoom(prev);
+  switch (cmd.type) {
     case 'hostSetSeat': {
       if (!Number.isInteger(cmd.seat) || cmd.seat < 0 || cmd.seat >= SEATS) fail('There is no such seat.');
       const current = room.seats[cmd.seat] ?? null;
@@ -503,9 +495,6 @@ export function handleCommand(prev: Room, key: string, cmd: Command, now: number
         if (current && !room.people[current]!.cpu) fail('Only CPU seats can be emptied this way.');
         room.seats[cmd.seat] = null;
       } else {
-        if (current && !room.people[current]!.cpu && room.people[current]!.connected) {
-          fail('That player is still connected. They can drop out from their settings.');
-        }
         room.seats[cmd.seat] = makeCpu(room, cmd.seat, cmd.cpu);
         if (current) cleanupAfterSeatChange(room, current);
       }
@@ -532,8 +521,9 @@ export function handleCommand(prev: Room, key: string, cmd: Command, now: number
     case 'hostEndGame':
       room.ended = true;
       break;
+    default:
+      fail('Unknown host command.');
   }
-  becomeHostIfNeeded(room);
   room.lastChangeAt = now;
   return room;
 }

@@ -1,17 +1,22 @@
 import { describe, expect, it } from 'vitest';
 import { seededRng } from '@lan-mahjong/shared';
-import { Command, Room, cpuTick, createRoom, disconnect, handleCommand, joinRoom } from '../src/game/room.js';
-import { viewFor } from '../src/game/view.js';
+import { Command, HostCommand, Room, cpuTick, createRoom, disconnect, handleCommand, handleHostCommand, joinRoom } from '../src/game/room.js';
+import { hostViewOf, viewFor } from '../src/game/view.js';
 
 const rng = seededRng(99);
 let clock = 1000;
 const tick = (): number => (clock += 100);
 
-function newRoom(): Room {
-  return createRoom({ id: 'r1', name: 'Friday game', hostName: 'Kyle', startingBalance: 1000, now: tick() });
+/** A game created on the host page (nobody in it yet). */
+function emptyRoom(): Room {
+  return createRoom({ id: 'r1', name: 'Friday game', startingBalance: 1000, now: tick() });
 }
 const join = (room: Room, name: string): Room => joinRoom(room, name, tick()).room;
+/** A game with Kyle joined as an ordinary player. */
+const newRoom = (): Room => join(emptyRoom(), 'Kyle');
 const cmd = (room: Room, who: string, c: Command): Room => handleCommand(room, who.toLowerCase(), c, tick(), rng);
+/** A host control from the laptop's host page. */
+const host = (room: Room, c: HostCommand): Room => handleHostCommand(room, c, tick());
 
 /** Kyle, Amy, Ben, Cat each in seats 0-3. */
 function fullTable(): Room {
@@ -28,15 +33,15 @@ function startedTable(): Room {
 }
 
 describe('creating and joining', () => {
-  it('the creator is the host and gets the starting balance', () => {
-    const r = newRoom();
-    expect(r.hostKey).toBe('kyle');
-    expect(r.people.kyle!.balance).toBe(1000);
-    expect(r.name).toBe('Friday game');
+  it('a game is created empty (on the host page); people who join get the starting balance', () => {
+    const empty = emptyRoom();
+    expect(Object.keys(empty.people)).toHaveLength(0);
+    expect(empty.name).toBe('Friday game');
+    expect(newRoom().people.kyle!.balance).toBe(1000);
   });
 
   it('needs a game name and a display name', () => {
-    expect(() => createRoom({ id: 'x', name: ' ', hostName: 'Kyle', startingBalance: 0, now: 0 })).toThrow();
+    expect(() => createRoom({ id: 'x', name: ' ', startingBalance: 0, now: 0 })).toThrow();
     expect(() => joinRoom(newRoom(), '   ', 0)).toThrow(/enter a name/);
   });
 
@@ -121,12 +126,22 @@ describe('what each device can see', () => {
     for (const t of r.match.round!.core.hands[0]!) expect(v).not.toContain(`"id":${t.id},`);
   });
 
-  it('spectators only see hands the player allows', () => {
+  it('spectators see no hands at first, and choose which hands to see', () => {
     let r = join(startedTable(), 'Spec');
-    expect(viewFor(r, 'spec', tick()).seats[2]!.hand).toBeNull();
-    r = cmd(r, 'Ben', { type: 'setHandVisible', visible: true });
-    expect(viewFor(r, 'spec', tick()).seats[2]!.hand).toHaveLength(13);
-    expect(viewFor(r, 'spec', tick()).seats[1]!.hand).toBeNull();
+    expect(viewFor(r, 'spec', tick()).seats.every((s) => s.hand === null)).toBe(true);
+    r = cmd(r, 'Spec', { type: 'setWatchedSeat', seat: 2, visible: true });
+    let v = viewFor(r, 'spec', tick());
+    expect(v.seats[2]!.hand).toHaveLength(13);
+    expect(v.seats[2]!.watched).toBe(true);
+    expect(v.seats[1]!.hand).toBeNull();
+    r = cmd(r, 'Spec', { type: 'setWatchedSeat', seat: 2, visible: false });
+    v = viewFor(r, 'spec', tick());
+    expect(v.seats[2]!.hand).toBeNull();
+  });
+
+  it('a seated player cannot use spectator hand choices to see other hands', () => {
+    const r = cmd(startedTable(), 'Amy', { type: 'setWatchedSeat', seat: 2, visible: true });
+    expect(viewFor(r, 'amy', tick()).seats[2]!.hand).toBeNull();
   });
 
   it('only shows a player their own buttons', () => {
@@ -169,66 +184,73 @@ describe('playing through the room', () => {
   });
 });
 
-describe('host controls', () => {
-  it('only the host can use host controls', () => {
+describe('host controls (laptop host page only)', () => {
+  it('players have no host commands', () => {
     const r = fullTable();
-    expect(() => cmd(r, 'Amy', { type: 'hostResetBalances' })).toThrow(/Only the host/);
-    expect(() => cmd(r, 'Amy', { type: 'hostSetTableColour', colour: 'red' })).toThrow(/Only the host/);
+    expect(() => cmd(r, 'Amy', { type: 'hostResetBalances' } as unknown as Command)).toThrow();
   });
 
   it('table colour and settings', () => {
     let r = fullTable();
-    r = cmd(r, 'Kyle', { type: 'hostSetTableColour', colour: 'blue' });
+    r = host(r, { type: 'hostSetTableColour', colour: 'blue' });
     expect(r.tableColour).toBe('blue');
-    r = cmd(r, 'Kyle', { type: 'hostUpdateSettings', settings: { minFan: 3, flowersOn: false } });
+    r = host(r, { type: 'hostUpdateSettings', settings: { minFan: 3, flowersOn: false } });
     expect(r.match.settings).toMatchObject({ minFan: 3, flowersOn: false });
-    expect(() => cmd(startedTable(), 'Kyle', { type: 'hostUpdateSettings', settings: { minFan: 2 } })).toThrow(/between rounds/);
+    expect(() => host(startedTable(), { type: 'hostUpdateSettings', settings: { minFan: 2 } })).toThrow(/between rounds/);
   });
 
   it('reset balances', () => {
     let r = fullTable();
     r.people.amy!.balance = 5;
-    r = cmd(r, 'Kyle', { type: 'hostResetBalances' });
+    r = host(r, { type: 'hostResetBalances' });
     expect(r.people.amy!.balance).toBe(1000);
   });
 
-  it('host disconnecting keeps them as host; host leaving passes it to the first player who joined', () => {
-    let r = fullTable();
-    r = disconnect(r, 'kyle', tick());
-    expect(r.hostKey).toBe('kyle');
-    r = join(r, 'Kyle');
-    r = cmd(r, 'Kyle', { type: 'leaveGame' });
-    expect(r.hostKey).toBe('amy');
-  });
-
-  it('host can fill a disconnected player\'s seat with a CPU, which keeps playing their hand', () => {
+  it('can fill a disconnected player\'s seat with a CPU, which keeps playing their hand', () => {
     let r = disconnect(startedTable(), 'amy', tick());
-    r = cmd(r, 'Kyle', { type: 'hostSetSeat', seat: 1, cpu: 'easy' });
+    r = host(r, { type: 'hostSetSeat', seat: 1, cpu: 'easy' });
     expect(r.people[r.seats[1]!]!.cpu).toBe('easy');
     expect(r.match.round!.core.hands[1]).toHaveLength(13);
     expect(r.people.amy!.balance).toBe(1000); // Amy keeps her balance
   });
 
-  it('host cannot replace a player who is still connected', () => {
-    expect(() => cmd(fullTable(), 'Kyle', { type: 'hostSetSeat', seat: 1, cpu: 'easy' })).toThrow(/still connected/);
+  it('can replace any player with a CPU; the player becomes a spectator', () => {
+    const r = host(fullTable(), { type: 'hostSetSeat', seat: 1, cpu: 'medium' });
+    expect(r.people[r.seats[1]!]!.cpu).toBe('medium');
+    expect(viewFor(r, 'amy', tick()).you.seat).toBeNull();
+  });
+
+  it('a player can take over a CPU seat between rounds, but not during a round', () => {
+    let r = host(newRoom(), { type: 'hostSetSeat', seat: 0, cpu: 'easy' });
+    r = cmd(r, 'Kyle', { type: 'takeSeat', seat: 0 });
+    expect(r.seats[0]).toBe('kyle');
+    let full = join(join(join(emptyRoom(), 'Amy'), 'Ben'), 'Cat');
+    for (let seat = 0; seat < 4; seat++) full = host(full, { type: 'hostSetSeat', seat, cpu: 'easy' });
+    let now = clock;
+    while (full.phase !== 'playing') full = cpuTick(full, (now += 1000), rng);
+    expect(() => handleCommand(full, 'amy', { type: 'takeSeat', seat: 1 }, now, rng)).toThrow(/between rounds/);
+  });
+
+  it('the host overview never includes hidden tiles', () => {
+    const json = JSON.stringify(hostViewOf(startedTable()));
+    expect(json).not.toMatch(/"hand"|"hands"|"type":"[mps]\d"/);
   });
 
   it('ending the game stops all commands', () => {
-    const r = cmd(fullTable(), 'Kyle', { type: 'hostEndGame' });
+    const r = host(fullTable(), { type: 'hostEndGame' });
     expect(r.ended).toBe(true);
     expect(() => cmd(r, 'Amy', { type: 'leaveSeat' })).toThrow(/ended/);
   });
 });
 
 describe('changing name', () => {
-  it('moves balance, seat and host to the new name', () => {
+  it('moves balance and seat to the new name', () => {
     let r = fullTable();
     r.people.kyle!.balance = 777;
     r = cmd(r, 'Kyle', { type: 'rename', newName: 'KJ' });
     expect(r.people.kyle).toBeUndefined();
     expect(r.people.kj).toMatchObject({ name: 'KJ', balance: 777 });
     expect(r.seats[0]).toBe('kj');
-    expect(r.hostKey).toBe('kj');
   });
 
   it('logging in later with the new name is the same person', () => {
@@ -265,9 +287,8 @@ describe('swapping players', () => {
 
 describe('CPU players', () => {
   it('an all-CPU table plays the whole 16-round game by itself, and chips always add up', () => {
-    let r = newRoom();
-    for (let seat = 0; seat < 4; seat++) r = cmd(r, 'Kyle', { type: 'hostSetSeat', seat, cpu: 'easy' });
-    expect(r.hostKey).toBe('kyle'); // the host keeps host controls while spectating
+    let r = emptyRoom();
+    for (let seat = 0; seat < 4; seat++) r = host(r, { type: 'hostSetSeat', seat, cpu: 'easy' });
     let now = clock;
     let steps = 0;
     while (r.phase !== 'finished') {
@@ -282,8 +303,8 @@ describe('CPU players', () => {
   });
 
   it('CPUs wait a moment before moving', () => {
-    let r = newRoom();
-    for (let seat = 0; seat < 4; seat++) r = cmd(r, 'Kyle', { type: 'hostSetSeat', seat, cpu: 'easy' });
+    let r = emptyRoom();
+    for (let seat = 0; seat < 4; seat++) r = host(r, { type: 'hostSetSeat', seat, cpu: 'easy' });
     expect(cpuTick(r, r.lastChangeAt + 10, rng)).toBe(r);
   });
 });

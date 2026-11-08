@@ -23,6 +23,9 @@ if (server.urls.length) {
   console.log(`  No network address found. On this computer, open http://localhost:${server.port}`);
 }
 console.log('');
+console.log('  HOST PAGE (create games, host controls) - open on THIS laptop only:');
+console.log(`    http://localhost:${server.port}/host`);
+console.log('');
 console.log(`  Games are saved to ${dataFile}`);
 console.log('  Keep this window open while playing. Press Ctrl+C to stop.');
 console.log('');
