@@ -142,6 +142,7 @@ disagrees with those, the newest dated entry here wins.
 | 2026-11-08 | **Merged into main.** Everything is now in the main version (pull request #1). Download link is now .../archive/refs/heads/main.zip. | Kyle |
 | 2026-11-08 | **Faster loading (no visible change):** the laptop now sends the game's screen files compressed (gzip), so a phone downloads ~77 KB instead of ~241 KB, and keeps them in memory instead of re-reading the disk. Installer: stronger compression and a smaller server file (~0.24 MB less). Almost all of the installer is Node.js itself (~80 MB before compression), which can't safely be made smaller. | Kyle |
 | 2026-11-08 | **Removed the tutorial and the "Add to home screen" button** (Kyle: the controls are intuitive, and home-screen shortcuts break whenever the laptop's address changes). The app icons and app settings file stay, so a manually added shortcut still shows the bird named "Mahjong". | Kyle |
+| 2026-11-08 | **Minimum fan in the top bar:** a small label next to the round name, "Min 3 fan" / "3番起糊". Seen by players and spectators; updates when the host changes it. | Kyle |
 | 2026-11-08 | **Shàng sets are shown in order**, lowest number first. | Kyle |
 | 2026-11-08 | **After the win summary:** seated players press Continue, then a popup like the seat picker shows who is ready, with Ready / Leave seat (and Back to summary). | Kyle |
 | 2026-11-08 | **Chips appear once:** only at the top right; your top-left name tag has no chips. | Kyle |

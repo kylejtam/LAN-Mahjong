@@ -425,6 +425,7 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
         </div>
         <div className="topbar-centre">
           <span className="round-label">{view.label[lang]}</span>
+          <span className="min-fan" title={tr('minFanTitle')}>{tr('minFanShort', { n: view.settings.minFan })}</span>
           <span className="compass">
             {SIDES.map((side) => {
               const sv = view.seats[seatAt(side)]!;

@@ -25,6 +25,8 @@ export const WIND_SHORT: Record<Lang, string[]> = { en: ['E', 'S', 'W', 'N'], zh
 const en = {
   // top bar and general
   undo: 'Undo',
+  minFanShort: 'Min {n} fan',
+  minFanTitle: 'Minimum fan needed to win',
   undoAgreed: '({n} agreed)',
   spectating: 'Spectating',
   allHands: 'All hands',
@@ -133,6 +135,8 @@ type Strings = typeof en;
 
 const zh: Strings = {
   undo: '還原',
+  minFanShort: '{n}番起糊',
+  minFanTitle: '最少要幾多番先可以食糊',
   undoAgreed: '（{n} 人同意）',
   spectating: '旁觀中',
   allHands: '睇晒全部手牌',
