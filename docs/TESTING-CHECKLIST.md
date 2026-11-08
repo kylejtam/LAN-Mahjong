@@ -2,43 +2,36 @@
 
 Tick each box as you go. If something goes wrong, see "What to send me" at the end.
 
-## Part A: set up the Windows laptop (once)
+## Part A: install on the Windows laptop (once, and again for each update)
 
-- [ ] **Install Node.js.** Go to <https://nodejs.org>, download the **LTS** version
-      for Windows, and run the installer. Click Next through every step (the
-      default choices are fine).
-- [ ] **Sign in to GitHub** on the laptop's browser (github.com → Sign in).
-      The project is private, so GitHub shows "404 Not Found" until you are signed in.
-- [ ] **Download the game.** Go to <https://github.com/kylejtam/LAN-Mahjong>.
-      1. Click the branch button near the top left (it says **main**) and choose
-         **claude/nice-sagan-boolsz**. (The game is on this branch; *main* only has
-         the two planning files.)
-      2. Click the green **Code** button → **Download ZIP**.
-- [ ] **Unzip it.** Right-click the ZIP file → **Extract All…** → **Extract**.
-      You get a folder called `LAN-Mahjong-claude-nice-sagan-boolsz`.
-- [ ] **Open a command window in that folder.** Open the folder, click the
-      address bar at the top, type `cmd`, and press Enter. A black window opens.
-- [ ] **Install the game's tools.** In the black window, type this and press Enter:
+- [ ] **Sign in to GitHub** in the laptop's browser (the project is private).
+- [ ] **Download the game:** <https://github.com/kylejtam/LAN-Mahjong/archive/refs/heads/claude/nice-sagan-boolsz.zip>
+      and extract it (right-click → **Extract All**).
+- [ ] In the extracted folder, double-click **LAN-Mahjong-Setup.exe**.
+- [ ] Windows may say **"Windows protected your PC"**: click **More info → Run anyway**
+      (this happens because the installer isn't paid-for "signed"; it is safe).
+- [ ] Click through the installer. Leave **"Start LAN Mahjong now"** ticked and click **Finish**.
+- [ ] **Make sure your Wi-Fi is a "Private" network:** Settings → Network & internet → Wi-Fi →
+      your network → **Private**.
+- [ ] **Stop the laptop going to sleep** while you play: Settings → System → Power →
+      "When plugged in, put my device to sleep after" → **Never**.
 
-      npm install
+To update later: download the new ZIP and run the new **LAN-Mahjong-Setup.exe**; your saved
+games are kept. You don't need Node.js, the black command window, or `npm` any more.
 
-      Wait until it finishes (a minute or two). Some yellow "warn" lines are normal.
-- [ ] **Make sure your Wi-Fi is a "Private" network.** Windows Settings → Network &
-      internet → Wi-Fi → click your network → set **Network profile type** to
-      **Private**. (On "Public", Windows blocks other devices from joining.)
-- [ ] **Stop the laptop going to sleep** while you play: Settings → System →
-      Power → Screen and sleep → set "When plugged in, put my device to sleep
-      after" to **Never**. Keep the laptop plugged in.
+## Part B: start the game (every time you play)
 
-## Part B: start the server (every time you play)
+- [ ] Double-click the **LAN Mahjong** icon (bird) on the desktop or in the Start menu.
+- [ ] A small window opens; **keep it open while playing**. Closing it stops the game.
+- [ ] **The first time only**, Windows may ask about the firewall for Node.js: tick
+      **Private networks** and click **Allow**.
+- [ ] The **host page** opens in your browser by itself (`http://localhost:3000/host`).
+- [ ] Double-clicking the icon again while it runs just opens the host page again.
 
-- [ ] In the black window (in the game folder), type `npm start` and press Enter.
-- [ ] **If Windows shows a firewall box** ("Windows Defender Firewall has blocked
-      some features of Node.js"): tick **Private networks**, then click **Allow**.
-- [ ] The window shows an address like `http://192.168.1.20:3000`. Leave this
-      window open the whole time you play. (Closing it stops the game.)
-- [ ] On the laptop, open a browser and go to `http://localhost:3000/host`.
-      This is the **host page**. You should see a QR code.
+## Uninstall
+
+- [ ] Start menu → LAN Mahjong → **Uninstall LAN Mahjong** (or Settings → Apps → LAN Mahjong → Uninstall).
+      It asks whether to also delete your saved games.
 
 ## Part C: join from each device
 
@@ -128,11 +121,6 @@ Write down which devices worked: ☐ iPhone ☐ iPad ☐ Samsung tablet ☐ lapt
   that you allowed Node.js in the firewall box, and that the device isn't on a guest
   Wi-Fi. If the firewall box never appeared, search Start for "Allow an app through
   Windows Firewall" and tick **Private** next to Node.js.
-- **"npm is not recognized":** restart the laptop after installing Node.js, then try again.
-- **"'vite' is not recognized" (or "tsx" / "not recognized")** when running `npm start`:
-  the tools aren't installed in this folder yet. Run `npm install` first. Every newly
-  downloaded folder needs its own `npm install`.
-- **"running scripts is disabled on this system":** you're in PowerShell. Use the
-  black `cmd` window from Part A instead, or type `npm.cmd start`.
-- **"address already in use":** the server is already running in another window.
-  Close the other window, or start on another port with `set PORT=4000 && npm start`.
+- **Nothing happens / the window closes at once:** take a photo of the window if you can and send it to me.
+- **"Windows protected your PC" when installing:** click **More info**, then **Run anyway**.
+- **The host page doesn't open:** open your browser and go to `http://localhost:3000/host`.

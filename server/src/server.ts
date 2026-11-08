@@ -441,7 +441,19 @@ export async function startServer(opts: ServerOptions): Promise<RunningServer> {
   };
   const interval = setInterval(tick, opts.tickMs ?? 250);
 
-  await new Promise<void>((resolve) => http.listen(port, opts.host ?? '0.0.0.0', resolve));
+  await new Promise<void>((resolve, reject) => {
+    // Report problems such as "port already in use" instead of waiting forever.
+    const onError = (err: Error): void => {
+      clearInterval(interval);
+      clearInterval(pingTimer);
+      reject(err);
+    };
+    http.once('error', onError);
+    http.listen(port, opts.host ?? '0.0.0.0', () => {
+      http.off('error', onError);
+      resolve();
+    });
+  });
   const actualPort = (http.address() as { port: number }).port;
 
   return {
