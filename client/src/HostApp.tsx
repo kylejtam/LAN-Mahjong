@@ -120,7 +120,7 @@ function GameCard({ game, send }: { game: HostGameView; send: (m: HostMessage) =
               {WIND_NAMES.en[(s.seat - dealer + 4) % 4]} seat{s.seat === dealer ? ' (dealer)' : ''}
             </b>
             <span>
-              {s.name ?? <span className="muted">Empty</span>}
+              {s.name ?? (game.round && game.round.phase !== 'ended' ? <span className="offline">Empty – the game is waiting for this seat</span> : <span className="muted">Empty</span>)}
               {s.cpu ? ` · CPU (${s.cpu})` : ''}
               {s.name && !s.cpu && !s.connected ? <span className="offline"> · offline</span> : ''}
             </span>

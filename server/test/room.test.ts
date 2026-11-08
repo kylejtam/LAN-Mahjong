@@ -284,10 +284,31 @@ describe('changing name', () => {
 });
 
 describe('swapping players', () => {
-  it('drop out to a CPU', () => {
-    const r = cmd(startedTable(), 'Ben', { type: 'dropOut', replacement: { cpu: 'hard' } });
-    expect(r.people[r.seats[2]!]!.cpu).toBe('hard');
-    expect(r.people.ben!.balance).toBe(1000);
+  it('dropping out leaves an empty seat; the round waits until the host page adds a CPU', () => {
+    let r = startedTable();
+    r = cmd(r, 'Kyle', { type: 'discard', tileId: r.match.round!.core.hands[0]![0]!.id });
+    // Amy (seat 1, next to play) drops out.
+    r = cmd(r, 'Amy', { type: 'dropOut', replacement: { none: true } });
+    expect(r.seats[1]).toBeNull();
+    expect(r.people.amy!.balance).toBe(1000);
+    expect(r.match.round!.core.hands[1]).toHaveLength(13); // her tiles stay at the seat
+    expect(viewFor(r, 'amy', tick()).you.seat).toBeNull();
+    // Nobody moves for that seat by themselves.
+    expect(cpuTick(r, r.lastChangeAt + 60_000, rng)).toBe(r);
+    // The host page adds a CPU, which carries on with the hand.
+    r = host(r, { type: 'hostSetSeat', seat: 1, cpu: 'easy' });
+    const after = cpuTick(r, r.lastChangeAt + 60_000, rng);
+    expect(after.match.round!.core.hands[1]).toHaveLength(14); // the CPU drew
+  });
+
+  it('players cannot bring in a CPU themselves', () => {
+    expect(() =>
+      cmd(startedTable(), 'Ben', { type: 'dropOut', replacement: { cpu: 'hard' } } as unknown as Command),
+    ).toThrow(/Unknown replacement/);
+  });
+
+  it('a new game starts with all 4 seats empty', () => {
+    expect(emptyRoom().seats).toEqual([null, null, null, null]);
   });
 
   it('drop out to a spectator only happens after the spectator confirms', () => {

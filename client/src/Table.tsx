@@ -133,12 +133,14 @@ export function Table({ view, send, onLeave }: Props): ReactElement {
 
   // ---------- hints ----------
   const turnName = round ? view.seats[round.turn]?.name ?? '' : '';
+  const waitingOnEmptySeat = !!round && round.phase !== 'ended' && !turnName;
   let hint = '';
   if (view.phase === 'playing' && round && round.phase !== 'ended') {
     if (a?.draw) hint = 'Your turn: drag the end tile of the wall into your hand.';
     else if (a?.drawReplacement) hint = 'Drag the replacement tile from the back of the wall into your hand.';
     else if (a?.discard) hint = 'Drag a tile to the middle of the table to discard it.';
     else if (claimable) hint = 'You can claim the last discard. Tap a button or the tile.';
+    else if (waitingOnEmptySeat) hint = 'Waiting for the host to fill the empty seat.';
     else if (mySeat === null) hint = `Watching. ${turnName}'s turn.`;
     else hint = `${turnName}'s turn.`;
   }
@@ -432,13 +434,13 @@ export function Table({ view, send, onLeave }: Props): ReactElement {
             {mySeat !== null && (
               <>
                 <h4>Drop out</h4>
-                <p className="muted">A CPU takes over your seat. You keep your chips.</p>
+                <p className="muted">
+                  You become a spectator and keep your chips. During a round, your tiles wait at the seat until the host adds a CPU. To hand your seat to a spectator instead, use a Swap button below.
+                </p>
                 <div className="row">
-                  {(['easy', 'medium', 'hard'] as const).map((d) => (
-                    <button key={d} className="btn" onClick={() => { command({ type: 'dropOut', replacement: { cpu: d } }); setPanel(null); }}>
-                      {d[0]!.toUpperCase() + d.slice(1)} CPU
-                    </button>
-                  ))}
+                  <button className="btn" onClick={() => { command({ type: 'dropOut', replacement: { none: true } }); setPanel(null); }}>
+                    Leave my seat
+                  </button>
                 </div>
                 {view.spectators.filter((s) => s.connected).length > 0 && (
                   <div className="row">

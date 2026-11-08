@@ -16,6 +16,9 @@
  * - Spectators choose which players' hands they see (all hidden at first).
  * - Seat changes only between rounds (a player may take over a CPU's seat
  *   between rounds). Swaps (drop out) can happen any time.
+ * - Only the host page can add CPU players. A player who drops out leaves an
+ *   empty seat; during a round the game waits on it until the host adds a CPU.
+ *   (To hand over to a spectator, use a swap instead of dropping out.)
  */
 import { DEFAULT_SETTINGS, GameSettings, NormalType, Rng, SEATS, Tile } from '@lan-mahjong/shared';
 import { MatchState, beginRound, closeRound, newMatch } from './match.js';
@@ -114,7 +117,12 @@ export type Command =
   | { type: 'setWatchAll'; visible: boolean }
   | { type: 'setPrefs'; prefs: Record<string, unknown> }
   | { type: 'rename'; newName: string }
-  | { type: 'dropOut'; replacement: { cpu: CpuDifficulty } | { spectator: string } }
+  /**
+   * Leave your seat. With no replacement the seat becomes empty (during a
+   * round its tiles wait there until the host page adds a CPU). Players can
+   * never add CPUs themselves.
+   */
+  | { type: 'dropOut'; replacement: { none: true } | { spectator: string } }
   | { type: 'answerSwap'; accept: boolean }
   | { type: 'leaveGame' };
 
@@ -452,14 +460,17 @@ export function handleCommand(prev: Room, key: string, cmd: Command, now: number
     }
     case 'dropOut': {
       const s = requireSeated(room, key);
-      if ('cpu' in cmd.replacement) {
-        room.seats[s] = makeCpu(room, s, cmd.replacement.cpu);
+      if ('none' in cmd.replacement) {
+        room.seats[s] = null;
+        room.pendingSwap = room.pendingSwap?.fromKey === key ? null : room.pendingSwap;
         cleanupAfterSeatChange(room, key);
-      } else {
+      } else if ('spectator' in cmd.replacement) {
         const toKey = nameKey(cmd.replacement.spectator);
         const to = room.people[toKey];
         if (!to || to.cpu || seatOf(room, toKey) !== null) fail('That spectator is not available.');
         room.pendingSwap = { fromKey: key, toKey, seat: s };
+      } else {
+        fail('Unknown replacement.');
       }
       break;
     }

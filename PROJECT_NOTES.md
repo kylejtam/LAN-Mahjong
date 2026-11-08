@@ -9,7 +9,7 @@ disagrees with those, the newest dated entry here wins.
 - Phase 1 (rules engine): **done**. Tile set and checks, shuffle, wall and dice
   break, dealing with flower replacement, winning-hand check, legal
   chow/pong/gong/win, two-winner rule, fan counting, payments.
-- Tests: 184 passing (`npm test`), including 60 rounds of random play that check no tile is ever lost or created.
+- Tests: 186 passing (`npm test`), including 60 rounds of random play that check no tile is ever lost or created.
 - Phase 2 (game server): **done**.
   - Step 1 round engine (`server/src/game/round.ts`): **done**.
   - Step 2 full 16-round game (`server/src/game/match.ts`): **done**.
@@ -75,6 +75,7 @@ disagrees with those, the newest dated entry here wins.
 | 2026-11-08 | **Chip lock button:** shown next to the chip total but does nothing yet (manual calculating is phase 6). | Claude |
 | 2026-11-08 | **Spectator "All hands":** a button for spectators opens a screen showing only the 4 hands (tiles, flowers and shown sets). It does not change which single hands the spectator chose to reveal on the table. | Kyle |
 | 2026-11-08 | **Spectate button** in the middle of the seat picker: anyone can start watching straight away (a seated player who taps it leaves their seat). Spectators get a "Take a seat" button between rounds. | Kyle |
+| 2026-11-08 | **CPUs only from the host page.** New games start with all 4 seats empty. Players can never add a CPU. "Drop out" in a player's settings just frees the seat (the player becomes a spectator and keeps their chips). During a round the empty seat keeps its tiles and the game waits on it until the host page adds a CPU. Swapping with a spectator (who must confirm) is still available. | Kyle |
 | 2026-11-08 | **First dealer** of a new game is seat 0 (East). | Claude (Kyle may change) |
 | 2026-11-08 | **Undo moves:** discard, 上, 碰, 槓, 胡. Draws are not separate moves. Undoing a discard puts the tile back in that player's hand and it is their turn again. | Kyle |
 | 2026-11-08 | **Several games at once:** one server can run many separate games, each with its own name. | Kyle |
