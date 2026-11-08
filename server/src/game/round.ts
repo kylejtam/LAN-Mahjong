@@ -492,7 +492,7 @@ export function claim(prev: RoundState, seat: number, c: Claim, now: number): Ro
   const tile = takeOffered();
   const own =
     c.kind === 'chow' ? removeTiles(hand, c.tileIds) : removeTypes(hand, tile.type, c.kind === 'pong' ? 2 : 3);
-  // A Shàng (run) is shown in order, lowest number first.
+  // A Soeng (run) is shown in order, lowest number first.
   const meldTiles = c.kind === 'chow' ? [...own, tile].sort((a, b) => a.type.localeCompare(b.type)) : [...own, tile];
   core.melds[seat]!.push({ kind: c.kind, tiles: meldTiles, concealed: false, claimedFrom: w.by });
   core.turn = seat;

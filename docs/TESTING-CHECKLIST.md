@@ -77,7 +77,7 @@ Write down which devices worked: ☐ iPhone ☐ iPad ☐ Samsung tablet ☐ lapt
 - [ ] Drag tiles to **reorder** your hand.
 - [ ] **Discard**: drag a tile to the middle; it slides into place. Other players' discards slide in too.
 - [ ] When you can claim, the tile shows big in the middle as **Take**; tap or drag it.
-      The flashing Shàng / Pèng / Gàng / Hú buttons also work, and so does tapping the discard.
+      The flashing Soeng / Pung / Gong / Wu buttons also work, and so does tapping the discard.
 - [ ] Once the next player draws, the buttons and flashing **disappear**.
 - [ ] Flowers go to your public tiles (left of your hand) and you draw a **Replacement**.
 - [ ] When anyone draws a flower (not during the deal), a big pop-up shows it in the middle ("N CPU Easy drew a flower" / "You drew a flower"), and the new flower glows gold where it lands.
