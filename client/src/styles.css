@@ -613,3 +613,6 @@ input { font: inherit; }
 /* Win celebration confetti: over everything, never blocks taps. */
 canvas.celebration { position: fixed; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 40; }
 .celebration-choice { flex-wrap: wrap; }
+
+/* Win summary: liability 包 line. */
+.liable-note { color: var(--gold, #f5c542); font-weight: 600; margin: 0.4em 0; }

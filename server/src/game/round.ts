@@ -59,6 +59,8 @@ export interface RoundSettings {
   flowersOn: boolean;
   minFan: number;
   payoutMode: PayoutMode;
+  /** Liability 包 for one-suit hands (missing in old save files = off). */
+  liabilityOn?: boolean;
 }
 
 /**
@@ -87,6 +89,8 @@ export type RoundResult =
       capHand: boolean;
       isChicken: boolean;
       changes: number[];
+      /** Liability 包: this seat paid the whole amount for everyone. */
+      liableSeat?: number | null;
     }
   | { type: 'draw' };
 
@@ -110,6 +114,12 @@ export interface RoundCore {
   replacementFor: 'gong' | 'flower' | null;
   discardCount: number;
   result: RoundResult | null;
+  /**
+   * Liability 包: liable[s] = the seat that fed player s a tile of their suit
+   * after s already had 3 face-up sets of that suit (null = nobody yet).
+   * Missing in old save files.
+   */
+  liable?: (number | null)[];
 }
 
 export type WindowStatus =
@@ -473,6 +483,13 @@ export function claim(prev: RoundState, seat: number, c: Claim, now: number): Ro
     return w.tile;
   };
 
+  // Liability 包: feeding a tile of the suit to someone showing 3 sets of it.
+  const suit = faceUpSuit(core.melds[seat]!);
+  if (suit && w.tile.type[0] === suit) {
+    const liable = (core.liable ??= [null, null, null, null]);
+    if (liable[seat] == null) liable[seat] = w.by;
+  }
+
   if (c.kind === 'win') {
     const tile = takeOffered();
     hand.push(tile);
@@ -561,6 +578,18 @@ function endWithWin(
     minFan: core.settings.minFan,
     mode: core.settings.payoutMode,
   });
+  // Liability 包: the liable player pays everything the winner gets, if the
+  // winning hand is all one suit (清一色). Not for chicken wins (the winner pays).
+  let changes = pay.changes;
+  let liableSeat: number | null = null;
+  const liable = core.liable?.[winner] ?? null;
+  if (core.settings.liabilityOn && liable !== null && !pay.isChicken && isOneSuitHand(core.hands[winner]!, core.melds[winner]!)) {
+    const total = changes[winner]!;
+    changes = [0, 0, 0, 0];
+    changes[winner] = total;
+    changes[liable] = -total;
+    liableSeat = liable;
+  }
   core.phase = 'ended';
   core.turn = winner;
   core.result = {
@@ -571,8 +600,27 @@ function endWithWin(
     items: fan.items,
     capHand: fan.capHand,
     isChicken: pay.isChicken,
-    changes: pay.changes,
+    changes,
+    liableSeat,
   };
+}
+
+/**
+ * The suit of a player's face-up sets, if they have at least 3 and they are
+ * all one suit (9 or more tiles of one suit showing). Concealed gongs don't count.
+ */
+export function faceUpSuit(melds: Meld[]): string | null {
+  const shown = melds.filter((m) => !m.concealed);
+  if (shown.length < 3) return null;
+  const suits = new Set(shown.flatMap((m) => m.tiles.map((t) => (isSuited(t.type) ? t.type[0]! : 'x'))));
+  if (suits.size !== 1 || suits.has('x')) return null;
+  return [...suits][0]!;
+}
+
+/** Is every tile of the winning hand (hidden and sets) the same suit? */
+function isOneSuitHand(hidden: Tile[], melds: Meld[]): boolean {
+  const all = [...hidden, ...melds.flatMap((m) => m.tiles)];
+  return all.length > 0 && all.every((t) => isSuited(t.type) && t.type[0] === all[0]!.type[0]);
 }
 
 // ---------- undo ----------

@@ -97,6 +97,9 @@ export function ResultPanel({ view, lang, command, canClaimWin, onWin, winLabel,
                 <span className="num">{tr('fan', { n: result.fan })}{result.capHand ? tr('maxFan') : ''}</span>
               </li>
             </ul>
+            {result.liableSeat != null && (
+              <p className="liable-note">{tr('liableNote', { name: personName(view.seats[result.liableSeat]?.name, lang) })}</p>
+            )}
             {result.isChicken && (
               <p className="muted">{tr('chickenNote', { min: view.settings.minFan, name: personName(view.seats[result.winner]?.name, lang) })}</p>
             )}

@@ -9,6 +9,7 @@ import {
   discard,
   draw,
   drawReplacement,
+  faceUpSuit,
   selfDrawWin,
   startRound,
   undo,
@@ -326,6 +327,72 @@ describe('winning', () => {
     r = draw(r, 1, 0);
     r = selfDrawWin(r, 1, 0);
     expect(r.core.result).toMatchObject({ isChicken: true, changes: [32, -96, 32, 32] });
+  });
+});
+
+describe('liability 包 for one-suit hands', () => {
+  // Seat 1 already shows 3 face-up pongs of dots (p1 p2 p3) and hides p5 p6 p7 p9.
+  const LIAB: Setup['hands'] = [
+    'm1 m2 m3 m4 m5 m6 m7 m8 m9 s1 s2 s3 wE p9',
+    'p1 p1 p1 p2 p2 p2 p3 p3 p3 p5 p6 p7 p9',
+    'dR dR s8 s9 m1 m1 wS wS wS wW wW wW s7',
+    'm5 m6 m7 s4 s5 s6 s6 s7 s8 wN wN wN dW',
+  ];
+  /** Move tiles from a seat's hidden hand into face-up pongs (as if claimed earlier). */
+  function showPongs(state: RoundState, seat: number, types: string[]): RoundState {
+    const next = structuredClone(state);
+    for (const type of types) {
+      const tiles = next.core.hands[seat]!.filter((t) => t.type === type).slice(0, 3);
+      next.core.hands[seat] = next.core.hands[seat]!.filter((t) => !tiles.includes(t));
+      next.core.melds[seat]!.push({ kind: 'pong', tiles, concealed: false, claimedFrom: 2 });
+    }
+    return next;
+  }
+  const start = (liabilityOn: boolean, hands = LIAB, front?: string): RoundState =>
+    showPongs(setupRound({ hands, front, settings: { minFan: 0, liabilityOn } }), 1, ['p1', 'p2', 'p3']);
+
+  it('knows when 9 tiles of one suit are showing', () => {
+    const r = start(true);
+    expect(faceUpSuit(r.core.melds[1]!)).toBe('p');
+    expect(faceUpSuit(r.core.melds[0]!)).toBeNull();
+  });
+
+  it('the player who discards the winning tile of that suit pays everything', () => {
+    const r = claim(dealerDiscards(start(true), 'p9'), 1, { kind: 'win' }, 0);
+    const res = r.core.result!;
+    if (res.type !== 'win') throw new Error('expected a win');
+    expect(res.items.map((i) => i.id)).toContain('fullFlush');
+    expect(res.liableSeat).toBe(0);
+    expect(res.changes[2]).toBe(0);
+    expect(res.changes[3]).toBe(0);
+    expect(res.changes[0]).toBe(-res.changes[1]!);
+    // With the setting off, the others pay their usual share.
+    const off = claim(dealerDiscards(start(false), 'p9'), 1, { kind: 'win' }, 0).core.result!;
+    if (off.type !== 'win') throw new Error('expected a win');
+    expect(off.liableSeat ?? null).toBeNull();
+    expect(off.changes[2]).toBeLessThan(0);
+    expect(off.changes[1]).toBe(res.changes[1]); // the winner gets the same total either way
+  });
+
+  it('feeding a set counts too: a later self-draw win is paid by the feeder alone', () => {
+    const hands: Setup['hands'] = [LIAB[0].replace('p9', 'p8'), LIAB[1], LIAB[2], LIAB[3]];
+    let r = start(true, hands, 'dG dG dG p9');
+    r = dealerDiscards(r, 'p8');
+    r = claim(r, 1, { kind: 'chow', tileIds: [idOf(r, 1, 'p6'), idOf(r, 1, 'p7')] }, 0); // fed by seat 0
+    expect(r.core.liable?.[1]).toBe(0);
+    r = discard(r, 1, idOf(r, 1, 'p5'), 0);
+    for (const seat of [2, 3, 0]) {
+      r = draw(r, seat, 0);
+      r = discard(r, seat, idOf(r, seat, 'dG'), 0);
+    }
+    r = draw(r, 1, 0);
+    r = selfDrawWin(r, 1, 0);
+    const res = r.core.result!;
+    if (res.type !== 'win') throw new Error('expected a win');
+    expect(res.liableSeat).toBe(0);
+    expect(res.changes).toEqual([-res.changes[1]!, res.changes[1], 0, 0]);
+    // Undo the win: the liability is still remembered for the hand.
+    expect(undo(r, 1, true).core.liable?.[1]).toBe(0);
   });
 });
 
