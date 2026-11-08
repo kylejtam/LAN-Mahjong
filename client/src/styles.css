@@ -569,3 +569,117 @@ input { font: inherit; }
   background: var(--tile-back); border: 2px solid #f4efe1; border-bottom-width: 5px; border-radius: 5px;
   box-shadow: 0 0 0 2px #f5c542, 0 0 14px 4px rgba(245, 197, 66, 0.75), 0 6px 10px rgba(0, 0, 0, 0.5);
 }
+
+/* ---------- Add to home screen (join screen) ---------- */
+.add-home { margin-top: 0.8em; }
+.add-home-panel { position: relative; max-width: min(92vw, 30em); }
+.add-home-panel .segmented { margin: 0.6em auto; flex-wrap: nowrap; justify-content: center; font-size: 0.85em; }
+.add-home-panel .segmented button { white-space: nowrap; }
+@media (max-height: 430px) {
+  .add-home-panel { font-size: 0.82em; padding: 0.6em 1em; }
+  .add-home-panel h3 { margin-bottom: 0.2em; }
+  .add-home-panel p { margin: 0.3em 0; }
+  .home-steps { margin: 0.4em 0; }
+}
+.home-steps { text-align: left; margin: 0.8em 0; padding-left: 1.4em; line-height: 1.45; }
+.home-steps li { margin: 0.35em 0; }
+
+/* ---------- Controls tutorial ---------- */
+.help-buttons { display: flex; gap: 0.6em; justify-content: center; margin-top: 0.8em; flex-wrap: wrap; }
+.tut-panel { position: relative; width: min(92vw, 30em); padding-top: 0.8em; }
+.tut-panel h3 { margin: 0.6em 0 0.3em; }
+.tut-step { color: var(--muted); font-size: 0.8em; }
+.tut-text { margin: 0 0 0.6em; line-height: 1.4; min-height: 2.8em; }
+.tut-dots { display: flex; gap: 0.45em; justify-content: center; margin: 0.4em 0 0.8em; }
+.tut-dots button { width: 0.6em; height: 0.6em; border-radius: 50%; border: none; padding: 0; background: var(--btn); cursor: pointer; }
+.tut-dots button.on { background: var(--accent); }
+.tut-nav { display: flex; justify-content: space-between; gap: 1em; }
+@media (max-height: 430px) {
+  .tut-panel { font-size: 0.85em; padding-top: 0.5em; padding-bottom: 0.6em; }
+  .tut-text { min-height: 0; }
+}
+
+/* The little table picture: 18em x 10em. Hand along the bottom, pond in the middle. */
+.tut-scene {
+  position: relative; width: 18em; height: 10em; margin: 0.4em auto 0; overflow: hidden;
+  background: var(--table, #1f5e3f); border-radius: 10px; font-size: min(1em, 4.4vw, 4.6vh);
+}
+.tut-pond { position: absolute; left: 4.5em; top: 1.2em; width: 9em; height: 4.6em; border: 1px dashed rgba(255, 255, 255, 0.25); border-radius: 8px; }
+.tut-hand { position: absolute; left: 2.9em; top: 7.4em; display: flex; gap: 0.15em; }
+.tut-scene .tile { flex: none; }
+.tut-finger {
+  position: absolute; left: 0; top: 0; width: 1.5em; height: 1.5em; margin: -0.75em 0 0 -0.75em; border-radius: 50%;
+  background: rgba(255, 255, 255, 0.55); border: 2px solid #fff; box-shadow: 0 0 8px rgba(0, 0, 0, 0.5);
+  z-index: 3; pointer-events: none; opacity: 0;
+}
+.tut-buttons { position: absolute; right: 0.7em; top: 7.6em; display: flex; gap: 0.3em; font-size: 0.6em; }
+.tut-buttons .act { display: inline-flex; align-items: center; justify-content: center; animation: flash 0.5s ease-in-out infinite alternate; }
+.tut-topbar { position: absolute; left: 0; right: 0; top: 0; height: 2.4em; background: rgba(0, 0, 0, 0.45); display: flex; align-items: center; padding: 0 0.4em; gap: 0.3em; }
+.tut-topbar.tut-right { justify-content: flex-end; }
+.tut-topbar .btn { font-size: 0.8em; pointer-events: none; }
+
+/* Draw: finger taps the glowing tile, which glides to the right end of the hand. */
+.tut-drawn { position: absolute; left: 8.2em; top: 2.5em; animation: tut-draw-tile 3s ease-in-out infinite; z-index: 2; }
+@keyframes tut-draw-tile { 0%, 30% { transform: translate(0, 0); } 55%, 100% { transform: translate(7.6em, 4.9em); } }
+.tut-draw .tut-finger { animation: tut-draw-finger 3s ease-in-out infinite; }
+@keyframes tut-draw-finger {
+  0% { opacity: 0; transform: translate(12em, 9em); }
+  10% { opacity: 1; }
+  25% { opacity: 1; transform: translate(9em, 3.6em) scale(1); }
+  30% { transform: translate(9em, 3.6em) scale(0.75); }
+  35% { opacity: 1; transform: translate(9em, 3.6em) scale(1); }
+  50%, 100% { opacity: 0; transform: translate(9em, 3.6em); }
+}
+
+/* Discard: a hand tile is dragged up to the middle. (5th tile: left 2.9 + 4 x 1.75 = 9.9em.) */
+.tut-move-discard { animation: tut-discard-tile 3s ease-in-out infinite; position: relative; z-index: 2; }
+@keyframes tut-discard-tile { 0%, 20% { transform: translate(0, 0); } 55%, 85% { transform: translate(-1.7em, -4.6em); } 100% { transform: translate(-1.7em, -4.6em); opacity: 0; } }
+.tut-discard .tut-finger { animation: tut-discard-finger 3s ease-in-out infinite; }
+@keyframes tut-discard-finger {
+  0% { opacity: 0; transform: translate(10.7em, 8.5em); }
+  15%, 20% { opacity: 1; transform: translate(10.7em, 8.5em); }
+  55% { opacity: 1; transform: translate(9em, 3.9em); }
+  70%, 100% { opacity: 0; transform: translate(9em, 3.9em); }
+}
+
+/* Reorder: the 2nd tile is dragged three places to the right; the others make room. */
+.tut-move-reorder { animation: tut-reorder-tile 3s ease-in-out infinite; position: relative; z-index: 2; }
+@keyframes tut-reorder-tile { 0%, 20% { transform: translate(0, 0); } 30% { transform: translate(0, -0.5em); } 60% { transform: translate(5.25em, -0.5em); } 70%, 90% { transform: translate(5.25em, 0); } 100% { transform: translate(0, 0); } }
+.tut-reorder .tut-hand > :nth-child(n + 3):nth-child(-n + 5) { animation: tut-reorder-make-room 3s ease-in-out infinite; }
+@keyframes tut-reorder-make-room { 0%, 40% { transform: translate(0, 0); } 60%, 90% { transform: translate(-1.75em, 0); } 100% { transform: translate(0, 0); } }
+.tut-reorder .tut-finger { animation: tut-reorder-finger 3s ease-in-out infinite; }
+@keyframes tut-reorder-finger {
+  0% { opacity: 0; transform: translate(5.5em, 8.6em); }
+  15%, 25% { opacity: 1; transform: translate(5.5em, 8.6em); }
+  60% { opacity: 1; transform: translate(10.75em, 8.1em); }
+  75%, 100% { opacity: 0; transform: translate(10.75em, 8.1em); }
+}
+
+/* Claim: the Take tile in the middle, the buttons flash, a finger taps the tile. */
+.tut-take { position: absolute; left: 7.9em; top: 1.4em; display: flex; flex-direction: column; align-items: center; color: #fff; font-weight: 700; font-size: 1em; }
+.tut-take span { font-size: 0.75em; }
+.tut-claim .tut-finger { animation: tut-tap 2.4s ease-in-out infinite; left: 8.9em; top: 2.6em; }
+/* Win: a finger taps the flashing win button. */
+.tut-win .tut-buttons { font-size: 0.8em; right: 1.2em; top: 2.6em; }
+.tut-win .tut-finger { animation: tut-tap 2.4s ease-in-out infinite; left: 15.4em; top: 4em; }
+/* Undo: tap the Undo button at the top left. */
+.tut-undo .tut-finger { animation: tut-tap 2.4s ease-in-out infinite; left: 2.4em; top: 1.2em; }
+/* Help: tap ? then the gear. */
+.tut-help .tut-finger { animation: tut-help-finger 3.2s ease-in-out infinite; }
+@keyframes tut-tap {
+  0% { opacity: 0; transform: translate(1.5em, 2em); }
+  30% { opacity: 1; transform: translate(0, 0) scale(1); }
+  40% { transform: translate(0, 0) scale(0.7); }
+  50% { opacity: 1; transform: translate(0, 0) scale(1); }
+  75%, 100% { opacity: 0; transform: translate(0, 0); }
+}
+@keyframes tut-help-finger {
+  0% { opacity: 0; transform: translate(14.5em, 4em); }
+  20% { opacity: 1; transform: translate(15.25em, 1.2em) scale(1); }
+  27% { transform: translate(15.25em, 1.2em) scale(0.7); }
+  34% { transform: translate(15.25em, 1.2em) scale(1); }
+  55% { transform: translate(16.75em, 1.2em) scale(1); }
+  62% { transform: translate(16.75em, 1.2em) scale(0.7); }
+  69% { opacity: 1; transform: translate(16.75em, 1.2em) scale(1); }
+  85%, 100% { opacity: 0; transform: translate(16.75em, 1.2em); }
+}
