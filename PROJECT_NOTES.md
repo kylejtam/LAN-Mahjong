@@ -104,6 +104,8 @@ disagrees with those, the newest dated entry here wins.
 | 2026-11-08 | **Undo with CPUs:** when it is a CPU's (or an empty seat's) turn, any seated player can press Undo. After an undo, CPUs wait 5 seconds so players can undo again. | Kyle |
 | 2026-11-08 | **CPU hands are shown sorted** (characters 1–9, dots 1–9, bamboo 1–9, winds, dragons) wherever they are visible. | Kyle |
 | 2026-11-08 | **All-CPU tables:** at the end of each hand the game waits until at least one spectator presses "Confirm – next hand". With nobody watching, it carries on by itself. | Kyle |
+| 2026-11-08 | **Public tiles left of private tiles.** Your shown sets and flowers sit in the same row as your hand, to their left; the row sizes itself so everything always fits on one line (public tiles a bit smaller than hand tiles). Your name tag sits under the row, next to the hint. Other players show name, then public tiles, then the hidden-tile count. | Kyle |
+| 2026-11-08 | **Discards always fit.** Side players get tall discard areas; top and bottom share the middle. The discard tile size is calculated from the space and the number of discards, so every discard stays visible (checked with 80 discards on iPhone SE / 13 / short Safari). | Claude (fix for Kyle's report) |
 | 2026-11-08 | **First dealer** of a new game is seat 0 (East). | Claude (Kyle may change) |
 | 2026-11-08 | **Undo moves:** discard, 上, 碰, 槓, 胡. Draws are not separate moves. Undoing a discard puts the tile back in that player's hand and it is their turn again. | Kyle |
 | 2026-11-08 | **Several games at once:** one server can run many separate games, each with its own name. | Kyle |

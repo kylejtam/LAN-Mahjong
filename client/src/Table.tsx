@@ -11,8 +11,8 @@
  * Your own seat is always at the bottom. The next player in turn order is on
  * your right, the opposite player at the top, the previous player on your left.
  */
-import { useEffect, useMemo, useState } from 'react';
-import type { ReactElement } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import type { CSSProperties, ReactElement } from 'react';
 import type { Meld, NormalType, Tile } from '@lan-mahjong/shared';
 import type { ClientMessage } from '../../server/src/protocol';
 import type { RoomView, SeatView } from '../../server/src/game/view';
@@ -23,6 +23,21 @@ import type { StringKey } from './i18n';
 import { DragSource, Drop, useDrag } from './drag';
 import { HelpPanel } from './HelpPanel';
 import { ResultPanel } from './ResultPanel';
+
+/** The window size, kept up to date when the device turns or the window changes. */
+function useScreenSize(): { w: number; h: number } {
+  const [size, setSize] = useState({ w: window.innerWidth, h: window.innerHeight });
+  useEffect(() => {
+    const update = (): void => setSize({ w: window.innerWidth, h: window.innerHeight });
+    window.addEventListener('resize', update);
+    window.addEventListener('orientationchange', update);
+    return () => {
+      window.removeEventListener('resize', update);
+      window.removeEventListener('orientationchange', update);
+    };
+  }, []);
+  return size;
+}
 
 type Side = 'bottom' | 'right' | 'top' | 'left';
 const SIDES: Side[] = ['bottom', 'right', 'top', 'left'];
@@ -56,6 +71,7 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
   const me = mySeat !== null ? view.seats[mySeat]! : null;
 
   const [panel, setPanel] = useState<'help' | 'settings' | null>(null);
+  const screen = useScreenSize();
   /** Spectators can close the seat picker and just watch. */
   const [justWatching, setJustWatching] = useState(false);
   const [chooser, setChooser] = useState<Chooser>(null);
@@ -195,6 +211,43 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
     </div>
   );
 
+  // Discard size: as big as possible while every player's discards still fit in their area.
+  const pondRef = useRef<HTMLDivElement | null>(null);
+  const [zones, setZones] = useState<Record<Side, { w: number; h: number }> | null>(null);
+  useEffect(() => {
+    const pond = pondRef.current;
+    if (!pond) return;
+    const measure = (): void => {
+      const out = {} as Record<Side, { w: number; h: number }>;
+      for (const side of SIDES) {
+        const el = pond.querySelector<HTMLElement>(`.discards-${side}`);
+        out[side] = { w: el?.clientWidth ?? 0, h: el?.clientHeight ?? 0 };
+      }
+      setZones(out);
+    };
+    measure();
+    // Re-measure whenever the middle area or any player's discard area changes size.
+    const ro = new ResizeObserver(measure);
+    ro.observe(pond);
+    pond.querySelectorAll('.discards').forEach((el) => ro.observe(el));
+    return () => ro.disconnect();
+  }, [!!round]);
+  const discardCount = (side: Side): number => round?.discards.filter((d) => d.by === seatAt(side)).length ?? 0;
+  const discardW = useMemo(() => {
+    const maxW = Math.min(screen.w * 0.028, screen.h * 0.055);
+    if (!zones) return maxW;
+    const fits = (n: number, w: number, h: number, d: number): boolean => {
+      if (n === 0) return true;
+      const perRow = Math.max(1, Math.floor((w + 1) / (d + 1)));
+      // +2 px per row leaves room for rounding and the 1 px gaps.
+      return Math.ceil(n / perRow) * (d * (4 / 3) + 2) <= h;
+    };
+    let d = Math.floor(maxW);
+    while (d > 8 && !SIDES.every((side) => fits(discardCount(side), zones[side].w - 1, zones[side].h - 1, d))) d -= 0.5;
+    return d;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [zones, round?.discards.length, screen.w, screen.h, bottomSeat]);
+
   const renderDiscards = (side: Side): ReactElement => {
     const seat = seatAt(side);
     const tiles = round?.discards.filter((d) => d.by === seat) ?? [];
@@ -236,26 +289,39 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
     return (
       <section className={`opp opp-${side}`} onClick={mySeat === null ? () => setSpectatorSeat(sv.seat) : undefined}>
         {nameTag(sv)}
-        {sv.hand ? (
-          <div className="opp-hand">
-            {sv.hand.map((t) => <TileView key={t.id} type={t.type} width="var(--opp-w)" />)}
-          </div>
-        ) : (
-          sv.handCount > 0 && (
-            // Hidden tiles: just one tile back and how many, to leave room for the public tiles.
-            <div className="opp-hidden" title={`${sv.handCount}`}>
-              <TileView back width="var(--opp-w)" />
-              <span>×{sv.handCount}</span>
+        {/* Public tiles (shown sets and flowers) first, then the hidden tiles. */}
+        <div className="opp-tiles">
+          {renderMelds(sv.melds, sv.flowers, 'var(--public-w)')}
+          {sv.hand ? (
+            <div className="opp-hand">
+              {sv.hand.map((t) => <TileView key={t.id} type={t.type} width="var(--opp-w)" />)}
             </div>
-          )
-        )}
-        {renderMelds(sv.melds, sv.flowers, 'var(--public-w)')}
+          ) : (
+            sv.handCount > 0 && (
+              // Hidden tiles: just one tile back and how many, to leave room for the public tiles.
+              <div className="opp-hidden" title={`${sv.handCount}`}>
+                <TileView back width="var(--opp-w)" />
+                <span>×{sv.handCount}</span>
+              </div>
+            )
+          )}
+        </div>
       </section>
     );
   };
 
   const bottom = view.seats[bottomSeat]!;
   const winLabel = labels.win;
+
+  // Size your row so public tiles + hand always fit on one line.
+  const publicCount = bottom.melds.reduce((n, m) => n + m.tiles.length, 0) + bottom.flowers.length;
+  const groups = bottom.melds.length + (bottom.flowers.length ? 1 : 0);
+  const handCount = serverHand ? serverHand.length : bottom.handCount;
+  const rowW = screen.w * 0.76 - 16;
+  const maxHand = Math.min(screen.w * 0.059, screen.h * 0.11);
+  const PUBLIC_RATIO = 0.72;
+  const handW = Math.max(14, Math.min(maxHand, rowW / (handCount + publicCount * PUBLIC_RATIO + groups * 0.3 + 0.6)));
+  const rowSizes = { '--hand-w': `${handW.toFixed(1)}px`, '--mine-w': `${(handW * PUBLIC_RATIO).toFixed(1)}px` } as CSSProperties;
   const showButtons = !!a && round?.phase !== 'ended';
   const dealerSeat = round ? view.seats.findIndex((s) => s.isDealer) : view.match.dealer;
   const iAmDealer = mySeat !== null && mySeat === view.match.dealer;
@@ -311,7 +377,7 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
         <section className="centre" data-drop="centre">
           {renderWall('top')}
           {renderWall('left')}
-          <div className="pond" data-drop="discard">
+          <div className="pond" data-drop="discard" ref={pondRef} style={{ '--discard-w': `${discardW}px` } as CSSProperties}>
             {renderDiscards('top')}
             {renderDiscards('left')}
             <div className="hub">
@@ -346,12 +412,11 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
         {renderOpponent('right')}
       </main>
 
-      <footer className="me">
-        <div className="me-info">
-          {nameTag(bottom)}
+      <footer className="me" style={rowSizes}>
+        <div className="me-row">
+          {/* Your public tiles (shown sets and flowers) sit to the left of your hand. */}
           {renderMelds(bottom.melds, bottom.flowers, 'var(--mine-w)')}
-        </div>
-        <div className="hand" data-drop="hand">
+          <div className="hand" data-drop="hand">
           {serverHand
             ? hand.map((t) => (
                 <span
@@ -364,6 +429,7 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
                 </span>
               ))
             : Array.from({ length: bottom.handCount }, (_, i) => <TileView key={i} back width="var(--hand-w)" />)}
+          </div>
         </div>
         <div className={`actions${claimable ? ' actions-claim' : ''}`}>
           {showButtons && a.chow.length > 0 && <button className="act act-chow" onClick={onChow}>{labels.chow}</button>}
@@ -371,7 +437,10 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
           {showButtons && (a.gong || ownGongs > 0) && <button className="act act-gong" onClick={onGong}>{labels.gong}</button>}
           {a && (a.win || a.selfDrawWin) && <button className="act act-win" onClick={onWin}>{winLabel}</button>}
         </div>
-        <div className="hint">{hint}</div>
+        <div className="me-bottom">
+          {nameTag(bottom)}
+          <span className="hint">{hint}</span>
+        </div>
       </footer>
 
       {view.phase === 'rolling' && iAmDealer && (

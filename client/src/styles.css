@@ -430,3 +430,34 @@ input { font: inherit; }
 .draw-label { font-weight: 800; color: #ffd447; }
 :root { --mine-w: min(3.3vw, 6.8vh); }
 .me-info { max-width: 34vw; }
+
+/* Your row: public tiles to the left of the hand, all on one line; name + hint underneath. */
+.me {
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-rows: auto auto;
+  grid-template-areas: 'row actions' 'bottom bottom';
+}
+.me-row { grid-area: row; display: flex; align-items: flex-end; justify-content: center; gap: 0.5em; min-width: 0; }
+.me-row .melds { flex-wrap: nowrap; gap: 0.25em; }
+.me-row .hand { flex-wrap: nowrap; }
+.me-bottom { grid-area: bottom; display: flex; align-items: center; gap: 0.8em; min-width: 0; }
+.me-bottom .hint { flex: 1; text-align: center; padding-right: 6em; }
+.opp-tiles { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 0.3em; }
+.opp-top .opp-tiles { flex-wrap: nowrap; }
+
+/* Discard areas: side players get tall areas; top and bottom share the middle column.
+   The tile size (--discard-w) is worked out so every discard always fits. */
+.pond {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.5fr) minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr) auto minmax(0, 1fr);
+  grid-template-areas: 'dleft dtop dright' 'dleft hub dright' 'dleft dbottom dright';
+}
+.discards { min-width: 0; min-height: 0; overflow: hidden; }
+.discards-top { max-width: none; align-self: stretch; justify-self: stretch; align-content: flex-end; justify-content: center; }
+.discards-bottom { max-width: none; align-self: stretch; justify-self: stretch; align-content: flex-start; justify-content: center; }
+.discards-left { align-self: stretch; justify-self: stretch; align-content: center; justify-content: flex-end; }
+.discards-right { align-self: stretch; justify-self: stretch; align-content: center; justify-content: flex-start; }
+.hub { justify-self: center; }
+.discards > span { display: block; line-height: 0; }
+/* Draw the "newest discard" outline inside the tile so area edges never clip it. */
+.tile-highlight { outline: 3px solid #ffd447; outline-offset: -3px; }
