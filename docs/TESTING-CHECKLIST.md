@@ -53,39 +53,64 @@ Write down which devices worked: ☐ iPhone ☐ iPad ☐ Samsung tablet ☐ lapt
 
 ## Part D: things to try
 
-### On the host page (laptop)
-- [ ] Create a game (name + starting balance).
-- [ ] Put CPU players in some seats (try easy, medium and hard).
-- [ ] Change "CPU time per move" (try 0.5 and 3) and see the CPUs speed up and slow down.
-- [ ] Change the table colour; check every device changes too.
+### Host page (laptop, `http://localhost:3000/host`)
+- [ ] Create a game: the starting balance shows **200** by default.
+- [ ] "CPU levels" and "History" start **closed**; click to open them.
+- [ ] Put CPUs in seats (easy / medium / hard). **Remove CPU** empties a seat.
+- [ ] **Remove player** takes a person out of their seat (they become a spectator).
+- [ ] Chips: change a number in a seat card, press **Set**, then **tap again** to confirm.
+- [ ] Change **CPU time per move** (e.g. 0.5 and 3) and watch the CPUs speed up / slow down.
+- [ ] Change the table colour; every device changes too.
+- [ ] After a few hands, open **History**: one column per seat, winner **green**,
+      discarder **red** (on a self-draw all losers are red).
+- [ ] **Roll back to before this** (two taps) and **Change current game** (two taps).
+- [ ] **End game** (two taps): every device is told.
 
-### On each player device
-- [ ] Type a name and tap **Join**. Tap a seat, then **Start**.
-- [ ] Turn the device upright: it asks you to turn it sideways. Turn it back.
-- [ ] Dealer only: **swipe the dice** to the middle.
-- [ ] **Drag** a tile from your hand to the middle to discard.
-- [ ] **Drag** the glowing wall tile into your hand to draw.
-- [ ] **Drag** tiles within your hand to reorder them.
-- [ ] When the buttons flash, try **Pèng / Shàng / Gàng / Hú**, and also try
-      tapping the discarded tile instead.
-- [ ] Try **Undo** after a discard (only the player whose turn it is can).
-- [ ] Open **?** (Help) and check both tables are readable.
-- [ ] Open **⚙** (Settings): switch to **中文**, change the theme, change your name.
-- [ ] Play a round to the end and check the summary (winning conditions, + / −
-      chips, total transferred). Everyone presses **Confirm**.
+### Join screen (each phone / tablet)
+- [ ] The bird logo shows next to "LAN Mahjong" (no white background).
+- [ ] Open the join screen **first**, then create a game on the laptop: it appears by itself.
+- [ ] Switch English / 中文.
+- [ ] Type a name, tap **Join**, then a seat (or **Spectate** in the middle).
+
+### Playing a hand
+- [ ] Press **Start**; the dealer swipes the dice; the dice then show next to the dealer's name.
+- [ ] The **deal animation** (~5 s): tiles slide to each player and the wall picture empties.
+- [ ] Your hand is **sorted** (fewest suit → most suit, 1–9, then winds E S W N, then dragons).
+- [ ] Your name, chips (and dice if you deal) are at the **top left**.
+- [ ] **Draw**: tap the glowing **Draw** tile in the middle, or drag it into your hand.
+- [ ] The new tile sits **apart on the right**; drag it into your hand and it joins it.
+- [ ] Drag tiles to **reorder** your hand.
+- [ ] **Discard**: drag a tile to the middle; it slides into place. Other players' discards slide in too.
+- [ ] When you can claim, the tile shows big in the middle as **Take**; tap or drag it.
+      The flashing Shàng / Pèng / Gàng / Hú buttons also work, and so does tapping the discard.
+- [ ] Once the next player draws, the buttons and flashing **disappear**.
+- [ ] Flowers go to your public tiles (left of your hand) and you draw a **Replacement**.
+- [ ] Left / right players' tiles lie **sideways in columns**; their name tags are one small line.
+- [ ] The wall picture around "tiles left" shrinks as tiles are drawn.
+- [ ] **Undo** after a discard. When it's a CPU's turn, you can undo for it.
+- [ ] Open **?** (Help): both tables readable.
+- [ ] Open **⚙** (Settings): change your name, change the language, **Leave my seat**,
+      **Swap with …** a spectator, close with the **×**.
+
+### End of a hand
+- [ ] Summary: winning conditions, the winner's sets grouped together, flowers,
+      **+ / −** chips for each player.
+- [ ] Buttons are only **Ready** and **Leave seat** (plus **Undo chicken win** for a chicken win).
+- [ ] Each player's row shows when they are **Ready**; when everyone is, the next hand starts.
+
+### Spectators
+- [ ] **Show / Hide** on each player; **All hands** shows all four hands.
+- [ ] **Sit here** on an empty seat works straight away, even mid-hand.
+- [ ] All-CPU table: the game waits at the end of each hand for **Next round**.
 
 ### Leaving and coming back
-- [ ] **Lock** a phone for 30 seconds, then unlock it. It should reconnect by itself.
-- [ ] **Close** the browser tab, open the address again, and join with the **same
-      name** (try different capitals, e.g. "kyle"). You should get your seat back.
-- [ ] On another device, tap **Spectate**, then try **All hands** and the eye buttons.
-- [ ] On the host page: set someone's chips, use **Roll back to before this**
-      on a finished game, and **Change current game**.
-- [ ] **Restart the server:** in the black window press **Ctrl + C**, then run
-      `npm start` again. Every device should reconnect to the same game and seats.
-- [ ] On the host page: **End game** (two taps). Every device should be told.
+- [ ] **Lock** a phone for 30 s, unlock: it reconnects by itself.
+- [ ] Switch to the camera and back: the game list / table updates by itself.
+- [ ] Close the tab and rejoin with the **same name** (try different capitals): same seat.
+- [ ] A swap request shows "Waiting for … to answer"; if declined, the asker is told.
+- [ ] **Restart the server** (Ctrl + C, then `npm start`): everyone reconnects to the same game.
 
-### Home screen (optional for now; full instructions come in phase 9)
+### Home screen (full instructions come in phase 9)
 - [ ] iPhone/iPad: Safari → Share → **Add to Home Screen**. Open it from there.
 - [ ] Samsung: Chrome → ⋮ menu → **Add to Home screen**. Open it from there.
 
