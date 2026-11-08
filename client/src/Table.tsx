@@ -13,7 +13,7 @@
  */
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties, ReactElement } from 'react';
-import type { Meld, NormalType, Tile } from '@lan-mahjong/shared';
+import type { Meld, NormalType, Tile, TileType } from '@lan-mahjong/shared';
 import { sortHand } from '@lan-mahjong/shared';
 import type { ClientMessage } from '../../server/src/protocol';
 import type { RoomView, SeatView } from '../../server/src/game/view';
@@ -230,7 +230,7 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
       {flowers.length > 0 && (
         <span className="meld flowers">
           {flowers.map((t) => (
-            <TileView key={t.id} type={t.type} width={size} sideways={sideways} />
+            <TileView key={t.id} type={t.type} width={size} sideways={sideways} className={newFlowerIds.has(t.id) ? 'flower-new' : undefined} />
           ))}
         </span>
       )}
@@ -365,6 +365,33 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
   const perWall = view.settings.flowersOn ? 18 : 17;
   const dealAnim = useDealAnimation(round, roundKey, perWall, sideOf);
 
+  // ---------- flowers: make a newly drawn flower obvious to everyone ----------
+  // A pop-up in the middle ("Kyle drew a flower") and a gold glow where it lands.
+  // Flowers handed out during the deal don't pop up.
+  const [flowerPops, setFlowerPops] = useState<{ key: string; seat: number; types: TileType[] }[]>([]);
+  const [newFlowerIds, setNewFlowerIds] = useState<Set<number>>(() => new Set());
+  const seenFlowers = useRef<{ key: string; ids: Set<number> }>({ key: '', ids: new Set() });
+  const flowerSig = view.seats.map((sv) => sv.flowers.map((f) => f.id).join(',')).join('|');
+  useEffect(() => {
+    const seen = seenFlowers.current;
+    const all = view.seats.flatMap((sv) => sv.flowers.map((f) => f.id));
+    const sameRound = seen.key === roundKey;
+    seenFlowers.current = { key: roundKey, ids: new Set(all) };
+    if (!sameRound || dealAnim || !round || round.phase === 'ended') return;
+    const pops = view.seats
+      .map((sv) => ({ seat: sv.seat, tiles: sv.flowers.filter((f) => !seen.ids.has(f.id)) }))
+      .filter((x) => x.tiles.length > 0)
+      .map((x) => ({ key: `${roundKey}-${x.tiles.map((t) => t.id).join('-')}`, seat: x.seat, types: x.tiles.map((t) => t.type) }));
+    if (pops.length === 0) return;
+    const ids = pops.flatMap((x) => view.seats[x.seat]!.flowers.filter((f) => !seen.ids.has(f.id)).map((f) => f.id));
+    setFlowerPops((list) => [...list.filter((x) => !pops.some((n) => n.seat === x.seat)), ...pops]);
+    setNewFlowerIds((old) => new Set([...old, ...ids]));
+    // Timers are not cancelled when the next state arrives, so each pop-up always finishes.
+    setTimeout(() => setFlowerPops((list) => list.filter((x) => !pops.some((n) => n.key === x.key))), 2000);
+    setTimeout(() => setNewFlowerIds((old) => new Set([...old].filter((id) => !ids.includes(id)))), 3500);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [flowerSig, roundKey, !!dealAnim]);
+
   useEffect(() => {
     const counts = view.seats.map((sv) => sv.handCount);
     const prev = prevCounts.current;
@@ -447,6 +474,27 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
       </header>
 
       <main className="board">
+        {flowerPops.length > 0 && (
+          <div className="flower-pops" aria-live="polite">
+            {flowerPops.map((fp) => (
+              <div key={fp.key} className="flower-pop">
+                <div className="flower-pop-tiles">
+                  {fp.types.map((type, i) => <TileView key={i} type={type} width="clamp(40px, 6vw, 72px)" />)}
+                </div>
+                <div className="flower-pop-text">
+                  {fp.seat === mySeat ? (
+                    tr('youDrewFlower')
+                  ) : (
+                    <>
+                      <span className="flower-pop-wind">{WIND_SHORT[lang][view.seats[fp.seat]!.wind]}</span>
+                      {tr('drewFlower', { name: personName(view.seats[fp.seat]?.name, lang) })}
+                    </>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
         {renderOpponent('top')}
         {renderOpponent('left')}
         <section className="centre" data-drop="centre">
@@ -554,7 +602,7 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
         />
       )}
       {view.you.watchAll && mySeat === null && round && (
-        <AllHands view={view} tr={tr} onClose={() => command({ type: 'setWatchAll', visible: false })} />
+        <AllHands view={view} tr={tr} newFlowerIds={newFlowerIds} onClose={() => command({ type: 'setWatchAll', visible: false })} />
       )}
       {(round?.phase === 'ended' || view.phase === 'finished') && (
         showReady === roundKey && mySeat !== null && view.phase !== 'finished' ? (
@@ -653,7 +701,7 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
 }
 
 /** Spectators: every player's hand, flowers and shown sets, and nothing else. */
-function AllHands({ view, tr, onClose }: { view: RoomView; tr: Tr; onClose: () => void }): ReactElement {
+function AllHands({ view, tr, newFlowerIds, onClose }: { view: RoomView; tr: Tr; newFlowerIds: Set<number>; onClose: () => void }): ReactElement {
   const lang = useLang();
   return (
     <div className="overlay all-hands-overlay">
@@ -673,7 +721,7 @@ function AllHands({ view, tr, onClose }: { view: RoomView; tr: Tr; onClose: () =
               ))}
               {s.flowers.length > 0 && (
                 <span className="meld flowers">
-                  {s.flowers.map((t) => <TileView key={t.id} type={t.type} width="var(--allhands-w)" />)}
+                  {s.flowers.map((t) => <TileView key={t.id} type={t.type} width="var(--allhands-w)" className={newFlowerIds.has(t.id) ? 'flower-new' : undefined} />)}
                 </span>
               )}
             </span>

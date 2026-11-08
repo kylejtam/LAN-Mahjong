@@ -26,6 +26,8 @@ const en = {
   // top bar and general
   undo: 'Undo',
   minFanShort: 'Min {n} fan',
+  drewFlower: '{name} drew a flower',
+  youDrewFlower: 'You drew a flower',
   minFanTitle: 'Minimum fan needed to win',
   undoAgreed: '({n} agreed)',
   spectating: 'Spectating',
@@ -136,6 +138,8 @@ type Strings = typeof en;
 const zh: Strings = {
   undo: '還原',
   minFanShort: '{n}番起糊',
+  drewFlower: '{name} 補花',
+  youDrewFlower: '你補花',
   minFanTitle: '最少要幾多番先可以食糊',
   undoAgreed: '（{n} 人同意）',
   spectating: '旁觀中',
