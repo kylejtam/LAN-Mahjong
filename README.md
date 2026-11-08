@@ -9,7 +9,8 @@ browser, no app install.
 
 ## Installing on the Windows laptop
 
-1. Download the project ZIP from GitHub and extract it.
+1. Download the installer: <https://github.com/kylejtam/LAN-Mahjong/releases/latest/download/LAN-Mahjong-Setup.exe>
+   (all versions: <https://github.com/kylejtam/LAN-Mahjong/releases>).
 2. Double-click **LAN-Mahjong-Setup.exe** and click through it
    (if Windows says "Windows protected your PC": **More info → Run anyway**).
 3. Double-click the **LAN Mahjong** icon on the desktop. A small window opens (keep it
@@ -18,6 +19,18 @@ browser, no app install.
 
 Uninstall from the Start menu (LAN Mahjong → Uninstall LAN Mahjong) or Settings → Apps.
 Saved games live in `%LOCALAPPDATA%\LAN Mahjong` and are kept when you update.
+
+**Updates are automatic:** each time LAN Mahjong starts, it checks GitHub for a newer
+release. If there is one, it downloads it, checks its fingerprint, installs it quietly and
+restarts by itself (before anyone joins). The version number is shown on the host page
+and the join screen.
+
+## Making a release
+
+Raise the `version` in `package.json` (for example 1.1.0 → 1.2.0) and merge it into
+`main`. GitHub (`.github/workflows/release.yml`) then runs the checks, builds
+`LAN-Mahjong-Setup.exe` and publishes it as release `v1.2.0` with its SHA-256 fingerprint.
+The installer is no longer stored in the code itself.
 
 ## For developers: running from the code
 

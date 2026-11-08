@@ -8,6 +8,7 @@ import type { ReactElement } from 'react';
 import type { Connection } from './net';
 import { Prefs, t } from './i18n';
 import { Logo } from './Logo';
+import { APP_VERSION } from './version';
 
 const NAME_KEY = 'lan-mahjong-name';
 
@@ -62,6 +63,7 @@ export function Lobby({ conn, prefs, setPrefs }: { conn: Connection; prefs: Pref
           </li>
         ))}
       </ul>
+      <p className="muted small app-version">LAN Mahjong v{APP_VERSION}</p>
     </div>
   );
 }

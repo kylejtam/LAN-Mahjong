@@ -26,6 +26,7 @@ import { CPU_LEVEL_DESCRIPTIONS } from './game/cpu.js';
 import { ClientMessage, GameListEntry, HostMessage, ServerHostMessage, ServerMessage } from './protocol.js';
 import { loadRooms, saveRooms } from './storage.js';
 import { lanAddresses } from './addresses.js';
+import { APP_VERSION } from './update.js';
 
 export interface ServerOptions {
   port: number;
@@ -338,7 +339,7 @@ export async function startServer(opts: ServerOptions): Promise<RunningServer> {
       return;
     }
     if (url.pathname === '/api/info') {
-      res.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify({ app: 'LAN Mahjong', port: actualPort, urls }));
+      res.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify({ app: 'LAN Mahjong', version: APP_VERSION, port: actualPort, urls }));
       return;
     }
     if (url.pathname === '/api/games') {
