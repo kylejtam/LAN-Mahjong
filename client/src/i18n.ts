@@ -5,6 +5,8 @@
  * Use t(lang, 'key', { name: 'Amy' }) – {name} in the text is replaced.
  */
 import { createContext, useContext } from 'react';
+import { CELEBRATION_STYLES } from './celebrate';
+import type { CelebrationStyle } from './celebrate';
 
 export type Lang = 'en' | 'zh';
 
@@ -27,6 +29,11 @@ const en = {
   undo: 'Undo',
   minFanShort: 'Min {n} fan',
   drewFlower: '{name} drew a flower',
+  celebration: 'Win celebration',
+  celebration_cannons: 'Confetti',
+  celebration_lucky: 'Red & gold',
+  celebration_chips: 'Gold chips',
+  celebration_fireworks: 'Fireworks',
   handStopped: 'The host stopped this hand. It will be dealt again.',
   youDrewFlower: 'You drew a flower',
   minFanTitle: 'Minimum fan needed to win',
@@ -140,6 +147,11 @@ const zh: Strings = {
   undo: '還原',
   minFanShort: '{n}番起糊',
   drewFlower: '{name} 補花',
+  celebration: '食糊慶祝',
+  celebration_cannons: '彩紙',
+  celebration_lucky: '紅金彩紙',
+  celebration_chips: '金籌碼',
+  celebration_fireworks: '煙花',
   handStopped: '主機停咗呢鋪牌，會重新派過。',
   youDrewFlower: '你補花',
   minFanTitle: '最少要幾多番先可以食糊',
@@ -284,8 +296,10 @@ export function translateServerMessage(lang: Lang, message: string): string {
 /** Each player's own choices (the app is always dark). */
 export interface Prefs {
   lang: Lang;
+  /** Confetti style when someone wins (only changes this player's screen). */
+  celebration: CelebrationStyle;
 }
-export const DEFAULT_PREFS: Prefs = { lang: 'en' };
+export const DEFAULT_PREFS: Prefs = { lang: 'en', celebration: 'cannons' };
 const PREFS_KEY = 'lan-mahjong-prefs';
 
 export function loadPrefs(): Prefs {
@@ -309,6 +323,7 @@ export function cleanPrefs(raw: unknown): Partial<Prefs> {
   if (raw && typeof raw === 'object') {
     const r = raw as Record<string, unknown>;
     if (r.lang === 'en' || r.lang === 'zh') out.lang = r.lang;
+    if (CELEBRATION_STYLES.includes(r.celebration as CelebrationStyle)) out.celebration = r.celebration as CelebrationStyle;
   }
   return out;
 }

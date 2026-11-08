@@ -24,6 +24,7 @@ import type { StringKey } from './i18n';
 import { DragSource, Drop, useDrag } from './drag';
 import { HelpPanel } from './HelpPanel';
 import { ChipIcon } from './ChipIcon';
+import { CELEBRATION_STYLES, celebrate } from './celebrate';
 import { ResultPanel } from './ResultPanel';
 
 /** The window size, kept up to date when the device turns or the window changes. */
@@ -184,6 +185,19 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
     const timer = setTimeout(() => setStopToast(false), 6000);
     return () => clearTimeout(timer);
   }, [view.roundStoppedAt]);
+
+  // ---------- win celebration ----------
+  // When a win summary appears (not a draw), throw confetti in this player's
+  // chosen style and play the fanfare. Only when it happens live: reopening the
+  // page while a summary is already showing doesn't replay it.
+  const winNow = !!round && round.phase === 'ended' && round.result?.type === 'win';
+  const celebrated = useRef<{ key: string; win: boolean }>({ key: roundKey, win: winNow });
+  useEffect(() => {
+    const before = celebrated.current;
+    celebrated.current = { key: roundKey, win: winNow };
+    if (winNow && before.key === roundKey && !before.win) celebrate(prefs.celebration);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [winNow, roundKey]);
 
   // ---------- action buttons ----------
   const onWin = (): void => (a?.selfDrawWin ? command({ type: 'selfDrawWin' }) : doClaim({ kind: 'win' }));
@@ -852,6 +866,22 @@ function SettingsPanel({
           <div className="segmented">
             <button className={prefs.lang === 'en' ? 'on' : ''} onClick={() => setPrefs({ ...prefs, lang: 'en' })}>English</button>
             <button className={prefs.lang === 'zh' ? 'on' : ''} onClick={() => setPrefs({ ...prefs, lang: 'zh' })}>中文</button>
+          </div>
+
+          <span>{tr('celebration')}</span>
+          <div className="segmented celebration-choice">
+            {CELEBRATION_STYLES.map((style) => (
+              <button
+                key={style}
+                className={prefs.celebration === style ? 'on' : ''}
+                onClick={() => {
+                  setPrefs({ ...prefs, celebration: style });
+                  celebrate(style); // a quick preview
+                }}
+              >
+                {tr(`celebration_${style}` as StringKey)}
+              </button>
+            ))}
           </div>
         </div>
 
