@@ -46,3 +46,4 @@ npm run typecheck   # check the code for type mistakes
 - `server/` – the game server: rounds, full games, rooms, CPU players, network, saving.
 - `client/` – the screens: the game table (players) and the host page (laptop).
 - `docs/screenshots/` – pictures of the screens.
+- `docs/TESTING-CHECKLIST.md` – step-by-step setup on a Windows laptop and what to test on each device.

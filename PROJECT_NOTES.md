@@ -34,7 +34,8 @@ disagrees with those, the newest dated entry here wins.
   confirms. Manual chip changes are on the host page.
 - Phase 7 (CPU players): **done**. Easy / medium / hard in `server/src/game/cpu.ts`,
   level descriptions and CPU time per move on the host page.
-- Phase 8 (testing on real devices on a real LAN): next.
+- Phase 8 (testing on real devices on a real LAN): **in progress**. Kyle is
+  testing with a Windows laptop as host. Checklist: `docs/TESTING-CHECKLIST.md`.
 
 ## Decisions
 
@@ -98,6 +99,7 @@ disagrees with those, the newest dated entry here wins.
 | 2026-11-08 | **CPU fair play:** CPUs only use what a real player in their seat could see (own tiles + everything face up). A test changes everyone else's hidden tiles and the wall and checks the CPU's move does not change. | Claude |
 | 2026-11-08 | **CPU time per move** is an editable number of seconds on the host page, per game (0.2–30 s, default 1 s). It is the same for every CPU level. Can be changed any time. | Kyle |
 | 2026-11-08 | **CPU strength (about 1,500 simulated hands):** easy wins ~13% against easy players; medium and hard win about two thirds of hands against easy players, hard collecting the most chips; against medium players hard is only slightly better (fewer chips lost). | Claude (measured) |
+| 2026-11-08 | **Host laptop is Windows.** Setup: install Node.js LTS, download the branch ZIP, `npm install`, `npm start`; Wi-Fi set to Private and Node.js allowed through the firewall. Saving falls back to a direct write if Windows locks the file. | Kyle |
 | 2026-11-08 | **First dealer** of a new game is seat 0 (East). | Claude (Kyle may change) |
 | 2026-11-08 | **Undo moves:** discard, 上, 碰, 槓, 胡. Draws are not separate moves. Undoing a discard puts the tile back in that player's hand and it is their turn again. | Kyle |
 | 2026-11-08 | **Several games at once:** one server can run many separate games, each with its own name. | Kyle |

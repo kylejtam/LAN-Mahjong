@@ -32,6 +32,13 @@ export function saveRooms(file: string, rooms: Iterable<Room>): void {
   mkdirSync(dirname(file), { recursive: true });
   const data: SaveFile = { version: 1, rooms: [...rooms].filter((r) => !r.ended) };
   const tmp = `${file}.tmp`;
-  writeFileSync(tmp, JSON.stringify(data));
-  renameSync(tmp, file);
+  const json = JSON.stringify(data);
+  writeFileSync(tmp, json);
+  try {
+    renameSync(tmp, file);
+  } catch {
+    // On Windows, antivirus or backup tools can briefly lock the file and
+    // make the rename fail. Fall back to writing the file directly.
+    writeFileSync(file, json);
+  }
 }
