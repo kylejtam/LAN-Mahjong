@@ -90,6 +90,7 @@ Write down which devices worked: ☐ iPhone ☐ iPad ☐ Samsung tablet ☐ lapt
 
 ### End of a hand
 - [ ] When someone wins, confetti goes off over the summary and a fanfare plays (iPhone/iPad: silent switch off). A draw has no celebration.
+- [ ] On the win summary and the Ready / Start pop-up, **?** and **⚙** in the top right still open Help and Settings.
 - [ ] ⚙ Settings → **Win celebration**: Confetti / Red & gold / Gold chips / Fireworks. Tapping one previews it; each device keeps its own choice.
 - [ ] Summary: winning conditions, the winner's sets grouped together, flowers,
       **+ / −** chips for each player.
