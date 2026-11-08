@@ -10,7 +10,7 @@ disagrees with those, the newest dated entry here wins.
   rule (see open questions). Built and tested: tile set and checks, shuffle,
   wall and dice break, dealing with flower replacement, winning-hand check,
   legal chow/pong/gong/win, fan counting, payments.
-- Tests: 90 passing (`npm test`).
+- Tests: 93 passing (`npm test`).
 
 ## Decisions
 
@@ -23,7 +23,7 @@ disagrees with those, the newest dated entry here wins.
 | 2026-11-08 | Dealing: 3 rounds of 4 tiles each, then 1 each, then 1 extra for the dealer. Flowers replaced from the back, dealer first, repeating until no hand has a flower. | Claude (standard HK) |
 | 2026-11-08 | Tile safety: the full set is checked right after shuffling and again after dealing. If anything is wrong the round stops with an error. | Claude |
 | 2026-11-08 | **Chicken win** = a valid winning hand below the minimum fan. The winner pays 32 to each of the other 3 players (96 total). Same for self-draw or discard. | Kyle |
-| 2026-11-08 | **Minimum fan** is a host setting. Default 3 until Kyle says otherwise. | Kyle / Claude default |
+| 2026-11-08 | **Minimum fan** is a host setting. **Default 1.** (Code: `DEFAULT_SETTINGS` in `shared/src/settings.ts`.) | Kyle |
 | 2026-11-08 | **Fan to chips table** approved (half-spicy, cap 10 fan = 128). Anything above 10 fan pays as 10. | Kyle |
 | 2026-11-08 | **Payout, default mode:** discarder pays 2 × base, the other two pay 1 × base each. | Kyle |
 | 2026-11-08 | **Payout, self-draw:** each of the other 3 players pays 2 × base. | Kyle |
@@ -32,6 +32,8 @@ disagrees with those, the newest dated entry here wins.
 | 2026-11-08 | **Fan list confirmed** by Kyle (table below). | Kyle |
 | 2026-11-08 | Fan combining: 小三元 / 大三元 replace the separate dragon pong fan; 小四喜 replaces seat/round wind fan; 一台花 (2) replaces the 正花 from that set; 清一色 replaces 混一色; cap hands score 10 and nothing is added. When a hand can be split more than one way, the highest-scoring split is used. | Claude (Kyle may change) |
 | 2026-11-08 | 坑坑胡 (all concealed pongs): no claimed sets; on a discard win the discard must finish the pair. 門前清 still counts with a concealed gong. | Claude (standard HK) |
+
+| 2026-11-08 | **New feature: Help button** in the top bar, immediately left of the settings button. Opens a screen showing the fan table and the fan to chips table. Built in phase 3; table contents live in `shared/src/fanTable.ts` and a test checks they match the scoring code. | Kyle |
 
 ## Open questions for Kyle
 
@@ -45,13 +47,17 @@ disagrees with those, the newest dated entry here wins.
 5. ~~Fan list~~ confirmed.
 6. **Two winners on one discard:** which player is "on the left"? And the
    10-second window conflicts with "no turn timers" in the notes.
-7. **Default minimum fan:** using 3 until Kyle confirms.
+7. ~~Default minimum fan~~ answered: 1.
 
 ### Batch 2: later phases (heads-up, no answer needed yet)
 
 - A browser on a phone or tablet cannot run a server. See chat notes before phase 2.
 - When the dealer wins, does the dealer stay? (Standard HK: yes.)
 - Does the round end when the wall is fully empty, or are some tiles kept back?
+
+## Top bar layout (updated)
+
+Left: undo. Centre: wind and player positions. Right: chip total + lock, then **help**, then settings (far right).
 
 ## Fan to chips table (approved)
 

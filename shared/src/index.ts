@@ -6,3 +6,5 @@ export * from './deal.js';
 export * from './hand.js';
 export * from './payout.js';
 export * from './scoring.js';
+export * from './settings.js';
+export * from './fanTable.js';
