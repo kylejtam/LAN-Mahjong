@@ -104,6 +104,9 @@ Write down which devices worked: ☐ iPhone ☐ iPad ☐ Samsung tablet ☐ lapt
   Wi-Fi. If the firewall box never appeared, search Start for "Allow an app through
   Windows Firewall" and tick **Private** next to Node.js.
 - **"npm is not recognized":** restart the laptop after installing Node.js, then try again.
+- **"'vite' is not recognized" (or "tsx" / "not recognized")** when running `npm start`:
+  the tools aren't installed in this folder yet. Run `npm install` first. Every newly
+  downloaded folder needs its own `npm install`.
 - **"running scripts is disabled on this system":** you're in PowerShell. Use the
   black `cmd` window from Part A instead, or type `npm.cmd start`.
 - **"address already in use":** the server is already running in another window.
