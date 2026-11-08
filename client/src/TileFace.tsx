@@ -207,18 +207,37 @@ function StickShape([x, y, h, c, tilt = 0]: Stick, key: number): ReactElement {
   );
 }
 
-/** One of bamboo: a simple bird. */
+/** One of bamboo: a peacock with a crest and a fanned tail (flat style). */
 function Bird(): ReactElement {
+  const tail: [number, number][] = [[-62, 26], [-42, 29], [-22, 29], [-2, 26]];
   return (
     <g>
-      <path d="M14 58 Q8 70 20 70 L28 60 Z" fill={BLUE} />
-      <path d="M18 60 Q12 74 26 72 L30 62 Z" fill={RED} />
-      <ellipse cx={32} cy={48} rx={14} ry={11} fill={GREEN} />
-      <circle cx={42} cy={30} r={7} fill={GREEN} />
-      <path d="M48 29 L56 31 L48 33 Z" fill={RED} />
-      <circle cx={44} cy={29} r={1.6} fill={IVORY} />
-      <path d="M38 23 Q40 14 46 18 Q42 20 42 24 Z" fill={RED} />
-      <path d="M30 59 L28 70 M34 59 L36 70" stroke={DARK} strokeWidth={2} />
+      {/* Tail feathers fanning down to the left, each with an "eye". */}
+      {tail.map(([angle, len], i) => (
+        <g key={i} transform={`translate(30 50) rotate(${angle + 180})`}>
+          <path d={`M0 0 Q4 ${len * 0.5} 0 ${len} Q-4 ${len * 0.5} 0 0 Z`} fill={i % 2 ? GREEN : '#2a9d8f'} />
+          <circle cx={0} cy={len - 4} r={3.6} fill={BLUE} />
+          <circle cx={0} cy={len - 4} r={1.6} fill={RED} />
+        </g>
+      ))}
+      {/* Body and wing. */}
+      <path d="M22 54 Q22 36 36 32 Q46 34 44 46 Q40 58 26 58 Z" fill={GREEN} />
+      <path d="M28 52 Q30 40 40 38 Q38 50 28 52 Z" fill="#14612f" />
+      {/* Neck and head. */}
+      <path d="M36 34 Q36 24 42 18 L46 22 Q42 28 42 36 Z" fill={BLUE} />
+      <circle cx={44} cy={18} r={5.5} fill={BLUE} />
+      <circle cx={45.5} cy={17} r={1.7} fill={IVORY} />
+      <circle cx={46} cy={17} r={0.8} fill={DARK} />
+      <path d="M49 17 L55 19 L49 21 Z" fill="#e0902b" />
+      {/* Crest: three thin plumes with dots. */}
+      {[-30, -10, 10].map((r) => (
+        <g key={r} transform={`rotate(${r} 43 13)`}>
+          <line x1={43} y1={13} x2={43} y2={5} stroke={DARK} strokeWidth={1} />
+          <circle cx={43} cy={5} r={1.6} fill={RED} />
+        </g>
+      ))}
+      {/* Legs. */}
+      <path d="M33 57 L32 68 M38 56 L39 68 M29 68 L35 68 M36 68 L42 68" stroke="#b5651d" strokeWidth={1.8} strokeLinecap="round" />
     </g>
   );
 }
@@ -268,12 +287,16 @@ function Face({ type }: { type: TileType }): ReactElement {
   }
   const Picture = FLOWER_PICTURES[type];
   if (Picture) {
-    // Picture plus the small number (1-4) that says which seat it belongs to.
+    // Picture plus a big number (1-4) that says which seat it belongs to.
     const isFlower = type[0] === 'f';
     return (
       <g>
-        <Picture />
-        {text(String(n), 10, 12, isFlower ? RED : BLUE, 52)}
+        <g transform="translate(9 13) scale(0.8)">
+          <Picture />
+        </g>
+        <text x={4} y={21} fontSize={23} fill={isFlower ? RED : BLUE} fontFamily="system-ui, sans-serif" fontWeight={800}>
+          {n}
+        </text>
       </g>
     );
   }
