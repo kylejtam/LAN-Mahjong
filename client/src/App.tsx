@@ -14,7 +14,7 @@ export function App(): ReactElement {
   const setPrefs = (p: Prefs): void => {
     setPrefsState(p);
     savePrefs(p);
-    if (conn.view) conn.send({ type: 'command', command: { type: 'setPrefs', prefs: { lang: p.lang } } });
+    if (conn.view) conn.send({ type: 'command', command: { type: 'setPrefs', prefs: { lang: p.lang, celebration: p.celebration } } });
   };
 
   // When you join (or log in on another device), your saved choices follow your name.
@@ -22,12 +22,12 @@ export function App(): ReactElement {
   useEffect(() => {
     if (!conn.view) return;
     const fromServer = cleanPrefs(conn.view.you.prefs);
-    if (fromServer.lang) {
+    if (fromServer.lang || fromServer.celebration) {
       const merged = { ...prefs, ...fromServer };
       setPrefsState(merged);
       savePrefs(merged);
     } else {
-      conn.send({ type: 'command', command: { type: 'setPrefs', prefs: { lang: prefs.lang } } });
+      conn.send({ type: 'command', command: { type: 'setPrefs', prefs: { lang: prefs.lang, celebration: prefs.celebration } } });
     }
     // Only when you join or change name.
     // eslint-disable-next-line react-hooks/exhaustive-deps

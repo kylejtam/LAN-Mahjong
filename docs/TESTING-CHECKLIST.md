@@ -89,6 +89,8 @@ Write down which devices worked: ☐ iPhone ☐ iPad ☐ Samsung tablet ☐ lapt
       **Swap with …** a spectator, close with the **×**.
 
 ### End of a hand
+- [ ] When someone wins, confetti goes off over the summary and a fanfare plays (iPhone/iPad: silent switch off). A draw has no celebration.
+- [ ] ⚙ Settings → **Win celebration**: Confetti / Red & gold / Gold chips / Fireworks. Tapping one previews it; each device keeps its own choice.
 - [ ] Summary: winning conditions, the winner's sets grouped together, flowers,
       **+ / −** chips for each player.
 - [ ] Buttons are only **Ready** and **Leave seat** (plus **Undo chicken win** for a chicken win).
