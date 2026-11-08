@@ -9,8 +9,10 @@ disagrees with those, the newest dated entry here wins.
 - Phase 1 (rules engine): **done**. Tile set and checks, shuffle, wall and dice
   break, dealing with flower replacement, winning-hand check, legal
   chow/pong/gong/win, two-winner rule, fan counting, payments.
-- Tests: 93 passing (`npm test`).
-- Phase 2 (game server): next. Hosting decided (option a).
+- Tests: 127 passing (`npm test`), including 60 rounds of random play that check no tile is ever lost or created.
+- Phase 2 (game server): in progress.
+  - Step 1 round engine (`server/src/game/round.ts`): **done**.
+  - Step 2 full 16-round game, step 3 players/seats/host, step 4 network: to do.
 
 ## Decisions
 
@@ -39,6 +41,11 @@ disagrees with those, the newest dated entry here wins.
 | 2026-11-08 | **Drawing is manual:** a player drags a tile from the end of the wall into their hand. | Kyle |
 | 2026-11-08 | **Claiming a discard:** no pass button. 上 碰 槓 胡 buttons stay available until the next player draws. They are big and flashing. A player can also claim by tapping the discarded tile. | Kyle |
 | 2026-11-08 | **3-second grace period:** for 3 seconds after the next player draws, another player can still claim the discard. The draw is undone (tile goes back to the wall) and the claim happens. | Kyle |
+| 2026-11-08 | **Stronger claims after the fact:** claims happen straight away and play continues. A stronger claim can still take the tile; the game jumps back to the discard and gives it to them. 碰/槓 can take over 上 within 3 s; 胡 can take over any other claim (including a lower-priority 胡) within 10 s. Hidden timers. | Kyle (timings: Claude's reading of Kyle's rules) |
+| 2026-11-08 | **Claim windows end at the next discard.** No discard lock during the grace period. | Kyle |
+| 2026-11-08 | **Replacement draws are manual** (drag from the back end of the wall) and forced: you cannot discard until you have drawn it. Flowers drawn during play go to the flower area automatically. | Kyle |
+| 2026-11-08 | Round engine details: a draw game happens when the next player tries to draw from an empty wall (so the 3 s grace still applies to the last discard). Robbing a gong 搶槓: others may 胡 on an added gong tile until 3 s after the gong player draws the replacement. Self-draw 胡 is only allowed straight after drawing. The full tile set is re-checked after every single move. | Claude |
+| 2026-11-08 | **First dealer** of a new game is seat 0 (East). | Claude (Kyle may change) |
 | 2026-11-08 | **Undo moves:** discard, 上, 碰, 槓, 胡. Draws are not separate moves. Undoing a discard puts the tile back in that player's hand and it is their turn again. | Kyle |
 | 2026-11-08 | **Several games at once:** one server can run many separate games, each with its own name. | Kyle |
 | 2026-11-08 | **Joining:** players open the server's address once; it is also shown as a **QR code** to scan. The game list shows every game on that server. Replaces the network scan in plan section 3. | Kyle |
@@ -49,10 +56,7 @@ disagrees with those, the newest dated entry here wins.
 
 ## Open questions for Kyle
 
-- **P2-A. Waiting for a stronger claim.** If someone taps 上 but another player
-  could still 碰/槓/胡 that tile, how long does the game wait? (see chat)
-- **P2-B. Discarding during the 3-second grace period.** (see chat)
-- **P2-C. Replacement draws** after a flower or gong: manual drag or automatic? (see chat)
+- None right now.
 
 ## Top bar layout (updated)
 
