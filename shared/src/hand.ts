@@ -181,3 +181,16 @@ export function canWinWith(hidden: readonly Tile[], melds: readonly Meld[], tile
 export function canWinSelfDraw(hidden: readonly Tile[], melds: readonly Meld[]): boolean {
   return findWinShape(hidden, melds) !== null;
 }
+
+/**
+ * Several players want to win 胡 on the same discard. Standard HK
+ * "stealing the win" 截糊: only the player nearest in turn order after the
+ * discarder wins. Returns that seat, or null if nobody claimed.
+ */
+export function resolveWinClaims(discarder: number, claimers: readonly number[]): number | null {
+  for (let step = 1; step < SEATS; step++) {
+    const seat = (discarder + step) % SEATS;
+    if (claimers.includes(seat)) return seat;
+  }
+  return null;
+}

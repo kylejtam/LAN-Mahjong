@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   Meld, NormalType, Tile, addedGongOptions, canGongDiscard, canPong, canWinSelfDraw, canWinWith,
-  chowOptions, concealedGongOptions, findWinShape, mayChowFrom,
+  chowOptions, concealedGongOptions, findWinShape, mayChowFrom, resolveWinClaims,
 } from '../src/index.js';
 
 let nextId = 1000;
@@ -86,5 +86,19 @@ describe('legal claims', () => {
   it('finds concealed gongs and added gongs', () => {
     expect(concealedGongOptions(t('wN wN wN wN m1'))).toEqual(['wN']);
     expect(addedGongOptions(t('m5 p2'), [pong('m5'), pong('dG')])).toEqual(['m5']);
+  });
+});
+
+describe('two players win on one discard (截糊 stealing the win)', () => {
+  it('gives the win to the player next in turn after the discarder', () => {
+    expect(resolveWinClaims(0, [2, 3])).toBe(2);
+    expect(resolveWinClaims(0, [3, 1])).toBe(1);
+    expect(resolveWinClaims(2, [1, 3])).toBe(3);
+    expect(resolveWinClaims(3, [2, 1])).toBe(1);
+  });
+
+  it('works with one claimer or none', () => {
+    expect(resolveWinClaims(1, [0])).toBe(0);
+    expect(resolveWinClaims(1, [])).toBe(null);
   });
 });

@@ -28,6 +28,7 @@ disagrees with those, the newest dated entry here wins.
 | 2026-11-08 | **Payout, default mode:** discarder pays 2 × base, the other two pay 1 × base each. | Kyle |
 | 2026-11-08 | **Payout, self-draw:** each of the other 3 players pays 2 × base. | Kyle |
 | 2026-11-08 | **Payout, "only discarder pays" mode:** discarder pays 4 × base (example: 3 fan → 4 × 8 = 32). Self-draw in this mode pays the same as normal self-draw (no discarder exists). | Kyle / Claude (self-draw part) |
+| 2026-11-08 | **Two winners on one discard:** standard HK 截糊 "stealing the win". Only the player nearest in turn order after the discarder wins. | Kyle |
 
 ## Open questions for Kyle
 
@@ -39,7 +40,8 @@ disagrees with those, the newest dated entry here wins.
 3. ~~Fan to chips table~~ answered.
 4. ~~Payments~~ answered.
 5. **Fan list** (proposal below).
-6. **Two players win on the same discard:** both win, or only the next in turn?
+6. ~~Two winners on one discard~~ answered (standard HK 截糊).
+7. **Default minimum fan:** using 3 until Kyle confirms.
 
 ### Batch 2: later phases (heads-up, no answer needed yet)
 
