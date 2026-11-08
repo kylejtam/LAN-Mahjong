@@ -5,17 +5,10 @@ import { Lobby } from './Lobby';
 import { Table } from './Table';
 import { LangContext, Prefs, cleanPrefs, loadPrefs, savePrefs, t, translateServerMessage } from './i18n';
 
-/** Apply the theme: light, dark, or follow the device ("system"). */
+/** Apply the theme: light or dark (dark by default). */
 function useTheme(theme: Prefs['theme']): void {
   useEffect(() => {
-    const media = window.matchMedia('(prefers-color-scheme: light)');
-    const apply = (): void => {
-      const actual = theme === 'system' ? (media.matches ? 'light' : 'dark') : theme;
-      document.documentElement.dataset.theme = actual;
-    };
-    apply();
-    media.addEventListener('change', apply);
-    return () => media.removeEventListener('change', apply);
+    document.documentElement.dataset.theme = theme === 'light' ? 'light' : 'dark';
   }, [theme]);
 }
 

@@ -8,7 +8,30 @@ import type { ReactElement } from 'react';
 import type { ClientMessage } from '../../server/src/protocol';
 import type { RoomView } from '../../server/src/game/view';
 import { TileView } from './TileFace';
-import { sortHand } from '@lan-mahjong/shared';
+import { NORMAL_TYPES, findWinShape, sortHand } from '@lan-mahjong/shared';
+import type { Meld, Tile } from '@lan-mahjong/shared';
+
+/**
+ * Split the winner's hidden tiles into its sets (runs and pongs) and pair, so
+ * each set is shown together. Other hands are just shown sorted.
+ */
+function groupWinningHand(hand: readonly Tile[], melds: readonly Meld[]): Tile[][] {
+  const shape = findWinShape(hand, melds);
+  const d = shape?.kind === 'standard' ? shape.decompositions[0] : undefined;
+  if (!d) return [sortHand(hand)];
+  const left = sortHand(hand);
+  const take = (type: string): Tile => {
+    const i = left.findIndex((t) => t.type === type);
+    return left.splice(i, 1)[0]!;
+  };
+  const groups: Tile[][] = d.sets.map((set) =>
+    set.kind === 'pong'
+      ? [take(NORMAL_TYPES[set.start]!), take(NORMAL_TYPES[set.start]!), take(NORMAL_TYPES[set.start]!)]
+      : [take(NORMAL_TYPES[set.start]!), take(NORMAL_TYPES[set.start + 1]!), take(NORMAL_TYPES[set.start + 2]!)],
+  );
+  groups.push([take(NORMAL_TYPES[d.pair]!), take(NORMAL_TYPES[d.pair]!)]);
+  return groups;
+}
 import { Lang, personName, t } from './i18n';
 
 interface Props {
@@ -45,7 +68,6 @@ export function ResultPanel({ view, lang, command, canClaimWin, onWin, winLabel 
   const waitingFor = view.seats.filter((s) => s.name && !s.cpu && !s.confirmed).map((s) => personName(s.name, lang));
   /** Chips with a clear sign: +48, −16 (a real minus sign), or 0. */
   const signed = (n: number): string => (n > 0 ? `+${n}` : n < 0 ? `−${Math.abs(n)}` : '0');
-  const transferred = result.type === 'win' ? result.changes.filter((c) => c > 0).reduce((a, b) => a + b, 0) : 0;
   return (
     <div className="overlay">
       <div className="panel result">
@@ -64,14 +86,12 @@ export function ResultPanel({ view, lang, command, canClaimWin, onWin, winLabel 
               {result.items.map((i) => (
                 <li key={i.id}>
                   <span className={lang === 'zh' ? 'zh' : ''}>{lang === 'zh' ? i.zh : i.en}</span>
-                  {lang === 'en' && <span className="zh">{i.zh}</span>}
                   <span className="num">{tr('fan', { n: i.fan })}</span>
                 </li>
               ))}
               {result.items.length === 0 && <li><span className="muted">{tr('noConditions')}</span></li>}
               <li className="fan-total-row">
                 <span>{tr('totalFan')}</span>
-                {lang === 'en' && <span />}
                 <span className="num">{tr('fan', { n: result.fan })}{result.capHand ? tr('maxFan') : ''}</span>
               </li>
             </ul>
@@ -88,7 +108,11 @@ export function ResultPanel({ view, lang, command, canClaimWin, onWin, winLabel 
               <div key={s.seat} className={`result-row${isWinner ? ' result-winner' : ''}`}>
                 <span className="result-name">{personName(s.name, lang)}</span>
                 <span className="result-tiles">
-                  {sortHand(s.hand ?? []).map((t) => <TileView key={t.id} type={t.type} width="1.6rem" />)}
+                  {(isWinner ? groupWinningHand(s.hand ?? [], s.melds) : [sortHand(s.hand ?? [])]).map((g, gi) => (
+                    <span key={`g${gi}`} className="meld">
+                      {g.map((t) => <TileView key={t.id} type={t.type} width="1.6rem" />)}
+                    </span>
+                  ))}
                   {s.melds.map((m, i) => (
                     <span key={i} className="meld">{m.tiles.map((t) => <TileView key={t.id} type={t.type} width="1.6rem" />)}</span>
                   ))}
@@ -103,7 +127,6 @@ export function ResultPanel({ view, lang, command, canClaimWin, onWin, winLabel 
             );
           })}
         </div>
-        {result.type === 'win' && <p className="transferred">{tr('totalTransferred', { n: transferred })}</p>}
         <div className="row">
           {canClaimWin && <button className="act act-win" onClick={onWin}>{winLabel}</button>}
           {me && (

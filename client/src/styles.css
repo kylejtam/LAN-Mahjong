@@ -476,3 +476,33 @@ input { font: inherit; }
   display: flex; gap: 0.8em; align-items: center; background: var(--panel); border: 1px solid var(--accent);
   padding: 0.4em 0.8em; border-radius: 10px;
 }
+
+/* ---------- Kyle's round of changes ---------- */
+:root { --tile-back-light: #6aa88b; }
+/* Name at the top left. */
+.topbar-left { align-items: center; }
+.topbar-left .nametag { background: rgba(255, 255, 255, 0.08); color: var(--fg); }
+/* Fan list: one language only. */
+.fan-items li { grid-template-columns: 1fr auto; }
+/* Show / Hide buttons for spectators. */
+.show-hide { font-size: 0.75em; padding: 0.1em 0.55em; border-radius: 999px; }
+.show-hide.on { background: #ffd447; color: #222; border-color: #ffd447; }
+/* Left and right players: tiles lie on their side in a column. */
+.opp-left .opp-tiles, .opp-right .opp-tiles { flex-direction: row; align-items: flex-start; flex-wrap: nowrap; gap: 0.3em; }
+.melds-sideways { display: flex; flex-direction: column; flex-wrap: wrap; max-height: 62vh; align-content: flex-start; gap: 0.25em; }
+.melds-sideways .meld { display: flex; flex-direction: column; gap: 1px; }
+.opp-hand.melds-sideways { gap: 1px; }
+.tile-sideways { position: relative; overflow: visible; }
+/* Side discards fill columns. */
+.discards-left, .discards-right { flex-direction: column; flex-wrap: wrap; align-content: flex-end; justify-content: center; }
+.discards-right { align-content: flex-start; }
+/* The wall picture around the tiles-left count. */
+.wall-box { position: relative; display: inline-grid; place-items: center; width: 6.2em; height: 6.2em; }
+.wall-box svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+.wall-box-text { display: flex; flex-direction: column; align-items: center; line-height: 1.1; }
+.hub-row { display: inline-flex; align-items: center; gap: 0.6em; }
+/* Side players: keep the name at the top and wrap long tile columns into more columns. */
+.opp-left, .opp-right { justify-content: flex-start; min-height: 0; }
+.opp-left .opp-tiles, .opp-right .opp-tiles { flex: 1 1 auto; min-height: 0; height: 0; align-self: stretch; justify-content: center; }
+.opp-left .melds-sideways, .opp-right .melds-sideways { height: 100%; max-height: none; }
+.opp-left, .opp-right { --public-w: min(2.4vw, 4.8vh); --opp-w: min(2.2vw, 4.4vh); }

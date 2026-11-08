@@ -19,7 +19,7 @@ import type { ClientMessage } from '../../server/src/protocol';
 import type { RoomView, SeatView } from '../../server/src/game/view';
 import type { Claim } from '../../server/src/game/round';
 import { TileView } from './TileFace';
-import { ACTION_LABELS, Prefs, WIND_CHARS, WIND_NAMES, personName, t, useLang } from './i18n';
+import { ACTION_LABELS, Prefs, WIND_CHARS, WIND_NAMES, WIND_SHORT, personName, t, useLang } from './i18n';
 import type { StringKey } from './i18n';
 import { DragSource, Drop, useDrag } from './drag';
 import { HelpPanel } from './HelpPanel';
@@ -189,19 +189,19 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
   }
 
   // ---------- pieces ----------
-  const renderMelds = (melds: Meld[], flowers: Tile[], size: string): ReactElement => (
-    <div className="melds">
+  const renderMelds = (melds: Meld[], flowers: Tile[], size: string, sideways?: 'left' | 'right'): ReactElement => (
+    <div className={`melds${sideways ? ' melds-sideways' : ''}`}>
       {melds.map((m, i) => (
         <span className="meld" key={i}>
           {m.tiles.map((t, j) => (
-            <TileView key={t.id} type={t.type} back={m.concealed && (j === 0 || j === 3)} width={size} />
+            <TileView key={t.id} type={t.type} back={m.concealed && (j === 0 || j === 3)} width={size} sideways={sideways} />
           ))}
         </span>
       ))}
       {flowers.length > 0 && (
         <span className="meld flowers">
           {flowers.map((t) => (
-            <TileView key={t.id} type={t.type} width={size} />
+            <TileView key={t.id} type={t.type} width={size} sideways={sideways} />
           ))}
         </span>
       )}
@@ -233,14 +233,19 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
   const discardW = useMemo(() => {
     const maxW = Math.min(screen.w * 0.028, screen.h * 0.055);
     if (!zones) return maxW;
-    const fits = (n: number, w: number, h: number, d: number): boolean => {
+    const fits = (n: number, w: number, h: number, d: number, sideways = false): boolean => {
       if (n === 0) return true;
+      if (sideways) {
+        // Tiles lie on their side and fill columns from top to bottom.
+        const perCol = Math.max(1, Math.floor((h + 1) / (d + 2)));
+        return Math.ceil(n / perCol) * (d * (4 / 3) + 2) <= w;
+      }
       const perRow = Math.max(1, Math.floor((w + 1) / (d + 1)));
       // +2 px per row leaves room for rounding and the 1 px gaps.
       return Math.ceil(n / perRow) * (d * (4 / 3) + 2) <= h;
     };
     let d = Math.floor(maxW);
-    while (d > 8 && !SIDES.every((side) => fits(discardCount(side), zones[side].w - 1, zones[side].h - 1, d))) d -= 0.5;
+    while (d > 8 && !SIDES.every((side) => fits(discardCount(side), zones[side].w - 1, zones[side].h - 1, d, side === 'left' || side === 'right'))) d -= 0.5;
     return d;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [zones, round?.discards.length, screen.w, screen.h, bottomSeat]);
@@ -254,7 +259,12 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
           const offered = round?.offered?.tile.id === d.tile.id;
           return (
             <span key={d.tile.id} onClick={offered ? onTapOffered : undefined} className={offered && claimable ? 'claimable' : ''}>
-              <TileView type={d.tile.type} width="var(--discard-w)" highlight={offered} />
+              <TileView
+                type={d.tile.type}
+                width="var(--discard-w)"
+                highlight={offered}
+                sideways={side === 'left' ? 'left' : side === 'right' ? 'right' : undefined}
+              />
             </span>
           );
         })}
@@ -264,7 +274,7 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
 
   const nameTag = (sv: SeatView): ReactElement => (
     <div className={`nametag${round && round.turn === sv.seat && round.phase !== 'ended' ? ' nametag-turn' : ''}`}>
-      <span className="wind-badge">{WIND_CHARS[sv.wind]}</span>
+      <span className="wind-badge">{WIND_SHORT[lang][sv.wind]}</span>
       <span className="nametag-name">{sv.name ? personName(sv.name, lang) : tr('empty')}</span>
       {sv.cpu && !sv.name?.startsWith('CPU') && <span className="cpu-badge">{tr('cpu')}</span>}
       {sv.name && !sv.connected && !sv.cpu && <span className="offline">{tr('offline')}</span>}
@@ -281,11 +291,10 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
       )}
       {mySeat === null && sv.name && (
         <button
-          className={`eye${sv.watched ? ' eye-on' : ''}`}
-          title={sv.watched ? tr('hideHand') : tr('showHand')}
-          onClick={() => command({ type: 'setWatchedSeat', seat: sv.seat, visible: !sv.watched })}
+          className={`btn show-hide${sv.watched ? ' on' : ''}`}
+          onClick={(e) => { e.stopPropagation(); command({ type: 'setWatchedSeat', seat: sv.seat, visible: !sv.watched }); }}
         >
-          {sv.watched ? '👁' : '◌'}
+          {sv.watched ? tr('hide') : tr('show')}
         </button>
       )}
     </div>
@@ -293,24 +302,17 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
 
   const renderOpponent = (side: Side): ReactElement => {
     const sv = view.seats[seatAt(side)]!;
+    const sideways = side === 'left' ? 'left' : side === 'right' ? 'right' : undefined;
     return (
       <section className={`opp opp-${side}`} onClick={mySeat === null ? () => setSpectatorSeat(sv.seat) : undefined}>
         {nameTag(sv)}
-        {/* Public tiles (shown sets and flowers) first, then the hidden tiles. */}
+        {/* Public tiles (shown sets and flowers); hidden tiles only when a spectator chose "Show". */}
         <div className="opp-tiles">
-          {renderMelds(sv.melds, sv.flowers, 'var(--public-w)')}
-          {sv.hand ? (
-            <div className="opp-hand">
-              {sortHand(sv.hand).map((t) => <TileView key={t.id} type={t.type} width="var(--opp-w)" />)}
+          {renderMelds(sv.melds, sv.flowers, 'var(--public-w)', sideways)}
+          {sv.hand && (
+            <div className={`opp-hand${sideways ? ' melds-sideways' : ''}`}>
+              {sortHand(sv.hand).map((t) => <TileView key={t.id} type={t.type} width="var(--opp-w)" sideways={sideways} />)}
             </div>
-          ) : (
-            sv.handCount > 0 && (
-              // Hidden tiles: just one tile back and how many, to leave room for the public tiles.
-              <div className="opp-hidden" title={`${sv.handCount}`}>
-                <TileView back width="var(--opp-w)" />
-                <span>×{sv.handCount}</span>
-              </div>
-            )
           )}
         </div>
       </section>
@@ -339,6 +341,8 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
     <div className={`table-screen felt-${view.tableColour}`}>
       <header className="topbar">
         <div className="topbar-left">
+          {me && nameTag(me)}
+          {mySeat === null && <span className="nametag"><span className="nametag-name">{view.you.name}</span></span>}
           {mySeat !== null ? (
             <button className="btn undo" disabled={!canUndo} onClick={() => command({ type: 'undo' })}>
               ↶ {tr('undo')}{lastWin && view.seats.some((s) => s.votedUndoWin) ? ` ${tr('undoAgreed', { n: view.seats.filter((s) => s.votedUndoWin).length })}` : ''}
@@ -356,14 +360,13 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
           )}
         </div>
         <div className="topbar-centre">
-          <span className="round-wind">{WIND_CHARS[view.match.roundWind]}</span>
           <span className="round-label">{view.label[lang]}</span>
           <span className="compass">
             {SIDES.map((side) => {
               const sv = view.seats[seatAt(side)]!;
               return (
                 <span key={side} className={`compass-${side}${sv.seat === dealerSeat ? ' compass-dealer' : ''}`} title={sv.name ?? ''}>
-                  {WIND_CHARS[sv.wind]}
+                  {WIND_SHORT[lang][sv.wind]}
                 </span>
               );
             })}
@@ -388,20 +391,19 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
             <div className="hub">
               {round ? (
                 a?.draw || a?.drawReplacement ? (
-                  // Big glowing tile to drag into your hand (the wall itself can be tiny on a phone).
+                  // Big glowing tile to tap or drag into your hand, next to the wall picture.
+                  <span className="hub-row">
+                  <WallBox round={round} sideOf={sideOf} perWall={view.settings.flowersOn ? 18 : 17} label={tr('tilesLeft')} />
                   <span
                     className="draw-pile"
                     onPointerDown={start(a.draw ? { kind: 'wallFront' } : { kind: 'wallBack' })}
                   >
                     <TileView back width="var(--draw-w)" />
                     <span className="draw-label">{a.draw ? tr('drawHere') : tr('replacementHere')}</span>
-                    <span className="hub-sub">{round.wallCount} {tr('tilesLeft')}</span>
+                  </span>
                   </span>
                 ) : (
-                  <>
-                    <div className="hub-count">{round.wallCount}</div>
-                    <div className="hub-sub">{tr('tilesLeft')}</div>
-                  </>
+                  <WallBox round={round} sideOf={sideOf} perWall={view.settings.flowersOn ? 18 : 17} label={tr('tilesLeft')} />
                 )
               ) : view.phase === 'rolling' ? (
                 iAmDealer ? <div className="hub-sub">{tr('swipeDiceHere')}</div> : <div className="hub-sub">{tr('waitingRoll', { name: personName(view.seats[view.match.dealer]?.name, lang) })}</div>
@@ -452,7 +454,7 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
           {a && (a.win || a.selfDrawWin) && <button className="act act-win" onClick={onWin}>{winLabel}</button>}
         </div>
         <div className="me-bottom">
-          {nameTag(bottom)}
+          {mySeat === null && nameTag(bottom)}
           <span className="hint">{hint}</span>
         </div>
       </footer>
@@ -681,8 +683,8 @@ function SettingsPanel({
   const [name, setName] = useState(view.you.name);
   const mySeat = view.you.seat;
   const nameChanged = name.trim() !== '' && name.trim() !== view.you.name;
-  const themes: Prefs['theme'][] = ['light', 'dark', 'system'];
-  const themeLabel: Record<Prefs['theme'], StringKey> = { light: 'themeLight', dark: 'themeDark', system: 'themeSystem' };
+  const themes: Prefs['theme'][] = ['dark', 'light'];
+  const themeLabel: Record<Prefs['theme'], StringKey> = { light: 'themeLight', dark: 'themeDark' };
   return (
     <div className="overlay" onClick={onClose}>
       <div className="panel settings" onClick={(e) => e.stopPropagation()}>
@@ -740,5 +742,50 @@ function SettingsPanel({
         </div>
       </div>
     </div>
+  );
+}
+
+/**
+ * A small picture of the wall around the "tiles left" count: a square that is
+ * solid when the wall is full. Stacks disappear in the real order: normal draws
+ * from the front, replacement tiles from the back.
+ */
+function WallBox({
+  round,
+  sideOf,
+  perWall,
+  label,
+}: {
+  round: NonNullable<RoomView['round']>;
+  sideOf: (seat: number) => Side;
+  perWall: number;
+  label: string;
+}): ReactElement {
+  const S = 100;
+  const T = 7; // thickness of the wall line
+  const seg = (S - 2 * T) / perWall;
+  const rects = round.wall.map((st) => {
+    const side = sideOf(st.seat);
+    // Position 0 is the right-hand end of that player's wall (as they see it).
+    let x = 0, y = 0, w = seg, h = T;
+    if (side === 'bottom') { x = T + (perWall - 1 - st.position) * seg; y = S - T; }
+    else if (side === 'top') { x = T + st.position * seg; y = 0; }
+    else if (side === 'right') { x = S - T; y = T + st.position * seg; w = T; h = seg; }
+    else { x = 0; y = T + (perWall - 1 - st.position) * seg; w = T; h = seg; }
+    return { key: `${st.seat}-${st.position}`, x, y, w, h, full: st.count === 2 };
+  });
+  return (
+    <span className="wall-box">
+      <svg viewBox={`0 0 ${S} ${S}`} preserveAspectRatio="none" aria-hidden>
+        <rect x={T / 2} y={T / 2} width={S - T} height={S - T} fill="none" stroke="rgba(255,255,255,0.12)" strokeWidth={1} />
+        {rects.map((r) => (
+          <rect key={r.key} x={r.x} y={r.y} width={r.w + 0.4} height={r.h + 0.4} fill={r.full ? 'var(--tile-back)' : 'var(--tile-back-light)'} />
+        ))}
+      </svg>
+      <span className="wall-box-text">
+        <span className="hub-count">{round.wallCount}</span>
+        <span className="hub-sub">{label}</span>
+      </span>
+    </span>
   );
 }

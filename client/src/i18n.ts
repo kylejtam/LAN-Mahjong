@@ -7,7 +7,7 @@
 import { createContext, useContext } from 'react';
 
 export type Lang = 'en' | 'zh';
-export type Theme = 'light' | 'dark' | 'system';
+export type Theme = 'light' | 'dark';
 
 /** The 4 action buttons: pinyin in English, characters in Chinese. */
 export const ACTION_LABELS: Record<Lang, { chow: string; pong: string; gong: string; win: string }> = {
@@ -20,6 +20,8 @@ export const WIND_NAMES: Record<Lang, string[]> = {
   zh: ['東', '南', '西', '北'],
 };
 export const WIND_CHARS = ['東', '南', '西', '北'];
+/** Short wind markers: letters in English, characters in Chinese. */
+export const WIND_SHORT: Record<Lang, string[]> = { en: ['E', 'S', 'W', 'N'], zh: WIND_CHARS };
 
 const en = {
   // top bar and general
@@ -82,7 +84,6 @@ const en = {
   theme: 'Theme',
   themeLight: 'Light',
   themeDark: 'Dark',
-  themeSystem: 'System',
   dropOut: 'Drop out',
   dropOutText:
     'You become a spectator and keep your chips. During a round, your tiles wait at the seat until the host adds a CPU. To hand your seat to a spectator instead, use a Swap button below.',
@@ -100,7 +101,9 @@ const en = {
   confirm: 'Confirm',
   waiting: 'Waiting…',
   undoWin: 'Undo win',
-  nextHand: 'Confirm – next hand',
+  nextHand: 'Next round',
+  show: 'Show',
+  hide: 'Hide',
   askedUndo: 'Asked to undo',
   waitingFor: 'Waiting for: {names}',
   gameFinished: 'Game finished',
@@ -187,7 +190,6 @@ const zh: Strings = {
   theme: '主題',
   themeLight: '淺色',
   themeDark: '深色',
-  themeSystem: '跟系統',
   dropOut: '退出',
   dropOutText: '你會變成旁觀，籌碼保留。打緊嗰陣，你啲牌會留喺個位，等主機加電腦。想交個位俾旁觀嘅人，就撳下面「換位」。',
   leaveMySeat: '離開座位',
@@ -203,7 +205,9 @@ const zh: Strings = {
   confirm: '確認',
   waiting: '等緊…',
   undoWin: '還原食糊',
-  nextHand: '確認 — 下一鋪',
+  nextHand: '下一鋪',
+  show: '顯示',
+  hide: '隱藏',
   askedUndo: '已要求還原',
   waitingFor: '等緊：{names}',
   gameFinished: '全局完',
@@ -299,7 +303,7 @@ export function cleanPrefs(raw: unknown): Partial<Prefs> {
   if (raw && typeof raw === 'object') {
     const r = raw as Record<string, unknown>;
     if (r.lang === 'en' || r.lang === 'zh') out.lang = r.lang;
-    if (r.theme === 'light' || r.theme === 'dark' || r.theme === 'system') out.theme = r.theme;
+    if (r.theme === 'light' || r.theme === 'dark') out.theme = r.theme; // old 'system' → default dark
   }
   return out;
 }

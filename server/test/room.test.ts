@@ -203,6 +203,15 @@ describe('playing through the room', () => {
 });
 
 describe('host controls (laptop host page only)', () => {
+  /** Kyle in seat 0 and three CPUs, round started. */
+  const kyleCpus = (): Room => {
+    let r = newRoom();
+    r = cmd(r, 'Kyle', { type: 'takeSeat', seat: 0 });
+    for (let seat = 1; seat < 4; seat++) r = host(r, { type: 'hostSetSeat', seat, cpu: 'easy' });
+    r = cmd(r, 'Kyle', { type: 'pressStart' });
+    return cmd(r, 'Kyle', { type: 'rollDice' });
+  };
+
   it('players have no host commands', () => {
     const r = fullTable();
     expect(() => cmd(r, 'Amy', { type: 'hostResetBalances' } as unknown as Command)).toThrow();
@@ -259,6 +268,17 @@ describe('host controls (laptop host page only)', () => {
     let now = clock;
     while (full.phase !== 'playing') full = cpuTick(full, (now += 1000), rng);
     expect(() => handleCommand(full, 'amy', { type: 'takeSeat', seat: 1 }, now, rng)).toThrow(/taken/);
+  });
+
+  it('can remove a CPU at any time so a player can sit there (mid-round the game waits)', () => {
+    let r = kyleCpus();
+    r = host(r, { type: 'hostSetSeat', seat: 2, cpu: null });
+    expect(r.seats[2]).toBeNull();
+    expect(r.match.round!.core.hands[2]!.length).toBeGreaterThan(0); // its tiles wait at the seat
+    r = join(r, 'Dan');
+    r = cmd(r, 'Dan', { type: 'takeSeat', seat: 2 });
+    expect(r.seats[2]).toBe('dan');
+    expect(() => host(r, { type: 'hostSetSeat', seat: 2, cpu: null })).toThrow(/Only CPU seats/);
   });
 
   it('the host overview never includes hidden tiles', () => {

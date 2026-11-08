@@ -281,8 +281,9 @@ function GameCard({ game, send }: { game: HostGameView; send: (m: HostMessage) =
                   {s.name && !s.cpu ? `Replace: ${d}` : `CPU ${d}`}
                 </button>
               ))}
-              {s.cpu && between && (
-                <button className="btn" onClick={() => cmd({ type: 'hostSetSeat', seat: s.seat, cpu: null })}>Empty</button>
+              {s.cpu && (
+                // Kick the CPU so a player can sit here (mid-round, the game waits for them).
+                <button className="btn danger" onClick={() => cmd({ type: 'hostSetSeat', seat: s.seat, cpu: null })}>Remove CPU</button>
               )}
             </div>
           </div>

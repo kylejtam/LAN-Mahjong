@@ -629,10 +629,11 @@ export function handleHostCommand(prev: Room, cmd: HostCommand, now: number): Ro
       if (!Number.isInteger(cmd.seat) || cmd.seat < 0 || cmd.seat >= SEATS) fail('There is no such seat.');
       const current = room.seats[cmd.seat] ?? null;
       if (cmd.cpu === null) {
-        // Remove a CPU (only between rounds, so a hand is never left without a player).
-        if (room.phase !== 'betweenRounds') fail('You can only empty a seat between rounds.');
+        // Remove a CPU so a player can sit there. Mid-round, the empty seat keeps
+        // its tiles and the game waits until someone sits down (or a CPU is added).
         if (current && !room.people[current]!.cpu) fail('Only CPU seats can be emptied this way.');
         room.seats[cmd.seat] = null;
+        if (current) cleanupAfterSeatChange(room, current);
       } else {
         room.seats[cmd.seat] = makeCpu(room, cmd.seat, cmd.cpu);
         if (current) cleanupAfterSeatChange(room, current);

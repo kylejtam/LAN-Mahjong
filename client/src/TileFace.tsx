@@ -313,21 +313,35 @@ export interface TileProps {
   dim?: boolean;
   className?: string;
   style?: CSSProperties;
+  /** Lie the tile on its side (for the players on the left and right). */
+  sideways?: 'left' | 'right';
 }
 
 /** A whole tile: ivory face with a coloured edge, or a plain back. */
-export function TileView({ type, back, width = '2.2rem', highlight, dim, className, style }: TileProps): ReactElement {
+export function TileView({ type, back, width = '2.2rem', highlight, dim, className, style, sideways }: TileProps): ReactElement {
+  const tall = `calc(${width} * 4 / 3)`;
+  // A sideways tile takes a wide, short space; the picture inside is turned 90°.
+  const svgStyle: CSSProperties | undefined = sideways
+    ? {
+        position: 'absolute',
+        width,
+        height: tall,
+        left: '50%',
+        top: '50%',
+        transform: `translate(-50%, -50%) rotate(${sideways === 'left' ? 90 : -90}deg)`,
+      }
+    : undefined;
   return (
     <span
-      className={`tile${highlight ? ' tile-highlight' : ''}${dim ? ' tile-dim' : ''}${className ? ` ${className}` : ''}`}
+      className={`tile${highlight ? ' tile-highlight' : ''}${dim ? ' tile-dim' : ''}${sideways ? ' tile-sideways' : ''}${className ? ` ${className}` : ''}`}
       style={{
-        width,
-        height: `calc(${width} * 4 / 3)`,
+        width: sideways ? tall : width,
+        height: sideways ? width : tall,
         ...style,
       }}
       aria-label={back || !type ? 'hidden tile' : type}
     >
-      <svg viewBox="0 0 64 84" preserveAspectRatio="none">
+      <svg viewBox="0 0 64 84" preserveAspectRatio="none" style={svgStyle}>
         {back || !type ? (
           <>
             <rect x={0} y={0} width={64} height={84} rx={7} fill="var(--tile-back-edge)" />

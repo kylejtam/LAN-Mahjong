@@ -9,7 +9,7 @@ disagrees with those, the newest dated entry here wins.
 - Phase 1 (rules engine): **done**. Tile set and checks, shuffle, wall and dice
   break, dealing with flower replacement, winning-hand check, legal
   chow/pong/gong/win, two-winner rule, fan counting, payments.
-- Tests: 226 passing (`npm test`), including 60 rounds of random play that check no tile is ever lost or created.
+- Tests: 227 passing (`npm test`), including 60 rounds of random play that check no tile is ever lost or created.
 - Phase 2 (game server): **done**.
   - Step 1 round engine (`server/src/game/round.ts`): **done**.
   - Step 2 full 16-round game (`server/src/game/match.ts`): **done**.
@@ -89,7 +89,7 @@ disagrees with those, the newest dated entry here wins.
 | 2026-11-08 | **Flower and season tiles show pictures, not words.** Flowers (the "Four Gentlemen"): plum blossom, orchid, chrysanthemum, bamboo. Seasons have no standard picture, so: spring peach blossom, summer lotus, autumn maple leaf, winter snowflake. Each shows a big number 1–4 in the top-left corner (red for flowers, blue for seasons). Preview: `docs/screenshots/flower-tiles.png`. | Kyle (season pictures: Claude, Kyle may change) |
 | 2026-11-08 | **1 bamboo** is drawn as a flat peacock (crest, fanned tail with eye spots) instead of the earlier simple bird. | Kyle |
 | 2026-11-08 | **Chinese wording:** Traditional Chinese with Hong Kong (Cantonese) table wording, e.g. 食糊, 出銃, 自摸, 流局, 雞糊, 爆棚. Server messages are translated on the device. CPU names show as 電腦東/南/西/北. | Kyle |
-| 2026-11-08 | **Player settings panel** (⚙): change name (type + Save; chips, seat and settings move to the new name), language (English / 中文), theme slider (Light / Dark / System, default Dark), drop out, leave game. Language and theme are saved on the device AND under the player's name on the server, so they follow the name to another device. The language can also be chosen on the start screen. | Kyle |
+| 2026-11-08 | **Player settings panel** (⚙): change name (type + Save; chips, seat and settings move to the new name), language (English / 中文), theme (Light / Dark, default Dark), drop out, leave game. Language and theme are saved on the device AND under the player's name on the server, so they follow the name to another device. The language can also be chosen on the start screen. | Kyle |
 | 2026-11-08 | **Manual chip changes: host page only.** Removed from the players' app: the manual payout calculator, manual adjustments with everyone agreeing, and the chip lock button (it only existed for manual calculating). The host page has a chip box for every person in a game: type the number, press Set, and it updates on every device at once. Automatic payouts after a win, and everyone confirming the round, stay as they are. | Kyle |
 | 2026-11-08 | **Win summary:** lists every winning condition (番種) with its fan and the total; shows each player's hand, shown sets and flowers; each player's chips as +N (green) or −N (red); and "Total chips transferred". The two seat-flower items are labelled (flowers) / (seasons) so they can be told apart. | Kyle |
 | 2026-11-08 | **Host page: history and roll back.** Every finished hand is recorded (game, result, chip changes, everyone's chips before it). "Roll back to before this" puts chips (including manual changes made since), wind and dealer back to just before that hand and removes the later hands. Two taps to confirm. Any round in progress is cancelled. | Kyle |
@@ -111,6 +111,13 @@ disagrees with those, the newest dated entry here wins.
 | 2026-11-08 | **Wall removed from the screen** to save space; the middle shows the tiles-left count and the Draw tile. **Dice** move next to the dealer's name once the hand starts. | Kyle |
 | 2026-11-08 | **Swaps:** the player who asked sees "Waiting for … to answer" with a Cancel button, and is told if the spectator declines (or accepts). | Kyle |
 | 2026-11-08 | **Empty seats:** a spectator can sit in an empty seat straight away, even mid-round (taking over that seat's tiles), using the "Sit here" button. Seated players still change seats only between rounds; CPU seats still need the host. | Kyle |
+| 2026-11-08 | **Host can remove a CPU at any time** ("Remove CPU" on the host page) so a player can sit there; mid-round the empty seat keeps its tiles and the game waits. | Kyle |
+| 2026-11-08 | **Win summary:** "Total chips transferred" removed; the winner's hand is grouped by set (runs and pongs together, a gap only between sets); winning conditions in the chosen language only. | Kyle |
+| 2026-11-08 | **Other players:** no hidden-tile count; only public tiles (shown sets, flowers) unless a spectator presses Show. Left and right players' tiles (and their discards) lie sideways in columns, wrapping into more columns when long. | Kyle |
+| 2026-11-08 | **Spectator buttons** say "Show" / "Hide" instead of an eye icon. | Kyle |
+| 2026-11-08 | **Wall picture:** a small square around the tiles-left count shows the remaining wall; stacks disappear in the real order (draws from the front, replacements from the back). | Kyle |
+| 2026-11-08 | **One language at a time:** top bar and winning conditions show only English or only Chinese; in English the winds are shown as E / S / W / N. (The Help tables still show the Chinese names next to the English ones.) | Kyle |
+| 2026-11-08 | **"Next round"** replaces "Confirm – next hand". **Theme:** Light or Dark only (Dark default); "System" removed. **Your name** (with chips and, for the dealer, the dice) is at the top left next to Undo. | Kyle |
 | 2026-11-08 | **First dealer** of a new game is seat 0 (East). | Claude (Kyle may change) |
 | 2026-11-08 | **Undo moves:** discard, 上, 碰, 槓, 胡. Draws are not separate moves. Undoing a discard puts the tile back in that player's hand and it is their turn again. | Kyle |
 | 2026-11-08 | **Several games at once:** one server can run many separate games, each with its own name. | Kyle |
