@@ -139,6 +139,24 @@ describe('what each device can see', () => {
     expect(v.seats[2]!.hand).toBeNull();
   });
 
+  it('"All hands" shows every hand to a spectator without changing their own choices', () => {
+    let r = join(startedTable(), 'Spec');
+    r = cmd(r, 'Spec', { type: 'setWatchedSeat', seat: 1, visible: true });
+    r = cmd(r, 'Spec', { type: 'setWatchAll', visible: true });
+    let v = viewFor(r, 'spec', tick());
+    expect(v.you.watchAll).toBe(true);
+    expect(v.seats.map((s) => s.hand?.length)).toEqual([14, 13, 13, 13]);
+    r = cmd(r, 'Spec', { type: 'setWatchAll', visible: false });
+    v = viewFor(r, 'spec', tick());
+    expect(v.seats.map((s) => s.hand?.length ?? null)).toEqual([null, 13, null, null]);
+  });
+
+  it('a seated player cannot use "All hands" to see other hands', () => {
+    const r = cmd(startedTable(), 'Amy', { type: 'setWatchAll', visible: true });
+    expect(viewFor(r, 'amy', tick()).seats[2]!.hand).toBeNull();
+    expect(viewFor(r, 'amy', tick()).you.watchAll).toBe(false);
+  });
+
   it('a seated player cannot use spectator hand choices to see other hands', () => {
     const r = cmd(startedTable(), 'Amy', { type: 'setWatchedSeat', seat: 2, visible: true });
     expect(viewFor(r, 'amy', tick()).seats[2]!.hand).toBeNull();

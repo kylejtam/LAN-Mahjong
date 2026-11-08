@@ -52,6 +52,8 @@ export interface Person {
   cpu: CpuDifficulty | null;
   /** As a spectator: the seats whose hands this person has chosen to see. */
   watchingSeats: number[];
+  /** As a spectator: the "All hands" screen is open (every hand is sent). */
+  watchAll?: boolean;
   /** Per-person preferences (language, theme ...), copied on rename. */
   prefs: Record<string, unknown>;
 }
@@ -109,6 +111,7 @@ export type Command =
   | { type: 'undo' }
   | { type: 'confirmRound' }
   | { type: 'setWatchedSeat'; seat: number; visible: boolean }
+  | { type: 'setWatchAll'; visible: boolean }
   | { type: 'setPrefs'; prefs: Record<string, unknown> }
   | { type: 'rename'; newName: string }
   | { type: 'dropOut'; replacement: { cpu: CpuDifficulty } | { spectator: string } }
@@ -335,7 +338,7 @@ export function handleCommand(prev: Room, key: string, cmd: Command, now: number
   if (prev.ended) fail('This game has ended.');
   const actor = prev.people[key];
   if (!actor) fail('You are not in this game.');
-  if (prev.phase === 'finished' && !['setPrefs', 'rename', 'leaveGame', 'setWatchedSeat'].includes(cmd.type)) {
+  if (prev.phase === 'finished' && !['setPrefs', 'rename', 'leaveGame', 'setWatchedSeat', 'setWatchAll'].includes(cmd.type)) {
     fail('The game is finished.');
   }
 
@@ -425,6 +428,9 @@ export function handleCommand(prev: Room, key: string, cmd: Command, now: number
       if (!Number.isInteger(cmd.seat) || cmd.seat < 0 || cmd.seat >= SEATS) fail('There is no such seat.');
       room.people[key]!.watchingSeats = room.people[key]!.watchingSeats.filter((x) => x !== cmd.seat);
       if (cmd.visible) room.people[key]!.watchingSeats.push(cmd.seat);
+      break;
+    case 'setWatchAll':
+      room.people[key]!.watchAll = !!cmd.visible;
       break;
     case 'setPrefs':
       room.people[key]!.prefs = { ...room.people[key]!.prefs, ...cmd.prefs };

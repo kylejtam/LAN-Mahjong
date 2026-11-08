@@ -41,7 +41,7 @@ export interface RoomView {
   id: string;
   name: string;
   label: { en: string; zh: string };
-  you: { name: string; seat: number | null; watchingSeats: number[]; prefs: Record<string, unknown> };
+  you: { name: string; seat: number | null; watchingSeats: number[]; watchAll: boolean; prefs: Record<string, unknown> };
   phase: RoomPhase;
   settings: GameSettings;
   startingBalance: number;
@@ -80,7 +80,7 @@ export function viewFor(room: Room, viewerKey: string, now: number): RoomView {
     const p = key ? room.people[key]! : null;
     const hand = round?.core.hands[seat] ?? [];
     const canSee =
-      !!round && (seat === mySeat || ended || (mySeat === null && viewer.watchingSeats.includes(seat)));
+      !!round && (seat === mySeat || ended || (mySeat === null && (!!viewer.watchAll || viewer.watchingSeats.includes(seat))));
     return {
       seat,
       name: p?.name ?? null,
@@ -120,6 +120,7 @@ export function viewFor(room: Room, viewerKey: string, now: number): RoomView {
       name: viewer.name,
       seat: mySeat,
       watchingSeats: viewer.watchingSeats.slice().sort(),
+      watchAll: mySeat === null && !!viewer.watchAll,
       prefs: viewer.prefs,
     },
     phase: room.phase,

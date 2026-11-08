@@ -52,6 +52,8 @@ export function Table({ view, send, onLeave }: Props): ReactElement {
   const me = mySeat !== null ? view.seats[mySeat]! : null;
 
   const [panel, setPanel] = useState<'help' | 'settings' | null>(null);
+  /** Spectators can close the seat picker and just watch. */
+  const [justWatching, setJustWatching] = useState(false);
   const [chooser, setChooser] = useState<Chooser>(null);
   const [locked, setLocked] = useState(true);
   const command = (c: Extract<ClientMessage, { type: 'command' }>['command']): void => send({ type: 'command', command: c });
@@ -251,9 +253,21 @@ export function Table({ view, send, onLeave }: Props): ReactElement {
     <div className={`table-screen felt-${view.tableColour}`}>
       <header className="topbar">
         <div className="topbar-left">
-          <button className="btn undo" disabled={!canUndo} onClick={() => command({ type: 'undo' })}>
-            ↶ Undo{lastWin && view.seats.some((s) => s.votedUndoWin) ? ` (${view.seats.filter((s) => s.votedUndoWin).length} agreed)` : ''}
-          </button>
+          {mySeat !== null ? (
+            <button className="btn undo" disabled={!canUndo} onClick={() => command({ type: 'undo' })}>
+              ↶ Undo{lastWin && view.seats.some((s) => s.votedUndoWin) ? ` (${view.seats.filter((s) => s.votedUndoWin).length} agreed)` : ''}
+            </button>
+          ) : (
+            <>
+              <span className="spectating-tag">Spectating</span>
+              {round && (
+                <button className="btn" onClick={() => command({ type: 'setWatchAll', visible: true })}>All hands</button>
+              )}
+              {view.phase === 'betweenRounds' && justWatching && (
+                <button className="btn" onClick={() => setJustWatching(false)}>Take a seat</button>
+              )}
+            </>
+          )}
         </div>
         <div className="topbar-centre">
           <span className="round-wind">{WIND_CHARS[view.match.roundWind]}</span>
@@ -349,7 +363,19 @@ export function Table({ view, send, onLeave }: Props): ReactElement {
         </div>
       )}
 
-      {view.phase === 'betweenRounds' && <SeatPicker view={view} command={command} />}
+      {view.phase === 'betweenRounds' && !(mySeat === null && justWatching) && (
+        <SeatPicker
+          view={view}
+          command={command}
+          onSpectate={() => {
+            if (mySeat !== null) command({ type: 'leaveSeat' });
+            setJustWatching(true);
+          }}
+        />
+      )}
+      {view.you.watchAll && mySeat === null && round && (
+        <AllHands view={view} onClose={() => command({ type: 'setWatchAll', visible: false })} />
+      )}
       {(round?.phase === 'ended' || view.phase === 'finished') && (
         <ResultPanel view={view} command={command} canClaimWin={!!a?.win} onWin={onWin} winLabel={winLabel} />
       )}
@@ -449,8 +475,48 @@ export function Table({ view, send, onLeave }: Props): ReactElement {
   );
 }
 
-/** Between rounds: choose a seat and press Start. */
-function SeatPicker({ view, command }: { view: RoomView; command: (c: Extract<ClientMessage, { type: 'command' }>['command']) => void }): ReactElement {
+/** Spectators: every player's hand, flowers and shown sets, and nothing else. */
+function AllHands({ view, onClose }: { view: RoomView; onClose: () => void }): ReactElement {
+  return (
+    <div className="overlay all-hands-overlay">
+      <div className="panel all-hands">
+        <h3>All hands</h3>
+        {view.seats.map((s) => (
+          <div key={s.seat} className={`all-hands-row${view.round?.turn === s.seat ? ' all-hands-turn' : ''}`}>
+            <span className="all-hands-name">
+              <span className="wind-badge">{WIND_CHARS[s.wind]}</span> {s.name ?? 'Empty'}
+            </span>
+            <span className="all-hands-tiles">
+              {(s.hand ?? []).map((t) => <TileView key={t.id} type={t.type} width="var(--allhands-w)" />)}
+              {s.melds.map((m, i) => (
+                <span key={i} className="meld">
+                  {m.tiles.map((t, j) => <TileView key={t.id} type={t.type} back={m.concealed && (j === 0 || j === 3)} width="var(--allhands-w)" />)}
+                </span>
+              ))}
+              {s.flowers.length > 0 && (
+                <span className="meld flowers">
+                  {s.flowers.map((t) => <TileView key={t.id} type={t.type} width="var(--allhands-w)" />)}
+                </span>
+              )}
+            </span>
+          </div>
+        ))}
+        <button className="btn" onClick={onClose}>Back to the table</button>
+      </div>
+    </div>
+  );
+}
+
+/** Between rounds: choose a seat and press Start, or tap Spectate in the middle to just watch. */
+function SeatPicker({
+  view,
+  command,
+  onSpectate,
+}: {
+  view: RoomView;
+  command: (c: Extract<ClientMessage, { type: 'command' }>['command']) => void;
+  onSpectate: () => void;
+}): ReactElement {
   const mySeat = view.you.seat;
   const me = mySeat !== null ? view.seats[mySeat] : null;
   const filled = view.seats.filter((s) => s.name).length;
@@ -475,6 +541,10 @@ function SeatPicker({ view, command }: { view: RoomView; command: (c: Extract<Cl
               </button>
             );
           })}
+          <button className="seat seat-spectate" onClick={onSpectate}>
+            <span className="seat-name">Spectate</span>
+            <span className="seat-wind">Just watch</span>
+          </button>
         </div>
         {me ? (
           <div className="row">
@@ -484,7 +554,7 @@ function SeatPicker({ view, command }: { view: RoomView; command: (c: Extract<Cl
             <button className="btn" onClick={() => command({ type: 'leaveSeat' })}>Leave seat</button>
           </div>
         ) : (
-          <p className="muted">Tap an empty seat to sit down, or just watch.</p>
+          <p className="muted">Tap an empty seat to sit down, or Spectate to just watch.</p>
         )}
         {filled < 4 && <p className="muted">A round starts when all 4 seats are filled and everyone presses Start. The host can fill seats with CPUs.</p>}
       </div>
