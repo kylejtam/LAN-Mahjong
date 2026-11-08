@@ -6,11 +6,11 @@ disagrees with those, the newest dated entry here wins.
 
 ## Current status
 
-- Phase 1 (rules engine): mostly done. Built and tested: tile set and checks,
-  shuffle, wall and dice break, dealing with flower replacement, winning-hand
-  check, legal chow/pong/gong/win, payments. Still to do: fan counting
-  (waits for Q5 fan list) and two-winner rule (Q6).
-- Tests: 56 passing (`npm test`).
+- Phase 1 (rules engine): done except the final wording of the two-winner
+  rule (see open questions). Built and tested: tile set and checks, shuffle,
+  wall and dice break, dealing with flower replacement, winning-hand check,
+  legal chow/pong/gong/win, fan counting, payments.
+- Tests: 90 passing (`npm test`).
 
 ## Decisions
 
@@ -28,7 +28,10 @@ disagrees with those, the newest dated entry here wins.
 | 2026-11-08 | **Payout, default mode:** discarder pays 2 × base, the other two pay 1 × base each. | Kyle |
 | 2026-11-08 | **Payout, self-draw:** each of the other 3 players pays 2 × base. | Kyle |
 | 2026-11-08 | **Payout, "only discarder pays" mode:** discarder pays 4 × base (example: 3 fan → 4 × 8 = 32). Self-draw in this mode pays the same as normal self-draw (no discarder exists). | Kyle / Claude (self-draw part) |
-| 2026-11-08 | **Two winners on one discard:** standard HK 截糊 "stealing the win". Only the player nearest in turn order after the discarder wins. | Kyle |
+| 2026-11-08 | **Two winners on one discard:** standard HK 截糊 "stealing the win". Built as: the player nearest in turn order after the discarder wins. Kyle added "the one on the left (previous player) wins, and must tap 胡 within 10 seconds"; exact meaning being confirmed. | Kyle |
+| 2026-11-08 | **Fan list confirmed** by Kyle (table below). | Kyle |
+| 2026-11-08 | Fan combining: 小三元 / 大三元 replace the separate dragon pong fan; 小四喜 replaces seat/round wind fan; 一台花 (2) replaces the 正花 from that set; 清一色 replaces 混一色; cap hands score 10 and nothing is added. When a hand can be split more than one way, the highest-scoring split is used. | Claude (Kyle may change) |
+| 2026-11-08 | 坑坑胡 (all concealed pongs): no claimed sets; on a discard win the discard must finish the pair. 門前清 still counts with a concealed gong. | Claude (standard HK) |
 
 ## Open questions for Kyle
 
@@ -39,8 +42,9 @@ disagrees with those, the newest dated entry here wins.
 2. ~~Fan limits~~ answered (host setting, default 3, cap 10).
 3. ~~Fan to chips table~~ answered.
 4. ~~Payments~~ answered.
-5. **Fan list** (proposal below).
-6. ~~Two winners on one discard~~ answered (standard HK 截糊).
+5. ~~Fan list~~ confirmed.
+6. **Two winners on one discard:** which player is "on the left"? And the
+   10-second window conflicts with "no turn timers" in the notes.
 7. **Default minimum fan:** using 3 until Kyle confirms.
 
 ### Batch 2: later phases (heads-up, no answer needed yet)
@@ -58,7 +62,7 @@ Discarder pays double the base.
 |-----|---|---|---|---|---|---|---|---|---|---|----------|
 | Base chips | 1 | 2 | 4 | 8 | 16 | 24 | 32 | 48 | 64 | 96 | 128 |
 
-## Proposed fan list (awaiting Kyle)
+## Fan list (confirmed)
 
 | Fan | Hand | 中文 |
 |-----|------|------|

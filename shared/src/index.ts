@@ -5,3 +5,4 @@ export * from './wall.js';
 export * from './deal.js';
 export * from './hand.js';
 export * from './payout.js';
+export * from './scoring.js';
