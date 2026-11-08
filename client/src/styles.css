@@ -111,7 +111,8 @@ input { font: inherit; }
 }
 .compass-top { grid-area: t; } .compass-left { grid-area: l; } .compass-right { grid-area: r; } .compass-bottom { grid-area: b; }
 .compass-dealer { color: #ffd447; font-weight: 700; }
-.chip-total { font-weight: 700; font-variant-numeric: tabular-nums; display: flex; align-items: center; gap: 0.2em; font-size: 1.15em; }
+.chip-total { font-weight: 700; font-variant-numeric: tabular-nums; display: flex; align-items: center; gap: 0.3em; font-size: 1.15em; }
+.chip-icon { flex: none; filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.5)); }
 
 .board {
   display: grid;
