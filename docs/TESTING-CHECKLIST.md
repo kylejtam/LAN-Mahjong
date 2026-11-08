@@ -7,8 +7,13 @@ Tick each box as you go. If something goes wrong, see "What to send me" at the e
 - [ ] **Install Node.js.** Go to <https://nodejs.org>, download the **LTS** version
       for Windows, and run the installer. Click Next through every step (the
       default choices are fine).
-- [ ] **Download the game.** Open this link, which downloads a ZIP file:
-      <https://github.com/kylejtam/LAN-Mahjong/archive/refs/heads/claude/nice-sagan-boolsz.zip>
+- [ ] **Sign in to GitHub** on the laptop's browser (github.com → Sign in).
+      The project is private, so GitHub shows "404 Not Found" until you are signed in.
+- [ ] **Download the game.** Go to <https://github.com/kylejtam/LAN-Mahjong>.
+      1. Click the branch button near the top left (it says **main**) and choose
+         **claude/nice-sagan-boolsz**. (The game is on this branch; *main* only has
+         the two planning files.)
+      2. Click the green **Code** button → **Download ZIP**.
 - [ ] **Unzip it.** Right-click the ZIP file → **Extract All…** → **Extract**.
       You get a folder called `LAN-Mahjong-claude-nice-sagan-boolsz`.
 - [ ] **Open a command window in that folder.** Open the folder, click the
