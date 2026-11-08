@@ -147,6 +147,7 @@ disagrees with those, the newest dated entry here wins.
 | 2026-11-08 | **Chip symbol:** a plain yellow circle in front of your chip count in the top right. | Kyle |
 | 2026-11-08 | **Host: Stop this hand** (two taps, only while a hand or its dice roll is in progress; not on the win summary). Nobody pays, chips and dealer stay; settings unlock; when everyone presses Start the same game is dealt again with new tiles. Players see "The host stopped this hand. It will be dealt again." | Kyle |
 | 2026-11-08 | **Win celebration:** when a win summary appears (not a draw; same for chicken wins), confetti plus a fanfare (sound D, louder) on every device. Each player picks the confetti style in ⚙ Settings: Confetti (cannons), Red & gold, Gold chips or Fireworks (default Confetti); it follows their name like the language. Made by code, no files. Doesn't replay when a page is reopened on the summary. | Kyle |
+| 2026-11-08 | **Help and Settings during pop-ups:** the ? and ⚙ buttons stay tappable (and bright) above the win summary and the Ready / Start pop-up; the rest of the top bar stays dimmed. | Kyle |
 | 2026-11-08 | **Shàng sets are shown in order**, lowest number first. | Kyle |
 | 2026-11-08 | **After the win summary:** seated players press Continue, then a popup like the seat picker shows who is ready, with Ready / Leave seat (and Back to summary). | Kyle |
 | 2026-11-08 | **Chips appear once:** only at the top right; your top-left name tag has no chips. | Kyle |

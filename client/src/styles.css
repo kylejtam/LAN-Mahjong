@@ -103,6 +103,8 @@ input { font: inherit; }
 }
 .topbar-left { display: flex; gap: 0.5em; padding-left: env(safe-area-inset-left); }
 .topbar-right { display: flex; gap: 0.5em; justify-content: flex-end; align-items: center; padding-right: env(safe-area-inset-right); }
+/* Help and Settings stay tappable above the pop-ups (win summary, Ready / Start), whose dark layer is z-index 20. */
+.topbar-right .btn.icon { position: relative; z-index: 21; }
 .topbar-centre { display: flex; align-items: center; gap: 0.6em; }
 .round-wind { font-size: 1.5em; font-weight: 700; }
 .compass {
