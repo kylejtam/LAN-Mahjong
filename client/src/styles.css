@@ -408,3 +408,25 @@ input { font: inherit; }
 
 .cpu-seconds { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
 .cpu-seconds input { width: 5.5rem; background: var(--input-bg); color: var(--fg); border: 1px solid var(--panel-border); border-radius: 6px; padding: 0.35em 0.5em; text-align: right; }
+
+/* ---------- phone fixes (phase 8) ---------- */
+:root {
+  /* Public tiles (shown sets and flowers) are bigger than hidden tile backs. */
+  --public-w: min(2.4vw, 5vh);
+  --draw-w: min(5vw, 10vh);
+}
+.opp-hidden { display: inline-flex; align-items: center; gap: 0.25em; font-weight: 700; color: #fff; opacity: 0.9; }
+.felt-white .opp-hidden { color: #222; }
+.opp-top .melds, .opp-top .opp-hand { flex-wrap: nowrap; }
+.opp-left, .opp-right { overflow: hidden; }
+.opp-left .melds, .opp-right .melds { max-width: 100%; }
+.me-info .melds { justify-content: flex-start; }
+.draw-pile {
+  display: inline-flex; flex-direction: column; align-items: center; gap: 0.15em;
+  cursor: grab; touch-action: none; padding: 0.3em 0.5em; border-radius: 10px;
+  background: rgba(255, 212, 71, 0.18); outline: 3px solid #ffd447;
+  animation: pulse 0.8s ease-in-out infinite alternate;
+}
+.draw-label { font-weight: 800; color: #ffd447; }
+:root { --mine-w: min(3.3vw, 6.8vh); }
+.me-info { max-width: 34vw; }

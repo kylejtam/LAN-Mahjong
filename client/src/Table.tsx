@@ -236,12 +236,20 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
     return (
       <section className={`opp opp-${side}`} onClick={mySeat === null ? () => setSpectatorSeat(sv.seat) : undefined}>
         {nameTag(sv)}
-        <div className="opp-hand">
-          {sv.hand
-            ? sv.hand.map((t) => <TileView key={t.id} type={t.type} width="var(--opp-w)" />)
-            : Array.from({ length: sv.handCount }, (_, i) => <TileView key={i} back width="var(--opp-w)" />)}
-        </div>
-        {renderMelds(sv.melds, sv.flowers, 'var(--opp-w)')}
+        {sv.hand ? (
+          <div className="opp-hand">
+            {sv.hand.map((t) => <TileView key={t.id} type={t.type} width="var(--opp-w)" />)}
+          </div>
+        ) : (
+          sv.handCount > 0 && (
+            // Hidden tiles: just one tile back and how many, to leave room for the public tiles.
+            <div className="opp-hidden" title={`${sv.handCount}`}>
+              <TileView back width="var(--opp-w)" />
+              <span>×{sv.handCount}</span>
+            </div>
+          )
+        )}
+        {renderMelds(sv.melds, sv.flowers, 'var(--public-w)')}
       </section>
     );
   };
@@ -308,11 +316,23 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
             {renderDiscards('left')}
             <div className="hub">
               {round ? (
-                <>
-                  <div className="hub-count">{round.wallCount}</div>
-                  <div className="hub-sub">{tr('tilesLeft')}</div>
-                  <div className="dice">{round.dice.map((d, i) => <span key={i} className="die">{d}</span>)}</div>
-                </>
+                a?.draw || a?.drawReplacement ? (
+                  // Big glowing tile to drag into your hand (the wall itself can be tiny on a phone).
+                  <span
+                    className="draw-pile"
+                    onPointerDown={start(a.draw ? { kind: 'wallFront' } : { kind: 'wallBack' })}
+                  >
+                    <TileView back width="var(--draw-w)" />
+                    <span className="draw-label">{a.draw ? tr('drawHere') : tr('replacementHere')}</span>
+                    <span className="hub-sub">{round.wallCount} {tr('tilesLeft')}</span>
+                  </span>
+                ) : (
+                  <>
+                    <div className="hub-count">{round.wallCount}</div>
+                    <div className="hub-sub">{tr('tilesLeft')}</div>
+                    <div className="dice">{round.dice.map((d, i) => <span key={i} className="die">{d}</span>)}</div>
+                  </>
+                )
               ) : view.phase === 'rolling' ? (
                 iAmDealer ? <div className="hub-sub">{tr('swipeDiceHere')}</div> : <div className="hub-sub">{tr('waitingRoll', { name: personName(view.seats[view.match.dealer]?.name, lang) })}</div>
               ) : null}
@@ -329,7 +349,7 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
       <footer className="me">
         <div className="me-info">
           {nameTag(bottom)}
-          {renderMelds(bottom.melds, bottom.flowers, 'var(--meld-w)')}
+          {renderMelds(bottom.melds, bottom.flowers, 'var(--mine-w)')}
         </div>
         <div className="hand" data-drop="hand">
           {serverHand

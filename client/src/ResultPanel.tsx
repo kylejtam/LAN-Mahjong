@@ -110,6 +110,12 @@ export function ResultPanel({ view, lang, command, canClaimWin, onWin, winLabel 
               {me.confirmed ? tr('waiting') : tr('confirm')}
             </button>
           )}
+          {!me && view.spectatorsConfirm && (
+            // All-CPU table: a spectator moves the game on to the next hand.
+            <button className="btn primary big" onClick={() => command({ type: 'confirmRound' })}>
+              {tr('nextHand')}
+            </button>
+          )}
           {me && result.type === 'win' && (
             <button className="btn" disabled={me.votedUndoWin} onClick={() => command({ type: 'undo' })}>
               {me.votedUndoWin ? tr('askedUndo') : tr('undoWin')}

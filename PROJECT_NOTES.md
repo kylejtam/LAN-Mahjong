@@ -9,7 +9,7 @@ disagrees with those, the newest dated entry here wins.
 - Phase 1 (rules engine): **done**. Tile set and checks, shuffle, wall and dice
   break, dealing with flower replacement, winning-hand check, legal
   chow/pong/gong/win, two-winner rule, fan counting, payments.
-- Tests: 210 passing (`npm test`), including 60 rounds of random play that check no tile is ever lost or created.
+- Tests: 217 passing (`npm test`), including 60 rounds of random play that check no tile is ever lost or created.
 - Phase 2 (game server): **done**.
   - Step 1 round engine (`server/src/game/round.ts`): **done**.
   - Step 2 full 16-round game (`server/src/game/match.ts`): **done**.
@@ -100,6 +100,10 @@ disagrees with those, the newest dated entry here wins.
 | 2026-11-08 | **CPU time per move** is an editable number of seconds on the host page, per game (0.2–30 s, default 1 s). It is the same for every CPU level. Can be changed any time. | Kyle |
 | 2026-11-08 | **CPU strength (about 1,500 simulated hands):** easy wins ~13% against easy players; medium and hard win about two thirds of hands against easy players, hard collecting the most chips; against medium players hard is only slightly better (fewer chips lost). | Claude (measured) |
 | 2026-11-08 | **Host laptop is Windows.** Setup: install Node.js LTS, download the branch ZIP, `npm install`, `npm start`; Wi-Fi set to Private and Node.js allowed through the firewall. Saving falls back to a direct write if Windows locks the file. | Kyle |
+| 2026-11-08 | **iPhone fixes (from Kyle's first test):** a big glowing Draw / Replacement tile appears in the middle of the table to drag into your hand (the wall can be tiny on a phone); other players' hidden tiles show as one tile back with a count (×13) so their shown sets and flowers can be bigger; your own sets and flowers are bigger too. Checked on iPhone SE, 13 and 15 Pro Max sizes, including a short Safari window. | Kyle |
+| 2026-11-08 | **Undo with CPUs:** when it is a CPU's (or an empty seat's) turn, any seated player can press Undo. After an undo, CPUs wait 5 seconds so players can undo again. | Kyle |
+| 2026-11-08 | **CPU hands are shown sorted** (characters 1–9, dots 1–9, bamboo 1–9, winds, dragons) wherever they are visible. | Kyle |
+| 2026-11-08 | **All-CPU tables:** at the end of each hand the game waits until at least one spectator presses "Confirm – next hand". With nobody watching, it carries on by itself. | Kyle |
 | 2026-11-08 | **First dealer** of a new game is seat 0 (East). | Claude (Kyle may change) |
 | 2026-11-08 | **Undo moves:** discard, 上, 碰, 槓, 胡. Draws are not separate moves. Undoing a discard puts the tile back in that player's hand and it is their turn again. | Kyle |
 | 2026-11-08 | **Several games at once:** one server can run many separate games, each with its own name. | Kyle |

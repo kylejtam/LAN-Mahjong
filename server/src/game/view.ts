@@ -14,7 +14,8 @@
 import { GameSettings, Meld, SEATS, Tile, tilesLeft } from '@lan-mahjong/shared';
 import { matchLabel } from './match.js';
 import { AvailableActions, DiscardEntry, Phase, RoundResult, availableActions, currentPlayer } from './round.js';
-import { CpuDifficulty, DEFAULT_CPU_SECONDS, HandRecord, PendingSwap, Room, RoomPhase, TableColour, seatOf } from './room.js';
+import { CpuDifficulty, DEFAULT_CPU_SECONDS, HandRecord, PendingSwap, Room, RoomPhase, TableColour, roundCanClose, seatOf, undoableForSeat } from './room.js';
+import { NORMAL_TYPES, NormalType, isFlower } from '@lan-mahjong/shared';
 
 export interface SeatView {
   seat: number;
@@ -64,8 +65,27 @@ export interface RoomView {
   };
   /** Your buttons. Null if you are not seated or no round is on. */
   actions: AvailableActions | null;
+  /** True when you are a spectator at an all-CPU table and the round is over. */
+  spectatorsConfirm: boolean;
+  roundCanClose: boolean;
   pendingSwap: (PendingSwap & { fromName: string; toName: string }) | null;
   ended: boolean;
+}
+
+/** Sort tiles: characters 1-9, dots 1-9, bamboo 1-9, winds, dragons (flowers last). */
+export function sortTiles(tiles: readonly Tile[]): Tile[] {
+  const order = (t: Tile): number => (isFlower(t.type) ? 99 : NORMAL_TYPES.indexOf(t.type as NormalType));
+  return [...tiles].sort((a, b) => order(a) - order(b) || a.id - b.id);
+}
+
+/** Undo is also allowed when the player to move is a CPU or an empty seat. */
+function withRoomUndo(room: Room, a: AvailableActions): AvailableActions {
+  const round = room.match.round;
+  if (a.undo || !round) return a;
+  const current = currentPlayer(round);
+  const last = round.history[round.history.length - 1];
+  const ok = current !== null && !!last && last.move !== 'win' && undoableForSeat(room, current);
+  return ok ? { ...a, undo: true } : a;
 }
 
 export function viewFor(room: Room, viewerKey: string, now: number): RoomView {
@@ -78,7 +98,9 @@ export function viewFor(room: Room, viewerKey: string, now: number): RoomView {
 
   const seats: SeatView[] = room.seats.map((key, seat) => {
     const p = key ? room.people[key]! : null;
-    const hand = round?.core.hands[seat] ?? [];
+    const raw = round?.core.hands[seat] ?? [];
+    // CPU hands are shown sorted the way a person would: each suit 1-9, then honours.
+    const hand = p?.cpu ? sortTiles(raw) : raw;
     const canSee =
       !!round && (seat === mySeat || ended || (mySeat === null && (!!viewer.watchAll || viewer.watchingSeats.includes(seat))));
     return {
@@ -149,7 +171,10 @@ export function viewFor(room: Room, viewerKey: string, now: number): RoomView {
           result: round.core.result,
         }
       : null,
-    actions: round && mySeat !== null ? availableActions(round, mySeat, now) : null,
+    actions: round && mySeat !== null ? withRoomUndo(room, availableActions(round, mySeat, now)) : null,
+    /** At an all-CPU table, spectators confirm the end of a round. */
+    spectatorsConfirm: mySeat === null && !!round && round.core.phase === 'ended' && room.seats.every((k) => !k || !!room.people[k]?.cpu),
+    roundCanClose: !!round && round.core.phase === 'ended' && roundCanClose(room),
     pendingSwap: visibleSwap,
     ended: room.ended,
   };

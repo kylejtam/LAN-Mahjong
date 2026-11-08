@@ -121,6 +121,8 @@ export interface Room {
   history?: HandRecord[];
   /** Seconds each CPU waits before a move (missing in old save files = default). */
   cpuSeconds?: number;
+  /** CPUs wait until this time (after an undo, so players can undo again). */
+  cpuPauseUntil?: number;
 }
 
 export type Command =
@@ -173,6 +175,8 @@ export function cpuDelay(room: Room): number {
   return Math.round((room.cpuSeconds ?? DEFAULT_CPU_SECONDS) * 1000);
 }
 export const MAX_NAME_LENGTH = 20;
+/** After an undo, CPUs wait this long so players can undo again. */
+export const UNDO_PAUSE_MS = 5000;
 
 const fail = (message: string): never => {
   throw new GameError(message);
@@ -355,10 +359,38 @@ function maybeBeginRolling(room: Room): void {
 }
 
 /** If the round is over and everyone has confirmed, pay out and get ready for the next one. */
+/** Is the seat's turn played by a CPU or nobody (so any player may undo for it)? */
+export function undoableForSeat(room: Room, seat: number): boolean {
+  const key = room.seats[seat];
+  return !key || !!room.people[key]?.cpu;
+}
+
+/** Spectators watching right now (connected, not seated, not CPUs). */
+function watchers(room: Room): string[] {
+  const seated = new Set(room.seats.filter(Boolean));
+  return Object.values(room.people)
+    .filter((p) => !p.cpu && p.connected && !seated.has(p.key))
+    .map((p) => p.key);
+}
+
+/**
+ * Can a finished round be paid out and closed?
+ * - Seated players: every one of them has confirmed.
+ * - All-CPU table: at least one spectator has confirmed; with nobody
+ *   watching, it carries on by itself.
+ */
+export function roundCanClose(room: Room): boolean {
+  const humans = seatedHumans(room);
+  if (humans.length > 0) return humans.every((k) => room.confirmed.includes(k));
+  const watching = watchers(room);
+  if (watching.length === 0) return true;
+  return room.confirmed.some((k) => watching.includes(k));
+}
+
 function maybeCloseRound(room: Room): void {
   const round = room.match.round;
   if (room.phase !== 'playing' || !round || round.core.phase !== 'ended') return;
-  if (!seatedHumans(room).every((k) => room.confirmed.includes(k))) return;
+  if (!roundCanClose(room)) return;
   const before = room.match;
   const { match, changes } = closeRound(room.match);
   const result = round.core.result!;
@@ -482,15 +514,23 @@ export function handleCommand(prev: Room, key: string, cmd: Command, now: number
         if (!room.undoWinVotes.includes(key)) room.undoWinVotes.push(key);
         maybeUndoWin(room);
       } else {
-        if (currentPlayer(round) !== s) fail('Only the player whose turn it is can undo.');
-        setRound(room, undo(round, s));
+        // The player whose turn it is may undo. If that seat is a CPU (or empty),
+        // any seated player may undo for it.
+        const current = currentPlayer(round);
+        if (current !== s && !(current !== null && undoableForSeat(room, current))) {
+          fail('Only the player whose turn it is can undo.');
+        }
+        setRound(room, undo(round, current!));
+        // Give players time to press undo again before the CPUs move.
+        room.cpuPauseUntil = now + UNDO_PAUSE_MS;
       }
       break;
     }
     case 'confirmRound': {
       const round = requireRound(room);
       if (round.core.phase !== 'ended') fail('The round is not over yet.');
-      requireSeated(room, key);
+      // Seated players confirm. At an all-CPU table, spectators confirm instead.
+      if (seatOf(room, key) === null && seatedHumans(room).length > 0) fail('You are not sitting at the table.');
       if (!room.confirmed.includes(key)) room.confirmed.push(key);
       maybeCloseRound(room);
       break;
@@ -713,7 +753,7 @@ function applyRoundMove(round: RoundState, seat: number, cmd: Command, now: numb
  * The server calls this regularly.
  */
 export function cpuTick(prev: Room, now: number, rng: Rng): Room {
-  if (prev.ended || now - prev.lastChangeAt < cpuDelay(prev)) return prev;
+  if (prev.ended || now - prev.lastChangeAt < cpuDelay(prev) || now < (prev.cpuPauseUntil ?? 0)) return prev;
   const cpuSeats = prev.seats
     .map((k, seat) => ({ k, seat }))
     .filter((x): x is { k: string; seat: number } => x.k !== null && !!prev.people[x.k]!.cpu);
@@ -741,8 +781,9 @@ export function cpuTick(prev: Room, now: number, rng: Rng): Room {
   if (prev.phase === 'playing' && prev.match.round) {
     const round = prev.match.round;
     if (round.core.phase === 'ended') {
-      // CPUs never hold up the next round. With only CPUs, carry on by itself.
-      if (seatedHumans(prev).length === 0) {
+      // CPUs never hold up the next round. At an all-CPU table with nobody
+      // watching, carry on by itself (spectators confirm with their button).
+      if (seatedHumans(prev).length === 0 && roundCanClose(prev)) {
         const room = cloneRoom(prev);
         maybeCloseRound(room);
         room.lastChangeAt = now;

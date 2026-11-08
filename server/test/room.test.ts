@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { seededRng } from '@lan-mahjong/shared';
+import { NORMAL_TYPES, seededRng } from '@lan-mahjong/shared';
 import { Command, HostCommand, Room, cpuTick, createRoom, disconnect, handleCommand, handleHostCommand, joinRoom } from '../src/game/room.js';
 import { hostViewOf, viewFor } from '../src/game/view.js';
 
@@ -339,6 +339,87 @@ describe('history, roll back and changing the current game (host page)', () => {
     expect(r.people.amy!.balance).toBe(1032);
     expect(() => host(r, { type: 'hostSetPosition', roundWind: 4, gameNumber: 1 })).toThrow();
     expect(() => host(r, { type: 'hostSetPosition', roundWind: 0, gameNumber: 5 })).toThrow();
+  });
+});
+
+describe('playing with CPUs', () => {
+  /** Kyle in seat 0, CPUs in seats 1-3, round started (Kyle deals). */
+  function kyleAndCpus(): Room {
+    let r = newRoom();
+    r = cmd(r, 'Kyle', { type: 'takeSeat', seat: 0 });
+    for (let seat = 1; seat < 4; seat++) r = host(r, { type: 'hostSetSeat', seat, cpu: 'medium' });
+    r = cmd(r, 'Kyle', { type: 'pressStart' });
+    return cmd(r, 'Kyle', { type: 'rollDice' });
+  }
+
+  it('when it is a CPU\'s turn, any seated player can undo (and CPUs pause so you can undo again)', () => {
+    let r = kyleAndCpus();
+    r = cmd(r, 'Kyle', { type: 'discard', tileId: r.match.round!.core.hands[0]![0]!.id });
+    // Now it is CPU South's turn. Kyle may undo for it.
+    expect(viewFor(r, 'kyle', tick()).actions!.undo).toBe(true);
+    r = cmd(r, 'Kyle', { type: 'undo' });
+    expect(r.match.round!.core.turn).toBe(0);
+    expect(r.match.round!.core.hands[0]).toHaveLength(14);
+    // CPUs wait for a few seconds after an undo.
+    expect(cpuTick(r, clock + 3000, rng)).toBe(r);
+  });
+
+  it('cannot undo for another human player', () => {
+    let r = startedTable();
+    r = cmd(r, 'Kyle', { type: 'discard', tileId: r.match.round!.core.hands[0]![0]!.id });
+    expect(() => cmd(r, 'Ben', { type: 'undo' })).toThrow(/Only the player whose turn/);
+    expect(viewFor(r, 'ben', tick()).actions!.undo).toBe(false);
+  });
+
+  it('CPU hands are shown sorted: each suit 1-9, then winds and dragons', () => {
+    let r = join(kyleAndCpus(), 'Spec');
+    r = cmd(r, 'Spec', { type: 'setWatchAll', visible: true });
+    const order = NORMAL_TYPES as readonly string[];
+    for (const seat of [1, 2, 3]) {
+      const types = viewFor(r, 'spec', tick()).seats[seat]!.hand!.map((t) => order.indexOf(t.type));
+      expect(types).toEqual([...types].sort((x, y) => x - y));
+    }
+  });
+
+  function allCpuRoundOver(withSpectator: boolean): Room {
+    let r = emptyRoom();
+    if (withSpectator) r = join(r, 'Spec');
+    for (let seat = 0; seat < 4; seat++) r = host(r, { type: 'hostSetSeat', seat, cpu: 'easy' });
+    let now = clock;
+    while (!(r.phase === 'playing' && r.match.round?.core.phase === 'ended')) {
+      r = cpuTick(r, (now += 1000), rng);
+    }
+    clock = now;
+    return r;
+  }
+
+  it('all-CPU table: waits for a spectator to confirm before the next hand', () => {
+    let r = allCpuRoundOver(true);
+    expect(viewFor(r, 'spec', tick()).spectatorsConfirm).toBe(true);
+    for (let i = 0; i < 20; i++) r = cpuTick(r, (clock += 1000), rng);
+    expect(r.match.round?.core.phase).toBe('ended'); // still waiting
+    r = cmd(r, 'Spec', { type: 'confirmRound' });
+    expect(r.match.handsPlayed).toBe(1);
+  });
+
+  it('all-CPU table with nobody watching carries on by itself', () => {
+    let r = allCpuRoundOver(false);
+    r = cpuTick(r, (clock += 5000), rng);
+    expect(r.match.handsPlayed).toBe(1);
+  });
+
+  it('a spectator who has left does not hold up an all-CPU table', () => {
+    let r = allCpuRoundOver(true);
+    r = disconnect(r, 'spec', tick());
+    r = cpuTick(r, (clock += 5000), rng);
+    expect(r.match.handsPlayed).toBe(1);
+  });
+
+  it('spectators cannot confirm for seated players', () => {
+    let r = join(startedTable(), 'Spec');
+    const round = r.match.round!;
+    r = { ...r, match: { ...r.match, round: { ...round, core: { ...round.core, phase: 'ended', result: { type: 'draw' } } } } };
+    expect(() => cmd(r, 'Spec', { type: 'confirmRound' })).toThrow(/not sitting/);
   });
 });
 
