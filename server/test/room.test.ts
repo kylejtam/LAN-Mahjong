@@ -323,7 +323,11 @@ describe('host controls (laptop host page only)', () => {
     r = join(r, 'Dan');
     r = cmd(r, 'Dan', { type: 'takeSeat', seat: 2 });
     expect(r.seats[2]).toBe('dan');
-    expect(() => host(r, { type: 'hostSetSeat', seat: 2, cpu: null })).toThrow(/Only CPU seats/);
+    // The host can also force a player out: they become a spectator and keep their chips.
+    r = host(r, { type: 'hostSetSeat', seat: 2, cpu: null });
+    expect(r.seats[2]).toBeNull();
+    expect(viewFor(r, 'dan', tick()).you.seat).toBeNull();
+    expect(r.people.dan!.balance).toBe(1000);
   });
 
   it('the host overview never includes hidden tiles', () => {
@@ -368,6 +372,7 @@ describe('history, roll back and changing the current game (host page)', () => {
       result: { type: 'win', winner: 'Amy', discarder: 'Kyle', fan: 3 },
     });
     expect(hostViewOf(r).history[0]!.changes).toContainEqual({ name: 'Amy', change: 32 });
+    expect(hostViewOf(r).history[0]).toMatchObject({ seatChanges: [-16, 32, -8, -8], winnerSeat: 1, discarderSeat: 0 });
     r = finishWith(playAgain(r), 2, null, [-16, -16, 48, -16]);
     expect(hostViewOf(r).history.map((h) => h.label.en)).toEqual(['East, game 1', 'East, game 2']);
   });

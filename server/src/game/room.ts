@@ -86,6 +86,10 @@ export interface HandRecord {
   result: { type: 'draw' } | { type: 'win'; winner: string; discarder: string | null; fan: number; isChicken: boolean };
   /** Chip change per person key. */
   changes: Record<string, number>;
+  /** Chip change per seat 0-3, and who won / discarded (seat numbers). Missing in old saves. */
+  seatChanges?: number[];
+  winnerSeat?: number | null;
+  discarderSeat?: number | null;
   /** Everyone's chips just before this hand was paid out (used to roll back). */
   balancesBefore: Record<string, number>;
 }
@@ -158,7 +162,7 @@ export type Command =
 
 /** Host controls. These only come from the host page on the server laptop. */
 export type HostCommand =
-  /** Put a CPU in a seat (replacing whoever is there), or empty a CPU seat (cpu: null). */
+  /** Put a CPU in a seat (replacing whoever is there), or empty the seat (cpu: null): removes a CPU or forces a player out. */
   | { type: 'hostSetSeat'; seat: number; cpu: CpuDifficulty | null }
   | { type: 'hostResetBalances' }
   /** Type in a person's chip count (the only way to change chips by hand). */
@@ -418,6 +422,9 @@ function maybeCloseRound(room: Room): void {
           ? { type: 'draw' }
           : { type: 'win', winner: nameAt(result.winner) ?? '', discarder: nameAt(result.discarder), fan: result.fan, isChicken: result.isChicken },
       changes: changesByKey,
+      seatChanges: changes.slice(),
+      winnerSeat: result.type === 'win' ? result.winner : null,
+      discarderSeat: result.type === 'win' ? result.discarder : null,
       balancesBefore: Object.fromEntries(Object.values(room.people).map((p) => [p.key, p.balance])),
     },
   ];
@@ -634,10 +641,11 @@ export function handleHostCommand(prev: Room, cmd: HostCommand, now: number): Ro
       if (!Number.isInteger(cmd.seat) || cmd.seat < 0 || cmd.seat >= SEATS) fail('There is no such seat.');
       const current = room.seats[cmd.seat] ?? null;
       if (cmd.cpu === null) {
-        // Remove a CPU so a player can sit there. Mid-round, the empty seat keeps
-        // its tiles and the game waits until someone sits down (or a CPU is added).
-        if (current && !room.people[current]!.cpu) fail('Only CPU seats can be emptied this way.');
+        // Empty the seat: remove a CPU, or force a player out (they become a
+        // spectator and keep their chips). Mid-round, the empty seat keeps its
+        // tiles and the game waits until someone sits down (or a CPU is added).
         room.seats[cmd.seat] = null;
+        if (room.pendingSwap?.seat === cmd.seat) room.pendingSwap = null;
         if (current) cleanupAfterSeatChange(room, current);
       } else {
         room.seats[cmd.seat] = makeCpu(room, cmd.seat, cmd.cpu);

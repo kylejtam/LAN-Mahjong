@@ -56,7 +56,7 @@ function useHostConnection() {
 export function HostApp(): ReactElement {
   const { games, urls, open, error, send, cpuLevels } = useHostConnection();
   const [gameName, setGameName] = useState('');
-  const [balance, setBalance] = useState(1000);
+  const [balance, setBalance] = useState(200);
   return (
     <div className="host">
       <h1>LAN Mahjong · Host</h1>
@@ -93,8 +93,8 @@ export function HostApp(): ReactElement {
       </div>
 
       {cpuLevels && (
-        <div className="card">
-          <h2 style={{ marginTop: 0 }}>CPU levels</h2>
+        <details className="card collapsible">
+          <summary><h2>CPU levels</h2></summary>
           <p className="muted small">CPUs only see what a real player in their seat could see, and never declare a win below the minimum fan.</p>
           <div className="cpu-levels">
             {(['easy', 'medium', 'hard'] as CpuDifficulty[]).map((lvl) => (
@@ -104,7 +104,7 @@ export function HostApp(): ReactElement {
               </div>
             ))}
           </div>
-        </div>
+        </details>
       )}
 
       {games.map((g) => (
@@ -136,10 +136,19 @@ function CpuSecondsField({ seconds, onSet }: { seconds: number; onSet: (s: numbe
   );
 }
 
-/** One person's chip count on the host page: type a number and press Set. */
-function ChipRow({ name, balance, onSet }: { name: string; balance: number; onSet: (b: number) => void }): ReactElement {
+/**
+ * One person's chips on the host page: type a number and press Set, then tap
+ * again to confirm (like ending the game).
+ */
+function ChipRow({ name, balance, onSet, label }: { name: string; balance: number; onSet: (b: number) => void; label?: string }): ReactElement {
   const [value, setValue] = useState(String(balance));
+  const [armed, setArmed] = useState(false);
   useEffect(() => setValue(String(balance)), [balance]);
+  useEffect(() => {
+    if (!armed) return;
+    const t = setTimeout(() => setArmed(false), 4000);
+    return () => clearTimeout(t);
+  }, [armed]);
   const n = Number(value);
   const valid = value.trim() !== '' && Number.isInteger(n);
   const changed = valid && n !== balance;
@@ -148,12 +157,18 @@ function ChipRow({ name, balance, onSet }: { name: string; balance: number; onSe
       className="chip-row"
       onSubmit={(e) => {
         e.preventDefault();
-        if (changed) onSet(n);
+        if (!changed) return;
+        if (armed) {
+          setArmed(false);
+          onSet(n);
+        } else setArmed(true);
       }}
     >
-      <span className="chip-name">{name}</span>
-      <input type="number" step={1} value={value} onChange={(e) => setValue(e.target.value)} aria-label={`Chips for ${name}`} />
-      <button className="btn primary" type="submit" disabled={!changed}>Set</button>
+      <span className="chip-name">{label ?? name}</span>
+      <input type="number" step={1} value={value} onChange={(e) => { setValue(e.target.value); setArmed(false); }} aria-label={`Chips for ${name}`} />
+      <button className={`btn ${armed ? 'danger' : 'primary'}`} type="submit" disabled={!changed}>
+        {armed ? 'Tap again to set' : 'Set'}
+      </button>
     </form>
   );
 }
@@ -210,13 +225,18 @@ function PositionAndHistory({ game, cmd }: { game: HostGameView; cmd: (c: Extrac
       </div>
       <p className="muted small">Chips are not changed. Any round being played is cancelled.</p>
 
-      <h3>History</h3>
+      <details className="collapsible history-section">
+      <summary><h3>History ({game.history.length} {game.history.length === 1 ? 'game' : 'games'})</h3></summary>
       {game.history.length === 0 ? (
         <p className="muted small">No games finished yet.</p>
       ) : (
         <table className="history">
           <thead>
-            <tr><th>#</th><th>Game</th><th>Result</th><th>Chips</th><th /></tr>
+            <tr>
+              <th>#</th><th>Game</th><th>Result</th>
+              {game.seats.map((s) => <th key={s.seat} className="num">{s.name ?? `Seat ${s.seat + 1}`}</th>)}
+              <th />
+            </tr>
           </thead>
           <tbody>
             {[...game.history].reverse().map((h) => (
@@ -228,9 +248,22 @@ function PositionAndHistory({ game, cmd }: { game: HostGameView; cmd: (c: Extrac
                     ? 'Draw'
                     : `${h.result.winner} won ${h.result.fan} fan ${h.result.discarder ? `on ${h.result.discarder}'s discard` : 'by self-draw'}${h.result.isChicken ? ' (chicken)' : ''}`}
                 </td>
-                <td className="small">
-                  {h.changes.filter((c) => c.change !== 0).map((c) => `${c.name} ${c.change > 0 ? '+' : '−'}${Math.abs(c.change)}`).join(', ') || '—'}
-                </td>
+                {h.seatChanges.map((change, seat) => {
+                  // Winner green; discarder red; on a self-draw every loser is red.
+                  const cls =
+                    h.result.type !== 'win' ? ''
+                      : seat === h.winnerSeat ? 'cell-win'
+                      : h.discarderSeat !== null ? (seat === h.discarderSeat ? 'cell-lose' : '')
+                      : change < 0 ? 'cell-lose' : '';
+                  const who = h.seatNames[seat];
+                  const current = game.seats[seat]?.name;
+                  return (
+                    <td key={seat} className={`num ${cls}`}>
+                      {change > 0 ? `+${change}` : change < 0 ? `−${Math.abs(change)}` : '0'}
+                      {who && who !== current && <div className="muted small">{who}</div>}
+                    </td>
+                  );
+                })}
                 <td>
                   <TwoTapButton
                     label="Roll back to before this"
@@ -244,6 +277,7 @@ function PositionAndHistory({ game, cmd }: { game: HostGameView; cmd: (c: Extrac
         </table>
       )}
       <p className="muted small">Rolling back puts everyone's chips, the wind and the dealer back to just before that game, and removes the games after it.</p>
+      </details>
     </>
   );
 }
@@ -274,37 +308,43 @@ function GameCard({ game, send }: { game: HostGameView; send: (m: HostMessage) =
               {s.cpu ? ` · CPU (${s.cpu})` : ''}
               {s.name && !s.cpu && !s.connected ? <span className="offline"> · offline</span> : ''}
             </span>
-            {s.balance !== null && <span className="chips">{s.balance} chips</span>}
+            {s.name && s.balance !== null && (
+              <ChipRow label="Chips" name={s.name} balance={s.balance} onSet={(balance) => cmd({ type: 'hostSetBalance', name: s.name!, balance })} />
+            )}
             <div className="row" style={{ justifyContent: 'flex-start', marginTop: 0 }}>
               {(['easy', 'medium', 'hard'] as CpuDifficulty[]).map((d) => (
                 <button key={d} className="btn" onClick={() => cmd({ type: 'hostSetSeat', seat: s.seat, cpu: d })}>
                   {s.name && !s.cpu ? `Replace: ${d}` : `CPU ${d}`}
                 </button>
               ))}
-              {s.cpu && (
-                // Kick the CPU so a player can sit here (mid-round, the game waits for them).
-                <button className="btn danger" onClick={() => cmd({ type: 'hostSetSeat', seat: s.seat, cpu: null })}>Remove CPU</button>
+              {s.name && (
+                // Empty the seat so someone else can sit there (mid-round, the game waits for them).
+                // A removed player becomes a spectator and keeps their chips.
+                <button className="btn danger" onClick={() => cmd({ type: 'hostSetSeat', seat: s.seat, cpu: null })}>
+                  {s.cpu ? 'Remove CPU' : 'Remove player'}
+                </button>
               )}
             </div>
           </div>
         ))}
       </div>
       {game.spectators.length > 0 && (
-        <p className="small">
-          Watching / not seated: {game.spectators.map((p) => `${p.name}${p.connected ? '' : ' (offline)'}`).join(', ')}
-        </p>
+        <>
+          <h3>Watching / not seated</h3>
+          <div className="chips-editor">
+            {game.spectators.map((p) => (
+              <ChipRow
+                key={p.name}
+                name={p.name}
+                label={`${p.name}${p.connected ? '' : ' (offline)'}`}
+                balance={p.balance}
+                onSet={(balance) => cmd({ type: 'hostSetBalance', name: p.name, balance })}
+              />
+            ))}
+          </div>
+        </>
       )}
-
-      <h3>Chips</h3>
-      <p className="muted small">Type the correct number and press Set. It updates on every player's device straight away.</p>
-      <div className="chips-editor">
-        {[
-          ...game.seats.filter((s) => s.name !== null).map((s) => ({ name: s.name!, balance: s.balance ?? 0, cpu: !!s.cpu })),
-          ...game.spectators.map((p) => ({ name: p.name, balance: p.balance, cpu: false })),
-        ].map((p) => (
-          <ChipRow key={p.name} name={p.name} balance={p.balance} onSet={(balance) => cmd({ type: 'hostSetBalance', name: p.name, balance })} />
-        ))}
-      </div>
+      <p className="muted small">Chips: type the correct number, press Set, then tap again. It updates on every player's device straight away.</p>
 
       <PositionAndHistory game={game} cmd={cmd} />
 

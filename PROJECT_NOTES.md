@@ -125,6 +125,9 @@ disagrees with those, the newest dated entry here wins.
 | 2026-11-08 | **Only chicken wins can be undone** ("Undo chicken win", everyone must agree). Normal wins cannot be undone. Replaces "undo can go back over any move, including wins". | Kyle |
 | 2026-11-08 | **End of a round:** only "Ready" and "Leave seat". Ready also counts as Start: when every seated player is Ready the next round begins (dealer rolls). Each player's row shows whether they are ready. | Kyle |
 | 2026-11-08 | Side players' name tags are one small line like the top player's; the wall picture has no outline. | Kyle |
+| 2026-11-08 | **Host page layout:** "CPU levels" and "History" are collapsible sections that start closed. History shows one column per seat: winner's cell green, discarder's red; on a self-draw every losing player is red. | Kyle |
+| 2026-11-08 | **Host chips:** set inside each seat's card (and a list for spectators); Set needs a second tap to confirm, like End game. **Remove player** forces a person out of their seat (they become a spectator and keep their chips), like Remove CPU. | Kyle |
+| 2026-11-08 | **Default starting balance: 200** on the host page's Create game form. | Kyle |
 | 2026-11-08 | **First dealer** of a new game is seat 0 (East). | Claude (Kyle may change) |
 | 2026-11-08 | **Undo moves:** discard, 上, 碰, 槓, 胡. Draws are not separate moves. Undoing a discard puts the tile back in that player's hand and it is their turn again. | Kyle |
 | 2026-11-08 | **Several games at once:** one server can run many separate games, each with its own name. | Kyle |

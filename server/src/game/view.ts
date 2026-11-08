@@ -211,7 +211,18 @@ export interface HostGameView {
   /** Short summary of the round, with no hidden tiles. */
   round: null | { phase: Phase; turn: number; wallCount: number; result: RoundResult | null };
   /** Finished hands, oldest first, with chip changes by name. */
-  history: (Omit<HandRecord, 'changes' | 'balancesBefore'> & { changes: { name: string; change: number }[] })[];
+  history: (Omit<HandRecord, 'changes' | 'balancesBefore' | 'seatChanges' | 'winnerSeat' | 'discarderSeat'> & {
+    changes: { name: string; change: number }[];
+    seatChanges: number[];
+    winnerSeat: number | null;
+    discarderSeat: number | null;
+  })[];
+}
+
+function seatByName(h: HandRecord, name: string | null): number | null {
+  if (!name) return null;
+  const i = h.seatNames.indexOf(name);
+  return i < 0 ? null : i;
 }
 
 export function hostViewOf(room: Room): HostGameView {
@@ -253,6 +264,10 @@ export function hostViewOf(room: Room): HostGameView {
       seatNames: h.seatNames,
       result: h.result,
       changes: Object.entries(h.changes).map(([key, change]) => ({ name: room.people[key]?.name ?? key, change })),
+      seatChanges: h.seatChanges ?? h.seatNames.map((n) => (n ? h.changes[n.toLowerCase()] ?? 0 : 0)),
+      // Older saved hands did not record seats: find them from the names.
+      winnerSeat: h.winnerSeat !== undefined ? h.winnerSeat : h.result.type === 'win' ? seatByName(h, h.result.winner) : null,
+      discarderSeat: h.discarderSeat !== undefined ? h.discarderSeat : h.result.type === 'win' ? seatByName(h, h.result.discarder) : null,
     })),
   };
 }
