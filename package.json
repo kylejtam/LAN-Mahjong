@@ -1,0 +1,28 @@
+{
+  "name": "lan-mahjong",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Hong Kong style mahjong for up to 4 players on a local network",
+  "workspaces": [
+    "shared",
+    "server",
+    "client"
+  ],
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc -p shared --noEmit && tsc -p server --noEmit && tsc -p client --noEmit",
+    "start": "npm run build && tsx server/src/main.ts",
+    "build": "npm run build -w client",
+    "prestart": "node scripts/check-install.cjs",
+    "build:windows": "bash scripts/build-windows.sh"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.5",
+    "@types/qrcode": "^1.5.6",
+    "@types/ws": "^8.18.2",
+    "tsx": "^4.23.15",
+    "typescript": "^5.6.3",
+    "vitest": "^2.1.8"
+  }
+}

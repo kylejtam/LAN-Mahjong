@@ -1,0 +1,12 @@
+{
+  "name": "@lan-mahjong/server",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Game server: holds the real game state and sends it to every device",
+  "type": "module",
+  "dependencies": {
+    "@lan-mahjong/shared": "*",
+    "qrcode": "^1.5.4",
+    "ws": "^8.22.1"
+  }
+}
