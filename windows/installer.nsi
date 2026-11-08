@@ -37,14 +37,33 @@ BrandingText "LAN Mahjong ${VERSION}"
 ; Only the game's own node.exe (the one inside the install folder) is stopped.
 ; (Do NOT match on window titles: the installer's own window is called
 ; "LAN Mahjong Setup", and an earlier version closed itself that way.)
-!macro StopRunningGame
-  nsExec::Exec `powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -Command "Get-Process -Name node -ErrorAction SilentlyContinue | Where-Object { $$_.Path -like '$INSTDIR\node\node.exe' } | Stop-Process -Force -ErrorAction SilentlyContinue"`
+!macro StopRunningGame ID
+  ; The installer is a 32-bit program. On 64-bit Windows a plain "powershell"
+  ; started from it is the 32-bit one, which cannot see where 64-bit programs
+  ; live, so it never found the game. Use the 64-bit one (Sysnative) when there,
+  ; and ask Windows' process list (CIM), which works either way.
+  StrCpy $1 "$WINDIR\Sysnative\WindowsPowerShell\v1.0\powershell.exe"
+  IfFileExists "$1" +2
+    StrCpy $1 "powershell"
+  nsExec::Exec `"$1" -NoProfile -NonInteractive -ExecutionPolicy Bypass -Command "$$p = @(Get-CimInstance Win32_Process | Where-Object { $$_.Name -eq 'node.exe' -and $$_.ExecutablePath -like '$INSTDIR\node\node.exe' }); $$p | ForEach-Object { Stop-Process -Id $$_.ProcessId -Force -ErrorAction SilentlyContinue }; $$p | ForEach-Object { Wait-Process -Id $$_.ProcessId -Timeout 10 -ErrorAction SilentlyContinue }"`
   Pop $0
-  Sleep 500
+  Sleep 1000
+  ; Safety net: if the game is somehow still running, ask the person to close it.
+  check_${ID}:
+    IfFileExists "$INSTDIR\node\node.exe" 0 done_${ID}
+    ; A running program's file can't be opened for writing on Windows.
+    ClearErrors
+    FileOpen $2 "$INSTDIR\node\node.exe" a
+    IfErrors 0 free_${ID}
+      MessageBox MB_OKCANCEL|MB_ICONEXCLAMATION "LAN Mahjong is still running.$\r$\n$\r$\nPlease close the LAN Mahjong window (the small black window), then click OK." /SD IDCANCEL IDOK check_${ID}
+      Abort "LAN Mahjong is still running. Close it and run this again."
+    free_${ID}:
+    FileClose $2
+  done_${ID}:
 !macroend
 
 Section "Install"
-  !insertmacro StopRunningGame
+  !insertmacro StopRunningGame inst
   SetOutPath "$INSTDIR"
   File "lan-mahjong.ico"
   File "LAN Mahjong.cmd"
@@ -72,7 +91,7 @@ Section "Install"
 SectionEnd
 
 Section "Uninstall"
-  !insertmacro StopRunningGame
+  !insertmacro StopRunningGame un
   Delete "$DESKTOP\LAN Mahjong.lnk"
   RMDir /r "$SMPROGRAMS\LAN Mahjong"
   RMDir /r "$INSTDIR\app"
