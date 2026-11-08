@@ -71,10 +71,12 @@ export function useConnection(): Connection {
     let stopped = false;
     let retry: ReturnType<typeof setTimeout> | null = null;
 
+    let lastMessageAt = Date.now();
     const connect = (): void => {
       const proto = location.protocol === 'https:' ? 'wss' : 'ws';
       const ws = new WebSocket(`${proto}://${location.host}/ws`);
       wsRef.current = ws;
+      lastMessageAt = Date.now();
       setStatus('connecting');
       ws.onopen = () => {
         setStatus('open');
@@ -82,6 +84,7 @@ export function useConnection(): Connection {
         if (s) ws.send(JSON.stringify({ type: 'joinGame', gameId: s.gameId, name: s.name }));
       };
       ws.onmessage = (e) => {
+        lastMessageAt = Date.now();
         const msg = JSON.parse(String(e.data)) as ServerMessage;
         switch (msg.type) {
           case 'games':
@@ -128,10 +131,45 @@ export function useConnection(): Connection {
         if (!stopped) retry = setTimeout(connect, 1500);
       };
     };
+    /** Throw away a connection that has gone quiet and open a fresh one. */
+    const reconnectNow = (): void => {
+      const old = wsRef.current;
+      if (old) {
+        old.onclose = null;
+        old.close();
+      }
+      if (retry) clearTimeout(retry);
+      connect();
+    };
+    /**
+     * Phones (especially iPhones) can freeze a page's connection while it is in
+     * the background (e.g. while scanning the QR code with the camera) without
+     * telling the page. So: every 10 s ask for the game list (keeps it fresh and
+     * proves the connection works), and if nothing arrives for 25 s, reconnect.
+     */
+    const heartbeat = setInterval(() => {
+      const ws = wsRef.current;
+      if (Date.now() - lastMessageAt > 25000) reconnectNow();
+      else if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'listGames' }));
+    }, 10000);
+    /** When the page comes back into view, check the connection straight away. */
+    const onVisible = (): void => {
+      if (document.visibilityState !== 'visible') return;
+      const ws = wsRef.current;
+      if (!ws || ws.readyState !== WebSocket.OPEN || Date.now() - lastMessageAt > 12000) reconnectNow();
+      else ws.send(JSON.stringify({ type: 'listGames' }));
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    window.addEventListener('pageshow', onVisible);
+    window.addEventListener('online', onVisible);
     connect();
     return () => {
       stopped = true;
       if (retry) clearTimeout(retry);
+      clearInterval(heartbeat);
+      document.removeEventListener('visibilitychange', onVisible);
+      window.removeEventListener('pageshow', onVisible);
+      window.removeEventListener('online', onVisible);
       wsRef.current?.close();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps

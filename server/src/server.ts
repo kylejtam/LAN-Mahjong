@@ -349,6 +349,7 @@ export async function startServer(opts: ServerOptions): Promise<RunningServer> {
   });
 
   hostWss.on('connection', (ws) => {
+    watch(ws);
     hostSockets.add(ws);
     sendHostState();
     ws.on('message', (data) => {
@@ -362,7 +363,31 @@ export async function startServer(opts: ServerOptions): Promise<RunningServer> {
     ws.on('close', () => hostSockets.delete(ws));
   });
 
+  // Every 15 s check each phone is still there; drop connections that died
+  // silently (so the person shows as disconnected and can rejoin with their name).
+  const alive = new WeakMap<WebSocket, boolean>();
+  const pingTimer = setInterval(() => {
+    for (const ws of [...clients.keys(), ...hostSockets]) {
+      if (alive.get(ws) === false) {
+        ws.terminate();
+        continue;
+      }
+      alive.set(ws, false);
+      try {
+        ws.ping();
+      } catch {
+        /* ignore */
+      }
+    }
+  }, 15000);
+  const watch = (ws: WebSocket): void => {
+    alive.set(ws, true);
+    ws.on('pong', () => alive.set(ws, true));
+    ws.on('message', () => alive.set(ws, true));
+  };
+
   wss.on('connection', (ws) => {
+    watch(ws);
     const c: Client = { roomId: null, key: null };
     clients.set(ws, c);
     send(ws, { type: 'games', games: gameList() });
@@ -425,6 +450,7 @@ export async function startServer(opts: ServerOptions): Promise<RunningServer> {
     rooms,
     close: async () => {
       clearInterval(interval);
+      clearInterval(pingTimer);
       if (saveTimer) clearTimeout(saveTimer);
       saveNow();
       for (const ws of [...clients.keys(), ...hostSockets]) ws.terminate();

@@ -131,6 +131,8 @@ disagrees with those, the newest dated entry here wins.
 | 2026-11-08 | **Always dark.** Light mode and the theme setting are removed. | Kyle |
 | 2026-11-08 | **Settings panel:** compact name box and language buttons; no "Drop out" heading/text; "Leave my seat" (and any Swap buttons) sit in one row with "Leave game"; an × in the top-right corner closes it. | Kyle |
 | 2026-11-08 | **Logo:** the original 1 bamboo bird on a tile is the game's logo, shown next to "LAN Mahjong" on the join screen and used as the browser tab icon (`client/public/logo.svg`). | Kyle |
+| 2026-11-08 | **Connections heal themselves.** Phones ask for the game list every 10 s and check the connection whenever the page comes back into view (e.g. after scanning the QR code with the camera); a connection that stays silent for 25 s is replaced. The server pings every phone every 15 s and drops connections that died silently. So new games appear on a waiting phone automatically. | Kyle (fix for his report) |
+| 2026-11-08 | **Logo without a background:** just the bird (lighter legs so they show on the dark screen); same for the browser tab icon. Tiles in the game keep their white faces. | Kyle |
 | 2026-11-08 | **First dealer** of a new game is seat 0 (East). | Claude (Kyle may change) |
 | 2026-11-08 | **Undo moves:** discard, 上, 碰, 槓, 胡. Draws are not separate moves. Undoing a discard puts the tile back in that player's hand and it is their turn again. | Kyle |
 | 2026-11-08 | **Several games at once:** one server can run many separate games, each with its own name. | Kyle |
