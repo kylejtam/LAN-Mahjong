@@ -392,3 +392,9 @@ input { font: inherit; }
 .transferred { font-weight: 700; margin: 0.3em 0 0; }
 .fan-items li { grid-template-columns: 1fr auto auto; }
 .fan-items .num { white-space: nowrap; min-width: 3.5em; }
+
+/* Host page: history */
+.history { width: 100%; border-collapse: collapse; font-size: 0.92em; }
+.history th, .history td { text-align: left; padding: 0.3em 0.5em; border-bottom: 1px solid var(--panel-border); vertical-align: middle; }
+.history th { color: var(--muted); font-weight: 600; }
+.host select { background: var(--input-bg); color: var(--fg); border: 1px solid var(--panel-border); border-radius: 6px; padding: 0.35em 0.5em; }

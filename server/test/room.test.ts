@@ -273,6 +273,75 @@ describe('host controls (laptop host page only)', () => {
   });
 });
 
+describe('history, roll back and changing the current game (host page)', () => {
+  /** Finish the current round as a win and have everyone confirm. */
+  function finishWith(r: Room, winner: number, discarder: number | null, changes: number[]): Room {
+    const round = r.match.round!;
+    r = {
+      ...r,
+      match: {
+        ...r.match,
+        round: { ...round, core: { ...round.core, phase: 'ended', result: { type: 'win', winner, discarder, fan: 3, items: [], capHand: false, isChicken: false, changes } } },
+      },
+    };
+    for (const n of ['Kyle', 'Amy', 'Ben', 'Cat']) r = cmd(r, n, { type: 'confirmRound' });
+    return r;
+  }
+  function playAgain(r: Room): Room {
+    for (const n of ['Kyle', 'Amy', 'Ben', 'Cat']) r = cmd(r, n, { type: 'pressStart' });
+    const dealerName = r.people[r.seats[r.match.dealer]!]!.name;
+    return cmd(r, dealerName, { type: 'rollDice' });
+  }
+
+  it('records every finished hand with its result and chip changes', () => {
+    let r = finishWith(startedTable(), 1, 0, [-16, 32, -8, -8]);
+    expect(r.history).toHaveLength(1);
+    expect(hostViewOf(r).history[0]).toMatchObject({
+      index: 0,
+      label: { en: 'East, game 1' },
+      result: { type: 'win', winner: 'Amy', discarder: 'Kyle', fan: 3 },
+    });
+    expect(hostViewOf(r).history[0]!.changes).toContainEqual({ name: 'Amy', change: 32 });
+    r = finishWith(playAgain(r), 2, null, [-16, -16, 48, -16]);
+    expect(hostViewOf(r).history.map((h) => h.label.en)).toEqual(['East, game 1', 'East, game 2']);
+  });
+
+  it('rolls back to before any game: chips, wind and dealer as they were; later games removed', () => {
+    let r = finishWith(startedTable(), 1, 0, [-16, 32, -8, -8]); // East 1 → Amy wins, dealer moves on
+    r = host(r, { type: 'hostSetBalance', name: 'Ben', balance: 5000 }); // a manual change after game 1
+    r = finishWith(playAgain(r), 2, null, [-16, -16, 48, -16]); // East 2
+    r = playAgain(r); // East 3 in progress
+    r = host(r, { type: 'hostRollBack', toHand: 1 }); // back to before East 2
+    expect(r.match).toMatchObject({ roundWind: 0, dealer: 1, dealerIndex: 1, handsPlayed: 1, round: null });
+    expect(r.phase).toBe('betweenRounds');
+    expect([r.people.kyle, r.people.amy, r.people.ben, r.people.cat].map((p) => p!.balance)).toEqual([984, 1032, 5000, 992]);
+    expect(r.history).toHaveLength(1);
+    r = host(r, { type: 'hostRollBack', toHand: 0 }); // back to the very start
+    expect([r.people.kyle, r.people.amy, r.people.ben, r.people.cat].map((p) => p!.balance)).toEqual([1000, 1000, 1000, 1000]);
+    expect(r.history).toHaveLength(0);
+    expect(() => host(r, { type: 'hostRollBack', toHand: 0 })).toThrow(/no such game/);
+  });
+
+  it('roll back still works after someone changes their name', () => {
+    let r = finishWith(startedTable(), 1, 0, [-16, 32, -8, -8]);
+    r = cmd(r, 'Amy', { type: 'rename', newName: 'Amelia' });
+    r = host(r, { type: 'hostRollBack', toHand: 0 });
+    expect(r.people.amelia!.balance).toBe(1000);
+  });
+
+  it('can jump to any wind and game number without touching chips', () => {
+    let r = finishWith(startedTable(), 1, 0, [-16, 32, -8, -8]);
+    r = playAgain(r);
+    r = host(r, { type: 'hostSetPosition', roundWind: 2, gameNumber: 3 });
+    expect(r.match).toMatchObject({ roundWind: 2, dealerIndex: 2, dealer: 2, round: null });
+    expect(r.phase).toBe('betweenRounds');
+    expect(hostViewOf(r).label.en).toBe('West, game 3');
+    expect(r.people.amy!.balance).toBe(1032);
+    expect(() => host(r, { type: 'hostSetPosition', roundWind: 4, gameNumber: 1 })).toThrow();
+    expect(() => host(r, { type: 'hostSetPosition', roundWind: 0, gameNumber: 5 })).toThrow();
+  });
+});
+
 describe('changing name', () => {
   it('moves balance and seat to the new name', () => {
     let r = fullTable();

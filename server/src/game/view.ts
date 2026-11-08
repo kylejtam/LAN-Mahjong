@@ -14,7 +14,7 @@
 import { GameSettings, Meld, SEATS, Tile, tilesLeft } from '@lan-mahjong/shared';
 import { matchLabel } from './match.js';
 import { AvailableActions, DiscardEntry, Phase, RoundResult, availableActions, currentPlayer } from './round.js';
-import { CpuDifficulty, PendingSwap, Room, RoomPhase, TableColour, seatOf } from './room.js';
+import { CpuDifficulty, HandRecord, PendingSwap, Room, RoomPhase, TableColour, seatOf } from './room.js';
 
 export interface SeatView {
   seat: number;
@@ -171,6 +171,8 @@ export interface HostGameView {
   spectators: { name: string; connected: boolean; balance: number }[];
   /** Short summary of the round, with no hidden tiles. */
   round: null | { phase: Phase; turn: number; wallCount: number; result: RoundResult | null };
+  /** Finished hands, oldest first, with chip changes by name. */
+  history: (Omit<HandRecord, 'changes' | 'balancesBefore'> & { changes: { name: string; change: number }[] })[];
 }
 
 export function hostViewOf(room: Room): HostGameView {
@@ -202,5 +204,15 @@ export function hostViewOf(room: Room): HostGameView {
     round: round
       ? { phase: round.core.phase, turn: round.core.turn, wallCount: tilesLeft(round.core.wall), result: round.core.result }
       : null,
+    history: (room.history ?? []).map((h) => ({
+      index: h.index,
+      roundWind: h.roundWind,
+      dealer: h.dealer,
+      dealerIndex: h.dealerIndex,
+      label: h.label,
+      seatNames: h.seatNames,
+      result: h.result,
+      changes: Object.entries(h.changes).map(([key, change]) => ({ name: room.people[key]?.name ?? key, change })),
+    })),
   };
 }

@@ -120,6 +120,96 @@ function ChipRow({ name, balance, onSet }: { name: string; balance: number; onSe
   );
 }
 
+/** A button that needs two taps: the first turns it into "Tap again to …". */
+function TwoTapButton({ label, confirmLabel, onConfirm, className = '' }: { label: string; confirmLabel: string; onConfirm: () => void; className?: string }): ReactElement {
+  const [armed, setArmed] = useState(false);
+  useEffect(() => {
+    if (!armed) return;
+    const t = setTimeout(() => setArmed(false), 4000);
+    return () => clearTimeout(t);
+  }, [armed]);
+  return (
+    <button
+      className={`btn ${className}${armed ? ' danger' : ''}`}
+      onClick={() => {
+        if (armed) {
+          setArmed(false);
+          onConfirm();
+        } else setArmed(true);
+      }}
+    >
+      {armed ? confirmLabel : label}
+    </button>
+  );
+}
+
+/** Change the current game, and the list of finished games with "roll back". */
+function PositionAndHistory({ game, cmd }: { game: HostGameView; cmd: (c: Extract<HostMessage, { type: 'hostCommand' }>['command']) => void }): ReactElement {
+  const [wind, setWind] = useState(game.match.roundWind);
+  const [num, setNum] = useState(game.match.dealerIndex + 1);
+  useEffect(() => {
+    setWind(game.match.roundWind);
+    setNum(game.match.dealerIndex + 1);
+  }, [game.match.roundWind, game.match.dealerIndex]);
+  const inRound = game.phase === 'playing' || game.phase === 'rolling';
+  return (
+    <>
+      <h3>Current game</h3>
+      <div className="row" style={{ justifyContent: 'flex-start', alignItems: 'center' }}>
+        <span>Now: <b>{game.label.en}</b></span>
+        <span className="muted">→ change to</span>
+        <select value={wind} onChange={(e) => setWind(Number(e.target.value))} aria-label="Wind">
+          {WIND_NAMES.en.map((w, i) => <option key={w} value={i}>{w}</option>)}
+        </select>
+        <select value={num} onChange={(e) => setNum(Number(e.target.value))} aria-label="Game number">
+          {[1, 2, 3, 4].map((n) => <option key={n} value={n}>game {n}</option>)}
+        </select>
+        <TwoTapButton
+          label="Go"
+          confirmLabel={inRound ? 'Tap again (ends this round)' : 'Tap again to change'}
+          onConfirm={() => cmd({ type: 'hostSetPosition', roundWind: wind, gameNumber: num })}
+        />
+      </div>
+      <p className="muted small">Chips are not changed. Any round being played is cancelled.</p>
+
+      <h3>History</h3>
+      {game.history.length === 0 ? (
+        <p className="muted small">No games finished yet.</p>
+      ) : (
+        <table className="history">
+          <thead>
+            <tr><th>#</th><th>Game</th><th>Result</th><th>Chips</th><th /></tr>
+          </thead>
+          <tbody>
+            {[...game.history].reverse().map((h) => (
+              <tr key={h.index}>
+                <td className="num">{h.index + 1}</td>
+                <td>{h.label.en}</td>
+                <td>
+                  {h.result.type === 'draw'
+                    ? 'Draw'
+                    : `${h.result.winner} won ${h.result.fan} fan ${h.result.discarder ? `on ${h.result.discarder}'s discard` : 'by self-draw'}${h.result.isChicken ? ' (chicken)' : ''}`}
+                </td>
+                <td className="small">
+                  {h.changes.filter((c) => c.change !== 0).map((c) => `${c.name} ${c.change > 0 ? '+' : '−'}${Math.abs(c.change)}`).join(', ') || '—'}
+                </td>
+                <td>
+                  <TwoTapButton
+                    label="Roll back to before this"
+                    confirmLabel="Tap again to roll back"
+                    onConfirm={() => cmd({ type: 'hostRollBack', toHand: h.index })}
+                  />
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+      <p className="muted small">Rolling back puts everyone's chips, the wind and the dealer back to just before that game, and removes the games after it.</p>
+    </>
+  );
+}
+
 function GameCard({ game, send }: { game: HostGameView; send: (m: HostMessage) => void }): ReactElement {
   const cmd = (command: Extract<HostMessage, { type: 'hostCommand' }>['command']): void => send({ type: 'hostCommand', gameId: game.id, command });
   const [confirmEnd, setConfirmEnd] = useState(false);
@@ -176,6 +266,8 @@ function GameCard({ game, send }: { game: HostGameView; send: (m: HostMessage) =
           <ChipRow key={p.name} name={p.name} balance={p.balance} onSet={(balance) => cmd({ type: 'hostSetBalance', name: p.name, balance })} />
         ))}
       </div>
+
+      <PositionAndHistory game={game} cmd={cmd} />
 
       <h3>Settings {between ? '' : <span className="muted small">(can change between rounds)</span>}</h3>
       <div className="form-grid">

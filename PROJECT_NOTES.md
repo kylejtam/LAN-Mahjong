@@ -9,7 +9,7 @@ disagrees with those, the newest dated entry here wins.
 - Phase 1 (rules engine): **done**. Tile set and checks, shuffle, wall and dice
   break, dealing with flower replacement, winning-hand check, legal
   chow/pong/gong/win, two-winner rule, fan counting, payments.
-- Tests: 187 passing (`npm test`), including 60 rounds of random play that check no tile is ever lost or created.
+- Tests: 191 passing (`npm test`), including 60 rounds of random play that check no tile is ever lost or created.
 - Phase 2 (game server): **done**.
   - Step 1 round engine (`server/src/game/round.ts`): **done**.
   - Step 2 full 16-round game (`server/src/game/match.ts`): **done**.
@@ -89,6 +89,8 @@ disagrees with those, the newest dated entry here wins.
 | 2026-11-08 | **Player settings panel** (⚙): change name (type + Save; chips, seat and settings move to the new name), language (English / 中文), theme slider (Light / Dark / System, default Dark), drop out, leave game. Language and theme are saved on the device AND under the player's name on the server, so they follow the name to another device. The language can also be chosen on the start screen. | Kyle |
 | 2026-11-08 | **Manual chip changes: host page only.** Removed from the players' app: the manual payout calculator, manual adjustments with everyone agreeing, and the chip lock button (it only existed for manual calculating). The host page has a chip box for every person in a game: type the number, press Set, and it updates on every device at once. Automatic payouts after a win, and everyone confirming the round, stay as they are. | Kyle |
 | 2026-11-08 | **Win summary:** lists every winning condition (番種) with its fan and the total; shows each player's hand, shown sets and flowers; each player's chips as +N (green) or −N (red); and "Total chips transferred". The two seat-flower items are labelled (flowers) / (seasons) so they can be told apart. | Kyle |
+| 2026-11-08 | **Host page: history and roll back.** Every finished hand is recorded (game, result, chip changes, everyone's chips before it). "Roll back to before this" puts chips (including manual changes made since), wind and dealer back to just before that hand and removes the later hands. Two taps to confirm. Any round in progress is cancelled. | Kyle |
+| 2026-11-08 | **Host page: change the current game.** Pick a wind and game number (1–4) and press Go (two taps). Game n of any wind is dealt by seat n (seat 1 = first dealer). Chips are not changed; any round in progress is cancelled. | Kyle |
 | 2026-11-08 | **First dealer** of a new game is seat 0 (East). | Claude (Kyle may change) |
 | 2026-11-08 | **Undo moves:** discard, 上, 碰, 槓, 胡. Draws are not separate moves. Undoing a discard puts the tile back in that player's hand and it is their turn again. | Kyle |
 | 2026-11-08 | **Several games at once:** one server can run many separate games, each with its own name. | Kyle |

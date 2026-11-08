@@ -21,7 +21,7 @@
  *   (To hand over to a spectator, use a swap instead of dropping out.)
  */
 import { DEFAULT_SETTINGS, GameSettings, NormalType, Rng, SEATS, Tile } from '@lan-mahjong/shared';
-import { MatchState, beginRound, closeRound, newMatch } from './match.js';
+import { MatchState, beginRound, closeRound, matchLabel, newMatch } from './match.js';
 import {
   Claim,
   GameError,
@@ -69,6 +69,23 @@ export interface Person {
  */
 export type RoomPhase = 'betweenRounds' | 'rolling' | 'playing' | 'finished';
 
+/** One finished hand, kept so the host page can show it and roll back to before it. */
+export interface HandRecord {
+  /** 0 for the first hand of the game, 1 for the next, ... */
+  index: number;
+  roundWind: number;
+  dealer: number;
+  dealerIndex: number;
+  label: { en: string; zh: string };
+  /** Names in seats 0-3 when it was played. */
+  seatNames: (string | null)[];
+  result: { type: 'draw' } | { type: 'win'; winner: string; discarder: string | null; fan: number; isChicken: boolean };
+  /** Chip change per person key. */
+  changes: Record<string, number>;
+  /** Everyone's chips just before this hand was paid out (used to roll back). */
+  balancesBefore: Record<string, number>;
+}
+
 export interface PendingSwap {
   fromKey: string;
   toKey: string;
@@ -96,6 +113,8 @@ export interface Room {
   /** Last time anything changed (used to pace CPU moves). */
   lastChangeAt: number;
   ended: boolean;
+  /** Finished hands, oldest first (may be missing in old save files). */
+  history?: HandRecord[];
 }
 
 export type Command =
@@ -133,6 +152,10 @@ export type HostCommand =
   | { type: 'hostResetBalances' }
   /** Type in a person's chip count (the only way to change chips by hand). */
   | { type: 'hostSetBalance'; name: string; balance: number }
+  /** Go back to just before hand `toHand` was played: chips, wind and dealer as they were then. */
+  | { type: 'hostRollBack'; toHand: number }
+  /** Jump to a wind (0 East ... 3 North) and game number (1-4). Chips are not changed. */
+  | { type: 'hostSetPosition'; roundWind: number; gameNumber: number }
   | { type: 'hostUpdateSettings'; settings: Partial<GameSettings>; startingBalance?: number }
   | { type: 'hostSetTableColour'; colour: TableColour }
   | { type: 'hostEndGame' };
@@ -207,6 +230,7 @@ export function createRoom(opts: {
     nextJoinOrder: 1,
     lastChangeAt: opts.now,
     ended: false,
+    history: [],
   };
   return room;
 }
@@ -324,7 +348,33 @@ function maybeCloseRound(room: Room): void {
   const round = room.match.round;
   if (room.phase !== 'playing' || !round || round.core.phase !== 'ended') return;
   if (!seatedHumans(room).every((k) => room.confirmed.includes(k))) return;
+  const before = room.match;
   const { match, changes } = closeRound(room.match);
+  const result = round.core.result!;
+  const nameAt = (seat: number | null): string | null =>
+    seat === null ? null : room.seats[seat] ? room.people[room.seats[seat]!]!.name : null;
+  const changesByKey: Record<string, number> = {};
+  changes.forEach((c, seat) => {
+    const key = room.seats[seat];
+    if (key) changesByKey[key] = c;
+  });
+  room.history = [
+    ...(room.history ?? []),
+    {
+      index: (room.history ?? []).length,
+      roundWind: before.roundWind,
+      dealer: before.dealer,
+      dealerIndex: before.dealerIndex,
+      label: { en: matchLabel(before, 'en'), zh: matchLabel(before, 'zh') },
+      seatNames: room.seats.map((k) => (k ? room.people[k]!.name : null)),
+      result:
+        result.type === 'draw'
+          ? { type: 'draw' }
+          : { type: 'win', winner: nameAt(result.winner) ?? '', discarder: nameAt(result.discarder), fan: result.fan, isChicken: result.isChicken },
+      changes: changesByKey,
+      balancesBefore: Object.fromEntries(Object.values(room.people).map((p) => [p.key, p.balance])),
+    },
+  ];
   changes.forEach((c, seat) => {
     const key = room.seats[seat];
     if (key) room.people[key]!.balance += c;
@@ -458,6 +508,10 @@ export function handleCommand(prev: Room, key: string, cmd: Command, now: number
       room.confirmed = room.confirmed.map(rekey);
       room.undoWinVotes = room.undoWinVotes.map(rekey);
       if (room.pendingSwap) room.pendingSwap = { ...room.pendingSwap, fromKey: rekey(room.pendingSwap.fromKey), toKey: rekey(room.pendingSwap.toKey) };
+      // Keep the hand history pointing at the same person.
+      const rekeyRecord = (r: Record<string, number>): Record<string, number> =>
+        Object.fromEntries(Object.entries(r).map(([k, v]) => [rekey(k), v]));
+      room.history = (room.history ?? []).map((h) => ({ ...h, changes: rekeyRecord(h.changes), balancesBefore: rekeyRecord(h.balancesBefore) }));
       break;
     }
     case 'dropOut': {
@@ -529,6 +583,38 @@ export function handleHostCommand(prev: Room, cmd: HostCommand, now: number): Ro
       person!.balance = cmd.balance;
       break;
     }
+    case 'hostRollBack': {
+      const history = room.history ?? [];
+      const target = history[cmd.toHand];
+      if (!Number.isInteger(cmd.toHand) || !target) fail('There is no such game in the history.');
+      for (const p of Object.values(room.people)) p.balance = target!.balancesBefore[p.key] ?? room.startingBalance;
+      room.history = history.slice(0, cmd.toHand);
+      room.match = {
+        ...room.match,
+        roundWind: target!.roundWind,
+        dealer: target!.dealer,
+        dealerIndex: target!.dealerIndex,
+        handsPlayed: cmd.toHand,
+        finished: false,
+        lastResult: null,
+      };
+      cancelRound(room);
+      break;
+    }
+    case 'hostSetPosition': {
+      if (!Number.isInteger(cmd.roundWind) || cmd.roundWind < 0 || cmd.roundWind > 3) fail('Choose East, South, West or North.');
+      if (!Number.isInteger(cmd.gameNumber) || cmd.gameNumber < 1 || cmd.gameNumber > 4) fail('The game number must be 1 to 4.');
+      // The first dealer is seat 0, so game n of every wind is dealt by seat n - 1.
+      room.match = {
+        ...room.match,
+        roundWind: cmd.roundWind,
+        dealerIndex: cmd.gameNumber - 1,
+        dealer: cmd.gameNumber - 1,
+        finished: false,
+      };
+      cancelRound(room);
+      break;
+    }
     case 'hostUpdateSettings': {
       if (room.phase !== 'betweenRounds') fail('Game settings can only change between rounds.');
       const settings = { ...room.match.settings, ...cmd.settings };
@@ -552,6 +638,15 @@ export function handleHostCommand(prev: Room, cmd: HostCommand, now: number): Ro
   }
   room.lastChangeAt = now;
   return room;
+}
+
+/** Stop any round in progress and go back to choosing seats / pressing Start. */
+function cancelRound(room: Room): void {
+  room.match = { ...room.match, round: null };
+  room.phase = 'betweenRounds';
+  room.startPressed = [];
+  room.confirmed = [];
+  room.undoWinVotes = [];
 }
 
 function cleanupAfterSeatChange(room: Room, oldKey: string): void {
