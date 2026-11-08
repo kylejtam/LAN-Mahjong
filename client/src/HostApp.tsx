@@ -9,7 +9,7 @@ import type { GameSettings } from '@lan-mahjong/shared';
 import { DEFAULT_SETTINGS } from '@lan-mahjong/shared';
 import type { HostMessage, ServerHostMessage } from '../../server/src/protocol';
 import type { HostGameView } from '../../server/src/game/view';
-import type { CpuDifficulty, TableColour } from '../../server/src/game/room';
+import type { CpuDifficulty, CpuSpeed, TableColour } from '../../server/src/game/room';
 import { WIND_NAMES } from './i18n';
 
 const COLOURS: TableColour[] = ['green', 'black', 'white', 'red', 'blue'];
@@ -19,6 +19,7 @@ function useHostConnection() {
   const [urls, setUrls] = useState<string[]>([]);
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [cpuLevels, setCpuLevels] = useState<Record<CpuDifficulty, string[]> | null>(null);
   const ws = useRef<WebSocket | null>(null);
   useEffect(() => {
     let stopped = false;
@@ -31,6 +32,7 @@ function useHostConnection() {
         if (msg.type === 'hostState') {
           setGames(msg.games);
           setUrls(msg.urls);
+          setCpuLevels(msg.cpuLevels);
         } else if (msg.type === 'error') {
           setError(msg.message);
           setTimeout(() => setError(null), 4000);
@@ -48,11 +50,11 @@ function useHostConnection() {
     };
   }, []);
   const send = (m: HostMessage): void => ws.current?.send(JSON.stringify(m));
-  return { games, urls, open, error, send };
+  return { games, urls, open, error, send, cpuLevels };
 }
 
 export function HostApp(): ReactElement {
-  const { games, urls, open, error, send } = useHostConnection();
+  const { games, urls, open, error, send, cpuLevels } = useHostConnection();
   const [gameName, setGameName] = useState('');
   const [balance, setBalance] = useState(1000);
   return (
@@ -89,6 +91,21 @@ export function HostApp(): ReactElement {
           </button>
         </div>
       </div>
+
+      {cpuLevels && (
+        <div className="card">
+          <h2 style={{ marginTop: 0 }}>CPU levels</h2>
+          <p className="muted small">CPUs only see what a real player in their seat could see, and never declare a win below the minimum fan.</p>
+          <div className="cpu-levels">
+            {(['easy', 'medium', 'hard'] as CpuDifficulty[]).map((lvl) => (
+              <div key={lvl} className="cpu-level">
+                <h3>{lvl[0]!.toUpperCase() + lvl.slice(1)}</h3>
+                <ul>{cpuLevels[lvl].map((line) => <li key={line}>{line}</li>)}</ul>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {games.map((g) => (
         <GameCard key={g.id} game={g} send={send} />
@@ -290,6 +307,12 @@ function GameCard({ game, send }: { game: HostGameView; send: (m: HostMessage) =
         </select>
         <label>Starting balance</label>
         <input disabled={!between} type="number" min={0} value={startBal} onChange={(e) => setStartBal(Number(e.target.value))} />
+        <label>CPU speed</label>
+        <select value={game.cpuSpeed} onChange={(e) => cmd({ type: 'hostSetCpuSpeed', speed: e.target.value as CpuSpeed })}>
+          <option value="fast">Fast (½ second per move)</option>
+          <option value="normal">Normal (1 second per move)</option>
+          <option value="slow">Slow (2 seconds per move)</option>
+        </select>
         <label>Table colour</label>
         <select value={game.tableColour} onChange={(e) => cmd({ type: 'hostSetTableColour', colour: e.target.value as TableColour })}>
           {COLOURS.map((c) => <option key={c} value={c}>{c[0]!.toUpperCase() + c.slice(1)}</option>)}

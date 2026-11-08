@@ -14,7 +14,7 @@
 import { GameSettings, Meld, SEATS, Tile, tilesLeft } from '@lan-mahjong/shared';
 import { matchLabel } from './match.js';
 import { AvailableActions, DiscardEntry, Phase, RoundResult, availableActions, currentPlayer } from './round.js';
-import { CpuDifficulty, HandRecord, PendingSwap, Room, RoomPhase, TableColour, seatOf } from './room.js';
+import { CpuDifficulty, CpuSpeed, HandRecord, PendingSwap, Room, RoomPhase, TableColour, seatOf } from './room.js';
 
 export interface SeatView {
   seat: number;
@@ -165,6 +165,7 @@ export interface HostGameView {
   settings: GameSettings;
   startingBalance: number;
   tableColour: TableColour;
+  cpuSpeed: CpuSpeed;
   match: RoomView['match'];
   seats: { seat: number; name: string | null; cpu: CpuDifficulty | null; connected: boolean; balance: number | null }[];
   /** Everyone in the game who is not seated (not CPUs). */
@@ -186,6 +187,7 @@ export function hostViewOf(room: Room): HostGameView {
     settings: room.match.settings,
     startingBalance: room.startingBalance,
     tableColour: room.tableColour,
+    cpuSpeed: room.cpuSpeed ?? 'normal',
     match: {
       roundWind: room.match.roundWind,
       dealer: room.match.dealer,

@@ -44,9 +44,9 @@ class Device {
     }
   }
   /** The newest state, waiting until it matches a condition. */
-  async state(cond: (v: RoomView) => boolean = () => true): Promise<RoomView> {
+  async state(cond: (v: RoomView) => boolean = () => true, timeoutMs = 3000): Promise<RoomView> {
     if (this.latest && cond(this.latest)) return this.latest;
-    const m = await this.waitFor((x): x is Extract<ServerMessage, { type: 'state' }> => x.type === 'state' && cond(x.view));
+    const m = await this.waitFor((x): x is Extract<ServerMessage, { type: 'state' }> => x.type === 'state' && cond(x.view), timeoutMs);
     return m.view;
   }
   error(): Promise<Extract<ServerMessage, { type: 'error' }>> {
@@ -324,9 +324,9 @@ describe('game server over the network', () => {
     // A spectator watches the all-CPU table get going: dice rolled and tiles discarded.
     const watcher = await device(s.port);
     watcher.send({ type: 'joinGame', gameId, name: 'Kyle' });
-    const v = await watcher.state((x) => (x.round?.discards.length ?? 0) >= 1);
+    const v = await watcher.state((x) => (x.round?.discards.length ?? 0) >= 1, 15000);
     expect(v.you.seat).toBeNull();
     host.close();
     watcher.close();
-  }, 15000);
+  }, 25000);
 });

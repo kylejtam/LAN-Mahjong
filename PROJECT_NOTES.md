@@ -9,7 +9,7 @@ disagrees with those, the newest dated entry here wins.
 - Phase 1 (rules engine): **done**. Tile set and checks, shuffle, wall and dice
   break, dealing with flower replacement, winning-hand check, legal
   chow/pong/gong/win, two-winner rule, fan counting, payments.
-- Tests: 191 passing (`npm test`), including 60 rounds of random play that check no tile is ever lost or created.
+- Tests: 209 passing (`npm test`), including 60 rounds of random play that check no tile is ever lost or created.
 - Phase 2 (game server): **done**.
   - Step 1 round engine (`server/src/game/round.ts`): **done**.
   - Step 2 full 16-round game (`server/src/game/match.ts`): **done**.
@@ -32,7 +32,9 @@ disagrees with those, the newest dated entry here wins.
   total; every hand with shown sets and flowers; each player's chips with
   + / − signs (winner highlighted); total chips transferred; everyone
   confirms. Manual chip changes are on the host page.
-- Phase 7 (CPU players easy / medium / hard): next.
+- Phase 7 (CPU players): **done**. Easy / medium / hard in `server/src/game/cpu.ts`,
+  level descriptions and CPU speed on the host page.
+- Phase 8 (testing on real devices on a real LAN): next.
 
 ## Decisions
 
@@ -91,6 +93,11 @@ disagrees with those, the newest dated entry here wins.
 | 2026-11-08 | **Win summary:** lists every winning condition (番種) with its fan and the total; shows each player's hand, shown sets and flowers; each player's chips as +N (green) or −N (red); and "Total chips transferred". The two seat-flower items are labelled (flowers) / (seasons) so they can be told apart. | Kyle |
 | 2026-11-08 | **Host page: history and roll back.** Every finished hand is recorded (game, result, chip changes, everyone's chips before it). "Roll back to before this" puts chips (including manual changes made since), wind and dealer back to just before that hand and removes the later hands. Two taps to confirm. Any round in progress is cancelled. | Kyle |
 | 2026-11-08 | **Host page: change the current game.** Pick a wind and game number (1–4) and press Go (two taps). Game n of any wind is dealt by seat n (seat 1 = first dealer). Chips are not changed; any round in progress is cancelled. | Kyle |
+| 2026-11-08 | **CPU levels:** Easy sometimes throws a random tile and never claims 上 碰 槓. Medium keeps the tiles that bring it closest to winning (and leave the most ways to finish), claims 上 碰 槓 when that helps, makes gongs. Hard plays like Medium, steers toward bigger hands, and near the end of the wall stops chasing a hand it cannot finish and throws the safest tiles. Descriptions are shown as bullet points on the host page. | Kyle (details: Claude) |
+| 2026-11-08 | **CPUs never declare a chicken win** (any level). They only win at or above the minimum fan. | Kyle |
+| 2026-11-08 | **CPU fair play:** CPUs only use what a real player in their seat could see (own tiles + everything face up). A test changes everyone else's hidden tiles and the wall and checks the CPU's move does not change. | Claude |
+| 2026-11-08 | **CPU speed** is a host page setting per game: Fast ½ s, Normal 1 s (default), Slow 2 s per move. Can be changed any time. | Kyle |
+| 2026-11-08 | **CPU strength (about 1,500 simulated hands):** easy wins ~13% against easy players; medium and hard win about two thirds of hands against easy players, hard collecting the most chips; against medium players hard is only slightly better (fewer chips lost). | Claude (measured) |
 | 2026-11-08 | **First dealer** of a new game is seat 0 (East). | Claude (Kyle may change) |
 | 2026-11-08 | **Undo moves:** discard, 上, 碰, 槓, 胡. Draws are not separate moves. Undoing a discard puts the tile back in that player's hand and it is their turn again. | Kyle |
 | 2026-11-08 | **Several games at once:** one server can run many separate games, each with its own name. | Kyle |

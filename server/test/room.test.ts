@@ -422,6 +422,18 @@ describe('CPU players', () => {
     expect(r.match.handsPlayed).toBeGreaterThanOrEqual(16);
   });
 
+  it('the host page sets how fast CPUs move', () => {
+    let r = emptyRoom();
+    for (let seat = 0; seat < 4; seat++) r = host(r, { type: 'hostSetSeat', seat, cpu: 'easy' });
+    expect(hostViewOf(r).cpuSpeed).toBe('normal');
+    expect(cpuTick(r, r.lastChangeAt + 600, rng)).toBe(r); // normal: waits 1 s
+    r = host(r, { type: 'hostSetCpuSpeed', speed: 'fast' });
+    expect(cpuTick(r, r.lastChangeAt + 600, rng)).not.toBe(r); // fast: moves after ½ s
+    r = host(r, { type: 'hostSetCpuSpeed', speed: 'slow' });
+    expect(cpuTick(r, r.lastChangeAt + 1500, rng)).toBe(r); // slow: waits 2 s
+    expect(() => host(r, { type: 'hostSetCpuSpeed', speed: 'warp' as never })).toThrow();
+  });
+
   it('CPUs wait a moment before moving', () => {
     let r = emptyRoom();
     for (let seat = 0; seat < 4; seat++) r = host(r, { type: 'hostSetSeat', seat, cpu: 'easy' });

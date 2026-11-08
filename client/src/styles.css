@@ -398,3 +398,10 @@ input { font: inherit; }
 .history th, .history td { text-align: left; padding: 0.3em 0.5em; border-bottom: 1px solid var(--panel-border); vertical-align: middle; }
 .history th { color: var(--muted); font-weight: 600; }
 .host select { background: var(--input-bg); color: var(--fg); border: 1px solid var(--panel-border); border-radius: 6px; padding: 0.35em 0.5em; }
+
+/* Host page: CPU level descriptions */
+.cpu-levels { display: grid; grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr)); gap: 0.8rem; }
+.cpu-level { background: var(--input-bg); border-radius: 8px; padding: 0.6rem 0.9rem; }
+.cpu-level h3 { margin: 0 0 0.3rem; }
+.cpu-level ul { margin: 0; padding-left: 1.1rem; }
+.cpu-level li { margin: 0.2rem 0; }
