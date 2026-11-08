@@ -217,6 +217,18 @@ describe('host controls (laptop host page only)', () => {
     expect(() => host(startedTable(), { type: 'hostUpdateSettings', settings: { minFan: 2 } })).toThrow(/between rounds/);
   });
 
+  it('the host page can type in any person\'s chip count (players cannot)', () => {
+    let r = join(startedTable(), 'Spec');
+    r = host(r, { type: 'hostSetBalance', name: 'AMY', balance: 1450 });
+    r = host(r, { type: 'hostSetBalance', name: 'Spec', balance: -20 });
+    expect(r.people.amy!.balance).toBe(1450);
+    expect(r.people.spec!.balance).toBe(-20);
+    expect(viewFor(r, 'ben', tick()).seats[1]!.balance).toBe(1450); // everyone sees it
+    expect(() => host(r, { type: 'hostSetBalance', name: 'Nobody', balance: 5 })).toThrow(/nobody/);
+    expect(() => host(r, { type: 'hostSetBalance', name: 'Amy', balance: 1.5 })).toThrow(/whole number/);
+    expect(() => cmd(r, 'Amy', { type: 'hostSetBalance', name: 'Amy', balance: 9999 } as unknown as Command)).toThrow();
+  });
+
   it('reset balances', () => {
     let r = fullTable();
     r.people.amy!.balance = 5;

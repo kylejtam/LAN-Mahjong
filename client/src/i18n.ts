@@ -43,8 +43,6 @@ const en = {
   reconnecting: 'Reconnecting…',
   rotate: 'Please turn your device sideways.',
   gameEndedByHost: 'The game was ended by the host.',
-  lockOn: 'Unlock (manual calculating)',
-  lockOff: 'Lock',
   // hints
   hintDraw: 'Your turn: drag the end tile of the wall into your hand.',
   hintReplace: 'Drag the replacement tile from the back of the wall into your hand.',
@@ -141,8 +139,6 @@ const zh: Strings = {
   reconnecting: '重新連接緊…',
   rotate: '請將部機打橫。',
   gameEndedByHost: '主機已經完咗呢局。',
-  lockOn: '解鎖（手動計數）',
-  lockOff: '鎖定',
   hintDraw: '到你：將牌牆尾嗰隻牌拖入手。',
   hintReplace: '將牌牆後面嘅補牌拖入手。',
   hintDiscard: '將一隻牌拖去枱中間打出。',

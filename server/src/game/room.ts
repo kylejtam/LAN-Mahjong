@@ -131,6 +131,8 @@ export type HostCommand =
   /** Put a CPU in a seat (replacing whoever is there), or empty a CPU seat (cpu: null). */
   | { type: 'hostSetSeat'; seat: number; cpu: CpuDifficulty | null }
   | { type: 'hostResetBalances' }
+  /** Type in a person's chip count (the only way to change chips by hand). */
+  | { type: 'hostSetBalance'; name: string; balance: number }
   | { type: 'hostUpdateSettings'; settings: Partial<GameSettings>; startingBalance?: number }
   | { type: 'hostSetTableColour'; colour: TableColour }
   | { type: 'hostEndGame' };
@@ -520,6 +522,13 @@ export function handleHostCommand(prev: Room, cmd: HostCommand, now: number): Ro
     case 'hostResetBalances':
       for (const p of Object.values(room.people)) p.balance = room.startingBalance;
       break;
+    case 'hostSetBalance': {
+      const person = room.people[nameKey(String(cmd.name ?? ''))];
+      if (!person) fail('There is nobody with that name in this game.');
+      if (!Number.isInteger(cmd.balance) || Math.abs(cmd.balance) > 1_000_000_000) fail('Chips must be a whole number.');
+      person!.balance = cmd.balance;
+      break;
+    }
     case 'hostUpdateSettings': {
       if (room.phase !== 'betweenRounds') fail('Game settings can only change between rounds.');
       const settings = { ...room.match.settings, ...cmd.settings };

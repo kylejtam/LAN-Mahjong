@@ -98,6 +98,28 @@ export function HostApp(): ReactElement {
   );
 }
 
+/** One person's chip count on the host page: type a number and press Set. */
+function ChipRow({ name, balance, onSet }: { name: string; balance: number; onSet: (b: number) => void }): ReactElement {
+  const [value, setValue] = useState(String(balance));
+  useEffect(() => setValue(String(balance)), [balance]);
+  const n = Number(value);
+  const valid = value.trim() !== '' && Number.isInteger(n);
+  const changed = valid && n !== balance;
+  return (
+    <form
+      className="chip-row"
+      onSubmit={(e) => {
+        e.preventDefault();
+        if (changed) onSet(n);
+      }}
+    >
+      <span className="chip-name">{name}</span>
+      <input type="number" step={1} value={value} onChange={(e) => setValue(e.target.value)} aria-label={`Chips for ${name}`} />
+      <button className="btn primary" type="submit" disabled={!changed}>Set</button>
+    </form>
+  );
+}
+
 function GameCard({ game, send }: { game: HostGameView; send: (m: HostMessage) => void }): ReactElement {
   const cmd = (command: Extract<HostMessage, { type: 'hostCommand' }>['command']): void => send({ type: 'hostCommand', gameId: game.id, command });
   const [confirmEnd, setConfirmEnd] = useState(false);
@@ -140,9 +162,20 @@ function GameCard({ game, send }: { game: HostGameView; send: (m: HostMessage) =
       </div>
       {game.spectators.length > 0 && (
         <p className="small">
-          Watching / not seated: {game.spectators.map((p) => `${p.name}${p.connected ? '' : ' (offline)'} (${p.balance})`).join(', ')}
+          Watching / not seated: {game.spectators.map((p) => `${p.name}${p.connected ? '' : ' (offline)'}`).join(', ')}
         </p>
       )}
+
+      <h3>Chips</h3>
+      <p className="muted small">Type the correct number and press Set. It updates on every player's device straight away.</p>
+      <div className="chips-editor">
+        {[
+          ...game.seats.filter((s) => s.name !== null).map((s) => ({ name: s.name!, balance: s.balance ?? 0, cpu: !!s.cpu })),
+          ...game.spectators.map((p) => ({ name: p.name, balance: p.balance, cpu: false })),
+        ].map((p) => (
+          <ChipRow key={p.name} name={p.name} balance={p.balance} onSet={(balance) => cmd({ type: 'hostSetBalance', name: p.name, balance })} />
+        ))}
+      </div>
 
       <h3>Settings {between ? '' : <span className="muted small">(can change between rounds)</span>}</h3>
       <div className="form-grid">

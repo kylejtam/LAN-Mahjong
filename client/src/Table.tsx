@@ -2,7 +2,7 @@
  * The game table: the screen you play on.
  *
  * Layout (landscape, the same for everyone):
- * - Top bar: undo (left), round and seat winds (centre), chips + lock, help,
+ * - Top bar: undo (left), round and seat winds (centre), your chips, help,
  *   settings (right).
  * - Middle: the other three players, the wall around the table and every
  *   discarded tile.
@@ -59,7 +59,6 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
   /** Spectators can close the seat picker and just watch. */
   const [justWatching, setJustWatching] = useState(false);
   const [chooser, setChooser] = useState<Chooser>(null);
-  const [locked, setLocked] = useState(true);
   const command = (c: Extract<ClientMessage, { type: 'command' }>['command']): void => send({ type: 'command', command: c });
   const doClaim = (claim: Claim): void => command({ type: 'claim', claim });
 
@@ -291,12 +290,7 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
         </div>
         <div className="topbar-right">
           {me && (
-            <span className="chip-total">
-              {me.balance}
-              <button className="lock" title={locked ? tr('lockOn') : tr('lockOff')} onClick={() => setLocked(!locked)}>
-                {locked ? '🔒' : '🔓'}
-              </button>
-            </span>
+            <span className="chip-total">{me.balance}</span>
           )}
           <button className="btn icon" title={tr('help')} onClick={() => setPanel('help')}>?</button>
           <button className="btn icon" title={tr('settings')} onClick={() => setPanel('settings')}>⚙</button>

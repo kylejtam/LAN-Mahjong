@@ -112,7 +112,6 @@ input { font: inherit; }
 .compass-top { grid-area: t; } .compass-left { grid-area: l; } .compass-right { grid-area: r; } .compass-bottom { grid-area: b; }
 .compass-dealer { color: #ffd447; font-weight: 700; }
 .chip-total { font-weight: 700; font-variant-numeric: tabular-nums; display: flex; align-items: center; gap: 0.2em; font-size: 1.15em; }
-.lock { background: none; border: none; cursor: pointer; font-size: 0.9em; padding: 0 0.2em; }
 
 .board {
   display: grid;
@@ -373,3 +372,12 @@ input { font: inherit; }
 }
 .lobby-head { display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap; margin-bottom: 1rem; }
 .lobby-head h1 { margin: 0; }
+
+/* Host page: chips editor */
+.chips-editor { display: grid; grid-template-columns: repeat(auto-fit, minmax(17rem, 1fr)); gap: 0.4rem 1rem; margin-bottom: 0.8rem; }
+.chip-row { display: grid; grid-template-columns: 1fr 7rem auto; gap: 0.5rem; align-items: center; }
+.chip-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.chip-row input {
+  background: var(--input-bg); color: var(--fg); border: 1px solid var(--panel-border); border-radius: 6px;
+  padding: 0.35em 0.5em; text-align: right; -webkit-user-select: text; user-select: text;
+}
