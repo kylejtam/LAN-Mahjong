@@ -378,7 +378,7 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
       const side = sideOf(sv.seat);
       const target = side === 'bottom' ? document.querySelector('.me-row') : document.querySelector(`.opp-${side} .nametag`);
       const t = target?.getBoundingClientRect();
-      if (t) flyBacks(from, { x: t.left + t.width / 2, y: t.top + t.height / 2 }, 1, 550);
+      if (t) flyBacks(from, { x: t.left + t.width / 2, y: t.top + t.height / 2 }, 1, 750);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [JSON.stringify(view.seats.map((sv) => sv.handCount)), roundKey]);
@@ -887,8 +887,9 @@ export function flyBacks(from: { x: number; y: number }, to: { x: number; y: num
   const dy = to.y - from.y;
   const anim = group.animate(
     [
-      { transform: 'translate(-50%, -50%) scale(1.15)', opacity: 1 },
-      { transform: `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px)) scale(0.9)`, opacity: 0.85 },
+      { transform: 'translate(-50%, -50%) scale(1.2)', opacity: 1 },
+      { transform: `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px)) scale(1)`, opacity: 1, offset: 0.85 },
+      { transform: `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px)) scale(0.9)`, opacity: 0 },
     ],
     { duration: ms, easing: 'ease-in-out', fill: 'forwards' },
   );

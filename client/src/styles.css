@@ -565,7 +565,7 @@ input { font: inherit; }
    browser's built-in animation feature, which also works on iPhones. */
 .fly-group { position: fixed; z-index: 15; pointer-events: none; display: flex; gap: 2px; transform: translate(-50%, -50%); }
 .fly-back {
-  display: block; width: clamp(20px, 3.4vw, 36px); aspect-ratio: 3 / 4;
-  background: var(--tile-back); border: 2px solid var(--tile-back-edge); border-radius: 3px;
-  box-shadow: 0 3px 6px rgba(0, 0, 0, 0.45);
+  display: block; width: clamp(24px, 3.6vw, 52px); aspect-ratio: 3 / 4;
+  background: var(--tile-back); border: 2px solid #f4efe1; border-bottom-width: 5px; border-radius: 5px;
+  box-shadow: 0 0 0 2px #f5c542, 0 0 14px 4px rgba(245, 197, 66, 0.75), 0 6px 10px rgba(0, 0, 0, 0.5);
 }

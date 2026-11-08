@@ -136,6 +136,7 @@ disagrees with those, the newest dated entry here wins.
 | 2026-11-08 | **Glides:** tapping Draw makes the tile glide from the middle into your hand; when other players draw, a tile glides from the middle to them. | Kyle |
 | 2026-11-08 | **Glides on every device (fix):** the old glide used a CSS trick iPhones ignore. Now uses the browser's built-in animation feature; the gliding tile is bigger and a little slower (about half a second). Applies to other players' draws (spectators see every seat's draws) and to the deal animation. | Kyle |
 | 2026-11-08 | **Installer fix:** updating while the game was running gave "Error opening file for writing: node.exe" because the close-the-game step (32-bit PowerShell) could not see the 64-bit game. Now uses 64-bit PowerShell and Windows' process list; if the game is still running anyway, the installer asks you to close its window and click OK. | Kyle |
+| 2026-11-08 | **Glides easier to see:** the gliding tile was green on a green table and small on a PC. It is now bigger on large screens, has a cream edge and a yellow glow, and takes about ¾ of a second. | Kyle |
 | 2026-11-08 | **Shàng sets are shown in order**, lowest number first. | Kyle |
 | 2026-11-08 | **After the win summary:** seated players press Continue, then a popup like the seat picker shows who is ready, with Ready / Leave seat (and Back to summary). | Kyle |
 | 2026-11-08 | **Chips appear once:** only at the top right; your top-left name tag has no chips. | Kyle |
