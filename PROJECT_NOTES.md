@@ -9,7 +9,7 @@ disagrees with those, the newest dated entry here wins.
 - Phase 1 (rules engine): **done**. Tile set and checks, shuffle, wall and dice
   break, dealing with flower replacement, winning-hand check, legal
   chow/pong/gong/win, two-winner rule, fan counting, payments.
-- Tests: 217 passing (`npm test`), including 60 rounds of random play that check no tile is ever lost or created.
+- Tests: 232 passing (`npm test`), including 60 rounds of random play that check no tile is ever lost or created.
 - Phase 2 (game server): **done**.
   - Step 1 round engine (`server/src/game/round.ts`): **done**.
   - Step 2 full 16-round game (`server/src/game/match.ts`): **done**.
@@ -106,6 +106,11 @@ disagrees with those, the newest dated entry here wins.
 | 2026-11-08 | **All-CPU tables:** at the end of each hand the game waits until at least one spectator presses "Confirm – next hand". With nobody watching, it carries on by itself. | Kyle |
 | 2026-11-08 | **Public tiles left of private tiles.** Your shown sets and flowers sit in the same row as your hand, to their left; the row sizes itself so everything always fits on one line (public tiles a bit smaller than hand tiles). Your name tag sits under the row, next to the hint. Other players show name, then public tiles, then the hidden-tile count. | Kyle |
 | 2026-11-08 | **Discards always fit.** Side players get tall discard areas; top and bottom share the middle. The discard tile size is calculated from the space and the number of discards, so every discard stays visible (checked with 80 discards on iPhone SE / 13 / short Safari). | Claude (fix for Kyle's report) |
+| 2026-11-08 | **Hands are sorted automatically**, left to right: the three suits from the one you hold fewest of to the one you hold most of (ties: characters, dots, bamboo), each 1→9; then winds East, South, West, North; then dragons, fewest of a dragon first, most last (ties 中 發 白). Applies to every hand shown (yours, CPUs', spectators', end of round). You can still drag tiles into your own order on your device; it goes back to sorted at the start of each hand. Rule lives in `shared/src/sort.ts`. | Kyle |
+| 2026-11-08 | **The tile you just drew** sits a little apart on the far right (yellow outline) until you discard. The Draw / Replacement tile in the middle can be **tapped** or dragged. | Kyle |
+| 2026-11-08 | **Wall removed from the screen** to save space; the middle shows the tiles-left count and the Draw tile. **Dice** move next to the dealer's name once the hand starts. | Kyle |
+| 2026-11-08 | **Swaps:** the player who asked sees "Waiting for … to answer" with a Cancel button, and is told if the spectator declines (or accepts). | Kyle |
+| 2026-11-08 | **Empty seats:** a spectator can sit in an empty seat straight away, even mid-round (taking over that seat's tiles), using the "Sit here" button. Seated players still change seats only between rounds; CPU seats still need the host. | Kyle |
 | 2026-11-08 | **First dealer** of a new game is seat 0 (East). | Claude (Kyle may change) |
 | 2026-11-08 | **Undo moves:** discard, 上, 碰, 槓, 胡. Draws are not separate moves. Undoing a discard puts the tile back in that player's hand and it is their turn again. | Kyle |
 | 2026-11-08 | **Several games at once:** one server can run many separate games, each with its own name. | Kyle |

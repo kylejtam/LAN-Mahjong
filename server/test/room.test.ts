@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { NORMAL_TYPES, seededRng } from '@lan-mahjong/shared';
+import { NORMAL_TYPES, seededRng, sortHand } from '@lan-mahjong/shared';
 import { Command, HostCommand, Room, cpuTick, createRoom, disconnect, handleCommand, handleHostCommand, joinRoom } from '../src/game/room.js';
 import { hostViewOf, viewFor } from '../src/game/view.js';
 
@@ -258,7 +258,7 @@ describe('host controls (laptop host page only)', () => {
     for (let seat = 0; seat < 4; seat++) full = host(full, { type: 'hostSetSeat', seat, cpu: 'easy' });
     let now = clock;
     while (full.phase !== 'playing') full = cpuTick(full, (now += 1000), rng);
-    expect(() => handleCommand(full, 'amy', { type: 'takeSeat', seat: 1 }, now, rng)).toThrow(/between rounds/);
+    expect(() => handleCommand(full, 'amy', { type: 'takeSeat', seat: 1 }, now, rng)).toThrow(/taken/);
   });
 
   it('the host overview never includes hidden tiles', () => {
@@ -371,14 +371,19 @@ describe('playing with CPUs', () => {
     expect(viewFor(r, 'ben', tick()).actions!.undo).toBe(false);
   });
 
-  it('CPU hands are shown sorted: each suit 1-9, then winds and dragons', () => {
+  it('CPU hands are shown sorted (suits fewest→most, 1-9, then winds, then dragons)', () => {
     let r = join(kyleAndCpus(), 'Spec');
     r = cmd(r, 'Spec', { type: 'setWatchAll', visible: true });
-    const order = NORMAL_TYPES as readonly string[];
     for (const seat of [1, 2, 3]) {
-      const types = viewFor(r, 'spec', tick()).seats[seat]!.hand!.map((t) => order.indexOf(t.type));
-      expect(types).toEqual([...types].sort((x, y) => x - y));
+      const shown = viewFor(r, 'spec', tick()).seats[seat]!.hand!;
+      expect(shown.map((t) => t.id)).toEqual(sortHand(shown).map((t) => t.id));
     }
+  });
+
+  it('tells your device which tile you just drew', () => {
+    let r = kyleAndCpus();
+    r = cmd(r, 'Kyle', { type: 'discard', tileId: r.match.round!.core.hands[0]![0]!.id });
+    expect(viewFor(r, 'kyle', tick()).justDrawnId).toBeNull();
   });
 
   function allCpuRoundOver(withSpectator: boolean): Room {
@@ -471,6 +476,30 @@ describe('swapping players', () => {
 
   it('a new game starts with all 4 seats empty', () => {
     expect(emptyRoom().seats).toEqual([null, null, null, null]);
+  });
+
+  it('a spectator can sit in an empty seat straight away, even mid-round', () => {
+    let r = join(startedTable(), 'Dan');
+    r = cmd(r, 'Ben', { type: 'dropOut', replacement: { none: true } }); // seat 2 is now empty
+    r = cmd(r, 'Dan', { type: 'takeSeat', seat: 2 });
+    expect(r.seats[2]).toBe('dan');
+    expect(viewFor(r, 'dan', tick()).seats[2]!.hand).toHaveLength(13); // Dan plays Ben's tiles
+    // Seated players still cannot move mid-round, and taken seats stay taken.
+    expect(() => cmd(r, 'Amy', { type: 'takeSeat', seat: 2 })).toThrow(/between rounds/);
+    r = join(r, 'Eve');
+    expect(() => cmd(r, 'Eve', { type: 'takeSeat', seat: 1 })).toThrow(/taken/);
+  });
+
+  it('the player who asked to swap sees the request waiting, can cancel it, and is told if it is declined', () => {
+    let r = join(startedTable(), 'Dan');
+    r = cmd(r, 'Ben', { type: 'dropOut', replacement: { spectator: 'dan' } });
+    expect(viewFor(r, 'ben', tick()).pendingSwap).toMatchObject({ toName: 'Dan' });
+    r = cmd(r, 'Ben', { type: 'cancelSwap' });
+    expect(viewFor(r, 'dan', tick()).pendingSwap).toBeNull();
+    r = cmd(r, 'Ben', { type: 'dropOut', replacement: { spectator: 'dan' } });
+    r = cmd(r, 'Dan', { type: 'answerSwap', accept: false });
+    expect(viewFor(r, 'ben', tick()).swapResult).toMatchObject({ toName: 'Dan', accepted: false });
+    expect(viewFor(r, 'amy', tick()).swapResult).toBeNull();
   });
 
   it('drop out to a spectator only happens after the spectator confirms', () => {

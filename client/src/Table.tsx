@@ -14,6 +14,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties, ReactElement } from 'react';
 import type { Meld, NormalType, Tile } from '@lan-mahjong/shared';
+import { sortHand } from '@lan-mahjong/shared';
 import type { ClientMessage } from '../../server/src/protocol';
 import type { RoomView, SeatView } from '../../server/src/game/view';
 import type { Claim } from '../../server/src/game/round';
@@ -78,16 +79,22 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
   const command = (c: Extract<ClientMessage, { type: 'command' }>['command']): void => send({ type: 'command', command: c });
   const doClaim = (claim: Claim): void => command({ type: 'claim', claim });
 
-  // My hand in the order I arranged it (updated straight away while the server confirms).
+  // Your hand: sorted automatically (suits fewest→most, 1-9, winds, dragons), unless
+  // you drag tiles into your own order. The tile you just drew sits apart on the far right.
   const serverHand = view.seats[bottomSeat]?.hand ?? null;
-  const [handOrder, setHandOrder] = useState<number[]>([]);
-  useEffect(() => setHandOrder(serverHand?.map((t) => t.id) ?? []), [JSON.stringify(serverHand?.map((t) => t.id))]);
+  const drawnId = mySeat !== null ? view.justDrawnId : null;
+  const roundKey = `${view.match.handsPlayed}-${round?.dice.join('') ?? ''}`;
+  const [manual, setManual] = useState<{ key: string; ids: number[] } | null>(null);
   const hand: Tile[] = useMemo(() => {
     if (!serverHand) return [];
-    const byId = new Map(serverHand.map((t) => [t.id, t]));
-    const ordered = handOrder.map((id) => byId.get(id)).filter((t): t is Tile => !!t);
-    return ordered.length === serverHand.length ? ordered : serverHand;
-  }, [serverHand, handOrder]);
+    const rest = serverHand.filter((t) => t.id !== drawnId);
+    if (!manual || manual.key !== roundKey) return sortHand(rest);
+    const byId = new Map(rest.map((t) => [t.id, t]));
+    const ordered = manual.ids.map((id) => byId.get(id)).filter((t): t is Tile => !!t);
+    const extra = rest.filter((t) => !manual.ids.includes(t.id)); // new tiles go on the right
+    return [...ordered, ...extra];
+  }, [serverHand, manual, roundKey, drawnId]);
+  const drawnTile = drawnId !== null ? serverHand?.find((t) => t.id === drawnId) ?? null : null;
 
   // Claim options on the offered tile (anything except your own turn moves).
   const claimable = !!a && (a.win || a.pong || a.gong || a.chow.length > 0) && !!round?.offered && round.offered.by !== mySeat;
@@ -97,9 +104,11 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
     if (src.kind === 'hand') {
       if (drop.zone === 'discard' && a?.discard) {
         command({ type: 'discard', tileId: src.tileId });
-      } else if (drop.zone === 'hand') {
-        // Reorder: put the tile where it was dropped.
-        const els = [...document.querySelectorAll<HTMLElement>('[data-hand-tile]')];
+      } else if (drop.zone === 'hand' && src.tileId !== drawnId) {
+        // Reorder (on this device only): put the tile where it was dropped.
+        const els = [...document.querySelectorAll<HTMLElement>('[data-hand-tile]')].filter(
+          (el) => el.dataset.drawn !== 'true',
+        );
         const others = els.filter((el) => Number(el.dataset.handTile) !== src.tileId);
         let index = others.findIndex((el) => {
           const r = el.getBoundingClientRect();
@@ -108,8 +117,7 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
         if (index < 0) index = others.length;
         const ids = others.map((el) => Number(el.dataset.handTile));
         ids.splice(index, 0, src.tileId);
-        setHandOrder(ids);
-        command({ type: 'reorderHand', tileIds: ids });
+        setManual({ key: roundKey, ids });
       }
     } else if (src.kind === 'wallFront' && drop.zone === 'hand' && a?.draw) {
       command({ type: 'draw' });
@@ -119,7 +127,23 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
       command({ type: 'rollDice' });
     }
   };
-  const { drag, start } = useDrag(onDrop);
+  /** Tapping the Draw / Replacement tile draws it too (dragging also works). */
+  const onTap = (src: DragSource): void => {
+    if (src.kind === 'wallFront' && a?.draw) command({ type: 'draw' });
+    else if (src.kind === 'wallBack' && a?.drawReplacement) command({ type: 'drawReplacement' });
+  };
+  const { drag, start } = useDrag(onDrop, onTap);
+
+  // Swap answers: tell the player who asked.
+  const [swapToast, setSwapToast] = useState<string | null>(null);
+  useEffect(() => {
+    const r = view.swapResult;
+    if (!r || Date.now() - r.at > 15000) return;
+    setSwapToast(r.accepted ? tr('swapAccepted', { name: r.toName }) : tr('swapDeclined', { name: r.toName }));
+    const timer = setTimeout(() => setSwapToast(null), 5000);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [view.swapResult?.at]);
 
   // ---------- action buttons ----------
   const onWin = (): void => (a?.selfDrawWin ? command({ type: 'selfDrawWin' }) : doClaim({ kind: 'win' }));
@@ -165,33 +189,6 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
   }
 
   // ---------- pieces ----------
-  const wallBySeat = (seat: number) =>
-    round ? round.wall.filter((s) => s.seat === seat).sort((x, y) => x.position - y.position) : [];
-  const frontStack = round?.wall[0];
-  const backStack = round?.wall[round.wall.length - 1];
-
-  const renderWall = (side: Side): ReactElement => {
-    const seat = seatAt(side);
-    const stacks = wallBySeat(seat);
-    return (
-      <div className={`wall wall-${side}`}>
-        {stacks.map((s) => {
-          const isFront = s === frontStack || (frontStack && s.seat === frontStack.seat && s.position === frontStack.position);
-          const isBack = backStack && s.seat === backStack.seat && s.position === backStack.position;
-          const canFront = isFront && a?.draw;
-          const canBack = isBack && a?.drawReplacement;
-          return (
-            <span
-              key={`${s.seat}-${s.position}`}
-              className={`stack stack-${s.count}${canFront || canBack ? ' stack-ready' : ''}`}
-              onPointerDown={canFront ? start({ kind: 'wallFront' }) : canBack ? start({ kind: 'wallBack' }) : undefined}
-            />
-          );
-        })}
-      </div>
-    );
-  };
-
   const renderMelds = (melds: Meld[], flowers: Tile[], size: string): ReactElement => (
     <div className="melds">
       {melds.map((m, i) => (
@@ -272,6 +269,16 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
       {sv.cpu && !sv.name?.startsWith('CPU') && <span className="cpu-badge">{tr('cpu')}</span>}
       {sv.name && !sv.connected && !sv.cpu && <span className="offline">{tr('offline')}</span>}
       {sv.balance !== null && <span className="chips">{sv.balance}</span>}
+      {round && sv.isDealer && (
+        <span className="dice dice-small" title="dice">
+          {round.dice.map((d, i) => <span key={i} className="die">{d}</span>)}
+        </span>
+      )}
+      {mySeat === null && !sv.name && round && (
+        <button className="btn sit-here" onClick={(e) => { e.stopPropagation(); command({ type: 'takeSeat', seat: sv.seat }); }}>
+          {tr('sitHere')}
+        </button>
+      )}
       {mySeat === null && sv.name && (
         <button
           className={`eye${sv.watched ? ' eye-on' : ''}`}
@@ -294,7 +301,7 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
           {renderMelds(sv.melds, sv.flowers, 'var(--public-w)')}
           {sv.hand ? (
             <div className="opp-hand">
-              {sv.hand.map((t) => <TileView key={t.id} type={t.type} width="var(--opp-w)" />)}
+              {sortHand(sv.hand).map((t) => <TileView key={t.id} type={t.type} width="var(--opp-w)" />)}
             </div>
           ) : (
             sv.handCount > 0 && (
@@ -375,8 +382,6 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
         {renderOpponent('top')}
         {renderOpponent('left')}
         <section className="centre" data-drop="centre">
-          {renderWall('top')}
-          {renderWall('left')}
           <div className="pond" data-drop="discard" ref={pondRef} style={{ '--discard-w': `${discardW}px` } as CSSProperties}>
             {renderDiscards('top')}
             {renderDiscards('left')}
@@ -396,7 +401,6 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
                   <>
                     <div className="hub-count">{round.wallCount}</div>
                     <div className="hub-sub">{tr('tilesLeft')}</div>
-                    <div className="dice">{round.dice.map((d, i) => <span key={i} className="die">{d}</span>)}</div>
                   </>
                 )
               ) : view.phase === 'rolling' ? (
@@ -406,8 +410,6 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
             {renderDiscards('right')}
             {renderDiscards('bottom')}
           </div>
-          {renderWall('right')}
-          {renderWall('bottom')}
         </section>
         {renderOpponent('right')}
       </main>
@@ -429,6 +431,18 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
                 </span>
               ))
             : Array.from({ length: bottom.handCount }, (_, i) => <TileView key={i} back width="var(--hand-w)" />)}
+          {drawnTile && (
+            // The tile you just drew, a little apart on the far right.
+            <span
+              key={drawnTile.id}
+              data-hand-tile={drawnTile.id}
+              data-drawn="true"
+              className={`hand-tile drawn-tile${drag?.moved && drag.src.kind === 'hand' && drag.src.tileId === drawnTile.id ? ' dragging' : ''}`}
+              onPointerDown={start({ kind: 'hand', tileId: drawnTile.id, type: drawnTile.type })}
+            >
+              <TileView type={drawnTile.type} width="var(--hand-w)" />
+            </span>
+          )}
           </div>
         </div>
         <div className={`actions${claimable ? ' actions-claim' : ''}`}>
@@ -501,6 +515,14 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
         </div>
       )}
 
+      {view.pendingSwap && view.pendingSwap.fromName === view.you.name && (
+        // You asked a spectator to take your seat: waiting for their answer.
+        <div className="swap-banner">
+          {tr('swapWaiting', { name: view.pendingSwap.toName })}
+          <button className="btn" onClick={() => command({ type: 'cancelSwap' })}>{tr('cancel')}</button>
+        </div>
+      )}
+      {swapToast && <div className="toast">{swapToast}</div>}
       {view.pendingSwap && view.pendingSwap.toName === view.you.name && (
         <div className="overlay">
           <div className="panel">
@@ -556,7 +578,7 @@ function AllHands({ view, tr, onClose }: { view: RoomView; tr: Tr; onClose: () =
               <span className="wind-badge">{WIND_CHARS[s.wind]}</span> {s.name ? personName(s.name, lang) : tr('empty')}
             </span>
             <span className="all-hands-tiles">
-              {(s.hand ?? []).map((t) => <TileView key={t.id} type={t.type} width="var(--allhands-w)" />)}
+              {sortHand(s.hand ?? []).map((t) => <TileView key={t.id} type={t.type} width="var(--allhands-w)" />)}
               {s.melds.map((m, i) => (
                 <span key={i} className="meld">
                   {m.tiles.map((t, j) => <TileView key={t.id} type={t.type} back={m.concealed && (j === 0 || j === 3)} width="var(--allhands-w)" />)}

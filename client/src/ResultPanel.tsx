@@ -8,6 +8,7 @@ import type { ReactElement } from 'react';
 import type { ClientMessage } from '../../server/src/protocol';
 import type { RoomView } from '../../server/src/game/view';
 import { TileView } from './TileFace';
+import { sortHand } from '@lan-mahjong/shared';
 import { Lang, personName, t } from './i18n';
 
 interface Props {
@@ -87,7 +88,7 @@ export function ResultPanel({ view, lang, command, canClaimWin, onWin, winLabel 
               <div key={s.seat} className={`result-row${isWinner ? ' result-winner' : ''}`}>
                 <span className="result-name">{personName(s.name, lang)}</span>
                 <span className="result-tiles">
-                  {(s.hand ?? []).map((t) => <TileView key={t.id} type={t.type} width="1.6rem" />)}
+                  {sortHand(s.hand ?? []).map((t) => <TileView key={t.id} type={t.type} width="1.6rem" />)}
                   {s.melds.map((m, i) => (
                     <span key={i} className="meld">{m.tiles.map((t) => <TileView key={t.id} type={t.type} width="1.6rem" />)}</span>
                   ))}

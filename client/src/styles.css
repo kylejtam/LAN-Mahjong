@@ -461,3 +461,18 @@ input { font: inherit; }
 .discards > span { display: block; line-height: 0; }
 /* Draw the "newest discard" outline inside the tile so area edges never clip it. */
 .tile-highlight { outline: 3px solid #ffd447; outline-offset: -3px; }
+
+/* No wall on screen: the middle is just the discards and the Draw tile. */
+.centre { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); grid-template-areas: 'pond'; }
+/* The tile you just drew sits a little apart on the far right. */
+.drawn-tile { margin-left: calc(var(--hand-w) * 0.35); }
+.drawn-tile .tile { box-shadow: 0 0 0 2px #ffd447; border-radius: 4px; }
+/* Dice next to the dealer. */
+.dice-small { margin: 0; gap: 0.12em; }
+.dice-small .die { width: 1.2em; height: 1.2em; font-size: 0.75em; }
+.sit-here { font-size: 0.8em; padding: 0.15em 0.6em; background: var(--accent); border-color: var(--accent); color: #fff; }
+.swap-banner {
+  position: fixed; left: 50%; top: 3.2em; transform: translateX(-50%); z-index: 30;
+  display: flex; gap: 0.8em; align-items: center; background: var(--panel); border: 1px solid var(--accent);
+  padding: 0.4em 0.8em; border-radius: 10px;
+}

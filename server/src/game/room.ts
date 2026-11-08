@@ -113,6 +113,8 @@ export interface Room {
   /** People who agreed to undo a win. */
   undoWinVotes: string[];
   pendingSwap: PendingSwap | null;
+  /** The answer to the last swap request (shown to the player who asked). */
+  swapResult?: { fromKey: string; toName: string; accepted: boolean; at: number } | null;
   nextJoinOrder: number;
   /** Last time anything changed (used to pace CPU moves). */
   lastChangeAt: number;
@@ -151,6 +153,7 @@ export type Command =
    */
   | { type: 'dropOut'; replacement: { none: true } | { spectator: string } }
   | { type: 'answerSwap'; accept: boolean }
+  | { type: 'cancelSwap' }
   | { type: 'leaveGame' };
 
 /** Host controls. These only come from the host page on the server laptop. */
@@ -450,9 +453,14 @@ export function handleCommand(prev: Room, key: string, cmd: Command, now: number
 
   switch (cmd.type) {
     case 'takeSeat': {
-      if (room.phase !== 'betweenRounds') fail('You can only change seats between rounds.');
       if (!Number.isInteger(cmd.seat) || cmd.seat < 0 || cmd.seat >= SEATS) fail('There is no such seat.');
       const occupant = room.seats[cmd.seat];
+      if (room.phase !== 'betweenRounds') {
+        // Mid-round, a spectator may sit in an empty seat straight away (and plays its tiles).
+        // Seated players still only change seats between rounds.
+        if (seat !== null) fail('You can only change seats between rounds.');
+        if (occupant) fail('That seat is taken.');
+      }
       // A free seat, or a CPU's seat (the CPU leaves), can be taken.
       if (occupant !== null && occupant !== undefined && !room.people[occupant]!.cpu) fail('That seat is taken.');
       if (seat !== null) room.seats[seat] = null;
@@ -590,6 +598,13 @@ export function handleCommand(prev: Room, key: string, cmd: Command, now: number
         room.seats[swap!.seat] = key;
         cleanupAfterSeatChange(room, swap!.fromKey);
       }
+      // Tell the player who asked how it went.
+      room.swapResult = { fromKey: swap!.fromKey, toName: room.people[key]!.name, accepted: cmd.accept, at: now };
+      break;
+    }
+    case 'cancelSwap': {
+      if (room.pendingSwap?.fromKey !== key) fail('You have not asked anyone to swap.');
+      room.pendingSwap = null;
       break;
     }
     case 'leaveGame': {

@@ -8,3 +8,4 @@ export * from './payout.js';
 export * from './scoring.js';
 export * from './settings.js';
 export * from './fanTable.js';
+export * from './sort.js';

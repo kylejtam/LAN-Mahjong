@@ -15,7 +15,7 @@ import { GameSettings, Meld, SEATS, Tile, tilesLeft } from '@lan-mahjong/shared'
 import { matchLabel } from './match.js';
 import { AvailableActions, DiscardEntry, Phase, RoundResult, availableActions, currentPlayer } from './round.js';
 import { CpuDifficulty, DEFAULT_CPU_SECONDS, HandRecord, PendingSwap, Room, RoomPhase, TableColour, roundCanClose, seatOf, undoableForSeat } from './room.js';
-import { NORMAL_TYPES, NormalType, isFlower } from '@lan-mahjong/shared';
+import { sortHand } from '@lan-mahjong/shared';
 
 export interface SeatView {
   seat: number;
@@ -69,13 +69,11 @@ export interface RoomView {
   spectatorsConfirm: boolean;
   roundCanClose: boolean;
   pendingSwap: (PendingSwap & { fromName: string; toName: string }) | null;
+  /** If you asked someone to swap: their answer (accepted or declined), and when. */
+  swapResult: { toName: string; accepted: boolean; at: number } | null;
+  /** The tile you just drew (shown on the far right of your hand), or null. */
+  justDrawnId: number | null;
   ended: boolean;
-}
-
-/** Sort tiles: characters 1-9, dots 1-9, bamboo 1-9, winds, dragons (flowers last). */
-export function sortTiles(tiles: readonly Tile[]): Tile[] {
-  const order = (t: Tile): number => (isFlower(t.type) ? 99 : NORMAL_TYPES.indexOf(t.type as NormalType));
-  return [...tiles].sort((a, b) => order(a) - order(b) || a.id - b.id);
 }
 
 /** Undo is also allowed when the player to move is a CPU or an empty seat. */
@@ -100,7 +98,7 @@ export function viewFor(room: Room, viewerKey: string, now: number): RoomView {
     const p = key ? room.people[key]! : null;
     const raw = round?.core.hands[seat] ?? [];
     // CPU hands are shown sorted the way a person would: each suit 1-9, then honours.
-    const hand = p?.cpu ? sortTiles(raw) : raw;
+    const hand = p?.cpu ? sortHand(raw) : raw;
     const canSee =
       !!round && (seat === mySeat || ended || (mySeat === null && (!!viewer.watchAll || viewer.watchingSeats.includes(seat))));
     return {
@@ -176,6 +174,14 @@ export function viewFor(room: Room, viewerKey: string, now: number): RoomView {
     spectatorsConfirm: mySeat === null && !!round && round.core.phase === 'ended' && room.seats.every((k) => !k || !!room.people[k]?.cpu),
     roundCanClose: !!round && round.core.phase === 'ended' && roundCanClose(room),
     pendingSwap: visibleSwap,
+    swapResult:
+      room.swapResult && room.swapResult.fromKey === viewerKey
+        ? { toName: room.swapResult.toName, accepted: room.swapResult.accepted, at: room.swapResult.at }
+        : null,
+    justDrawnId:
+      round && mySeat !== null && round.core.turn === mySeat && round.core.phase === 'mustDiscard' && round.core.lastDraw !== null
+        ? round.core.hands[mySeat]!.at(-1)?.id ?? null
+        : null,
     ended: room.ended,
   };
 }
