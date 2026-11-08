@@ -6,7 +6,11 @@ disagrees with those, the newest dated entry here wins.
 
 ## Current status
 
-- Phase 1 (rules engine): not started. Waiting on the questions below.
+- Phase 1 (rules engine): mostly done. Built and tested: tile set and checks,
+  shuffle, wall and dice break, dealing with flower replacement, winning-hand
+  check, legal chow/pong/gong/win, payments. Still to do: fan counting
+  (waits for Q5 fan list) and two-winner rule (Q6).
+- Tests: 56 passing (`npm test`).
 
 ## Decisions
 
@@ -14,17 +18,26 @@ disagrees with those, the newest dated entry here wins.
 |------|----------|-----|
 | 2026-11-08 | Project layout: one repository with three parts: `shared/` (rules engine, used by both sides), `server/` (Node.js game server), `client/` (browser screens). | Claude (Kyle may change) |
 | 2026-11-08 | Automated tests use **Vitest**, a common TypeScript testing tool. Run them with `npm test`. | Claude (Kyle may change) |
+| 2026-11-08 | Tile codes in the code: `m1`–`m9` characters 萬, `p1`–`p9` dots 筒, `s1`–`s9` bamboo 索, `wE wS wW wN` winds, `dR dG dW` dragons 中發白, `f1`–`f4` flowers 梅蘭菊竹, `n1`–`n4` seasons 春夏秋冬. | Claude |
+| 2026-11-08 | Seats are numbered 0–3 in turn order. Wall break: dice total counts seats from the dealer (dealer = 1); in that wall, count that many stacks from the right end; draws start after them. Replacement tiles come from the back end. | Claude (standard HK) |
+| 2026-11-08 | Dealing: 3 rounds of 4 tiles each, then 1 each, then 1 extra for the dealer. Flowers replaced from the back, dealer first, repeating until no hand has a flower. | Claude (standard HK) |
+| 2026-11-08 | Tile safety: the full set is checked right after shuffling and again after dealing. If anything is wrong the round stops with an error. | Claude |
+| 2026-11-08 | **Chicken win** = a valid winning hand below the minimum fan. The winner pays 32 to each of the other 3 players (96 total). Same for self-draw or discard. | Kyle |
+| 2026-11-08 | **Minimum fan** is a host setting. Default 3 until Kyle says otherwise. | Kyle / Claude default |
+| 2026-11-08 | **Fan to chips table** approved (half-spicy, cap 10 fan = 128). Anything above 10 fan pays as 10. | Kyle |
+| 2026-11-08 | **Payout, default mode:** discarder pays 2 × base, the other two pay 1 × base each. | Kyle |
+| 2026-11-08 | **Payout, self-draw:** each of the other 3 players pays 2 × base. | Kyle |
+| 2026-11-08 | **Payout, "only discarder pays" mode:** discarder pays 4 × base (example: 3 fan → 4 × 8 = 32). Self-draw in this mode pays the same as normal self-draw (no discarder exists). | Kyle / Claude (self-draw part) |
 
 ## Open questions for Kyle
 
 ### Batch 1: scoring (needed for phase 1)
 
-1. **Chicken win:** confirm the *winner pays* 32 to each other player (a hidden
-   penalty), and what the win summary should show so it does not give it away.
-2. **Minimum fan default** and the **maximum fan** (the cap, also the value of
-   "limit" hands).
-3. **Fan to chips table** (proposal below).
-4. **Self-draw payment** and the **"only discarder pays"** amount.
+1. ~~Chicken win~~ answered. Still open (phase 6): what the win summary shows
+   for a chicken win so it is not given away.
+2. ~~Fan limits~~ answered (host setting, default 3, cap 10).
+3. ~~Fan to chips table~~ answered.
+4. ~~Payments~~ answered.
 5. **Fan list** (proposal below).
 6. **Two players win on the same discard:** both win, or only the next in turn?
 
@@ -34,7 +47,7 @@ disagrees with those, the newest dated entry here wins.
 - When the dealer wins, does the dealer stay? (Standard HK: yes.)
 - Does the round end when the wall is fully empty, or are some tiles kept back?
 
-## Proposed fan to chips table (awaiting Kyle)
+## Fan to chips table (approved)
 
 "Half-spicy" (半辣) HK table. Base = what each non-discarder pays.
 Discarder pays double the base.

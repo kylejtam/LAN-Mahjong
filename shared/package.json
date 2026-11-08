@@ -1,0 +1,8 @@
+{
+  "name": "@lan-mahjong/shared",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Rules engine: tiles, dealing, legal moves, win checking, scoring",
+  "type": "module",
+  "main": "src/index.ts"
+}
