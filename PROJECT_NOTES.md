@@ -35,6 +35,12 @@ disagrees with those, the newest dated entry here wins.
 | 2026-11-08 | 坑坑胡 (all concealed pongs): no claimed sets; on a discard win the discard must finish the pair. 門前清 still counts with a concealed gong. | Claude (standard HK) |
 | 2026-11-08 | **New feature: Help button** in the top bar, immediately left of the settings button. Opens a screen showing the fan table and the fan to chips table. Built in phase 3; table contents live in `shared/src/fanTable.ts` and a test checks they match the scoring code. | Kyle |
 | 2026-11-08 | **Hosting (option a):** a laptop runs the game server in the background. Any player on any device (phone, tablet, laptop) can create a game and hold host controls. The server's laptop does not have to be a player. No app install. Replaces plan section 1 option C. An iPhone/iPad host app may be added later. | Kyle |
+| 2026-11-08 | **Host disconnects:** the game keeps going; host controls wait for the host to return. Replaces "game pauses for everyone" in the notes (that was only needed when the host's phone held the game). | Kyle |
+| 2026-11-08 | **Drawing is manual:** a player drags a tile from the end of the wall into their hand. | Kyle |
+| 2026-11-08 | **Claiming a discard:** no pass button. 上 碰 槓 胡 buttons stay available until the next player draws. They are big and flashing. A player can also claim by tapping the discarded tile. | Kyle |
+| 2026-11-08 | **3-second grace period:** for 3 seconds after the next player draws, another player can still claim the discard. The draw is undone (tile goes back to the wall) and the claim happens. | Kyle |
+| 2026-11-08 | **Undo moves:** discard, 上, 碰, 槓, 胡. Draws are not separate moves. Undoing a discard puts the tile back in that player's hand and it is their turn again. | Kyle |
+| 2026-11-08 | **Several games at once:** one server can run many separate games, each with its own name. | Kyle |
 | 2026-11-08 | **Joining:** players open the server's address once; it is also shown as a **QR code** to scan. The game list shows every game on that server. Replaces the network scan in plan section 3. | Kyle |
 | 2026-11-08 | **Saving:** the server saves the game to a file on its device, so a game survives a restart. Replaces "nothing is saved" in plan section 2. | Kyle |
 | 2026-11-08 | **Dealer stays when the dealer wins** (standard HK). Repeated hands (dealer stays after a win or a draw) do NOT count toward the 16 rounds. | Kyle |
@@ -43,7 +49,10 @@ disagrees with those, the newest dated entry here wins.
 
 ## Open questions for Kyle
 
-- Phase 2 questions: see chat (batch of 4).
+- **P2-A. Waiting for a stronger claim.** If someone taps 上 but another player
+  could still 碰/槓/胡 that tile, how long does the game wait? (see chat)
+- **P2-B. Discarding during the 3-second grace period.** (see chat)
+- **P2-C. Replacement draws** after a flower or gong: manual drag or automatic? (see chat)
 
 ## Top bar layout (updated)
 
