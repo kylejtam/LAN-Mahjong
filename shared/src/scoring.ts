@@ -148,7 +148,9 @@ function scoreSplit(ctx: WinContext, sets: SetInfo[], pair: number, noClaimedMel
       if (set.every((t) => have.has(t as TileType))) {
         items.push(item(`fullSet_${prefix}`, 2, `All 4 ${en}`, `一台花 (${zh})`));
       } else if (have.has(`${prefix}${ctx.seatWind + 1}` as TileType)) {
-        items.push(item(`seatFlower_${prefix}`, 1, 'Seat flower', '正花'));
+        items.push(
+          item(`seatFlower_${prefix}`, 1, prefix === 'f' ? 'Seat flower (flowers)' : 'Seat flower (seasons)', prefix === 'f' ? '正花（花）' : '正花（季）'),
+        );
       }
     }
   }

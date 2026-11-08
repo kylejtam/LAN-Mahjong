@@ -28,7 +28,11 @@ disagrees with those, the newest dated entry here wins.
 - Phase 5 (player settings): **done**. Settings panel with name change,
   language (English / Hong Kong Chinese) and theme slider (Light / Dark /
   System). Host settings live on the host page (done in phase 3).
-- Phase 6 (win summary): next. Manual payouts were moved to the host page (see decisions).
+- Phase 6 (win summary): **done**. Winning conditions with fan each and a
+  total; every hand with shown sets and flowers; each player's chips with
+  + / − signs (winner highlighted); total chips transferred; everyone
+  confirms. Manual chip changes are on the host page.
+- Phase 7 (CPU players easy / medium / hard): next.
 
 ## Decisions
 
@@ -84,6 +88,7 @@ disagrees with those, the newest dated entry here wins.
 | 2026-11-08 | **Chinese wording:** Traditional Chinese with Hong Kong (Cantonese) table wording, e.g. 食糊, 出銃, 自摸, 流局, 雞糊, 爆棚. Server messages are translated on the device. CPU names show as 電腦東/南/西/北. | Kyle |
 | 2026-11-08 | **Player settings panel** (⚙): change name (type + Save; chips, seat and settings move to the new name), language (English / 中文), theme slider (Light / Dark / System, default Dark), drop out, leave game. Language and theme are saved on the device AND under the player's name on the server, so they follow the name to another device. The language can also be chosen on the start screen. | Kyle |
 | 2026-11-08 | **Manual chip changes: host page only.** Removed from the players' app: the manual payout calculator, manual adjustments with everyone agreeing, and the chip lock button (it only existed for manual calculating). The host page has a chip box for every person in a game: type the number, press Set, and it updates on every device at once. Automatic payouts after a win, and everyone confirming the round, stay as they are. | Kyle |
+| 2026-11-08 | **Win summary:** lists every winning condition (番種) with its fan and the total; shows each player's hand, shown sets and flowers; each player's chips as +N (green) or −N (red); and "Total chips transferred". The two seat-flower items are labelled (flowers) / (seasons) so they can be told apart. | Kyle |
 | 2026-11-08 | **First dealer** of a new game is seat 0 (East). | Claude (Kyle may change) |
 | 2026-11-08 | **Undo moves:** discard, 上, 碰, 槓, 胡. Draws are not separate moves. Undoing a discard puts the tile back in that player's hand and it is their turn again. | Kyle |
 | 2026-11-08 | **Several games at once:** one server can run many separate games, each with its own name. | Kyle |

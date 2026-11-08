@@ -381,3 +381,14 @@ input { font: inherit; }
   background: var(--input-bg); color: var(--fg); border: 1px solid var(--panel-border); border-radius: 6px;
   padding: 0.35em 0.5em; text-align: right; -webkit-user-select: text; user-select: text;
 }
+
+/* Win summary */
+.result-subhead { margin: 0.4em 0 0.2em; color: var(--muted); font-weight: 600; }
+.fan-items li { padding: 0.1em 0; }
+.fan-total-row { border-top: 1px solid var(--panel-border); margin-top: 0.2em; padding-top: 0.25em !important; font-weight: 700; }
+.result-row { grid-template-columns: 6em 1fr 4.5em; padding: 0.2em 0.3em; border-radius: 8px; }
+.result-winner { background: rgba(63, 181, 111, 0.14); }
+.change { font-size: 1.25em; font-weight: 800; }
+.transferred { font-weight: 700; margin: 0.3em 0 0; }
+.fan-items li { grid-template-columns: 1fr auto auto; }
+.fan-items .num { white-space: nowrap; min-width: 3.5em; }
