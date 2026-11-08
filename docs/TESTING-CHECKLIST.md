@@ -70,6 +70,7 @@ Write down which devices worked: ☐ iPhone ☐ iPad ☐ Samsung tablet ☐ lapt
 - [ ] The **deal animation** (~5 s): tiles slide to each player and the wall picture empties.
 - [ ] Your hand is **sorted** (fewest suit → most suit, 1–9, then winds E S W N, then dragons).
 - [ ] Your name, chips (and dice if you deal) are at the **top left**.
+- [ ] The top bar shows the **minimum fan** next to the round name ("Min 1 fan" / "1番起糊"). Change it on the host page between hands: every device updates.
 - [ ] **Draw**: tap the glowing **Draw** tile in the middle, or drag it into your hand.
 - [ ] The new tile sits **apart on the right**; drag it into your hand and it joins it.
 - [ ] Drag tiles to **reorder** your hand.
