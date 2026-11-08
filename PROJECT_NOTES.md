@@ -6,11 +6,11 @@ disagrees with those, the newest dated entry here wins.
 
 ## Current status
 
-- Phase 1 (rules engine): done except the final wording of the two-winner
-  rule (see open questions). Built and tested: tile set and checks, shuffle,
-  wall and dice break, dealing with flower replacement, winning-hand check,
-  legal chow/pong/gong/win, fan counting, payments.
+- Phase 1 (rules engine): **done**. Tile set and checks, shuffle, wall and dice
+  break, dealing with flower replacement, winning-hand check, legal
+  chow/pong/gong/win, two-winner rule, fan counting, payments.
 - Tests: 93 passing (`npm test`).
+- Phase 2 (game server): waiting on Kyle's hosting decision (open question H1).
 
 ## Decisions
 
@@ -28,32 +28,24 @@ disagrees with those, the newest dated entry here wins.
 | 2026-11-08 | **Payout, default mode:** discarder pays 2 × base, the other two pay 1 × base each. | Kyle |
 | 2026-11-08 | **Payout, self-draw:** each of the other 3 players pays 2 × base. | Kyle |
 | 2026-11-08 | **Payout, "only discarder pays" mode:** discarder pays 4 × base (example: 3 fan → 4 × 8 = 32). Self-draw in this mode pays the same as normal self-draw (no discarder exists). | Kyle / Claude (self-draw part) |
-| 2026-11-08 | **Two winners on one discard:** standard HK 截糊 "stealing the win". Built as: the player nearest in turn order after the discarder wins. Kyle added "the one on the left (previous player) wins, and must tap 胡 within 10 seconds"; exact meaning being confirmed. | Kyle |
+| 2026-11-08 | **Two winners on one discard:** standard HK 截糊. The next player in turn order after the discarder who can win gets priority (example: West discards, North and South can win → North). | Kyle |
+| 2026-11-08 | **Win priority window:** the priority player has 10 seconds to tap 胡. The timer is NOT shown. If they don't tap in time, the next eligible player may win. (Exception to "no turn timers"; built in phase 2.) | Kyle |
 | 2026-11-08 | **Fan list confirmed** by Kyle (table below). | Kyle |
-| 2026-11-08 | Fan combining: 小三元 / 大三元 replace the separate dragon pong fan; 小四喜 replaces seat/round wind fan; 一台花 (2) replaces the 正花 from that set; 清一色 replaces 混一色; cap hands score 10 and nothing is added. When a hand can be split more than one way, the highest-scoring split is used. | Claude (Kyle may change) |
+| 2026-11-08 | Fan combining: 小三元 / 大三元 replace the separate dragon pong fan; 小四喜 replaces seat/round wind fan; 一台花 (2) replaces the 正花 from that set; 清一色 replaces 混一色; cap hands score 10 and nothing is added. When a hand can be split more than one way, the highest-scoring split is used. | Kyle (confirmed) |
 | 2026-11-08 | 坑坑胡 (all concealed pongs): no claimed sets; on a discard win the discard must finish the pair. 門前清 still counts with a concealed gong. | Claude (standard HK) |
-
 | 2026-11-08 | **New feature: Help button** in the top bar, immediately left of the settings button. Opens a screen showing the fan table and the fan to chips table. Built in phase 3; table contents live in `shared/src/fanTable.ts` and a test checks they match the scoring code. | Kyle |
+| 2026-11-08 | **Joining:** players open the server's address once; it is also shown as a **QR code** to scan. The game list shows every game on that server. Replaces the network scan in plan section 3. | Kyle |
+| 2026-11-08 | **Saving:** the server saves the game to a file on its device, so a game survives a restart. Replaces "nothing is saved" in plan section 2. | Kyle |
+| 2026-11-08 | **Dealer stays when the dealer wins** (standard HK). Repeated hands (dealer stays after a win or a draw) do NOT count toward the 16 rounds. | Kyle |
+| 2026-11-08 | **Draw:** the round is a draw when the wall is completely empty. No tiles are kept back. | Kyle |
+| 2026-11-08 | **Chicken win can be visible.** The win summary may show that it was a chicken win and that the winner paid 96. Replaces "no sign that it is not a real win" in the notes. | Kyle |
 
 ## Open questions for Kyle
 
-### Batch 1: scoring (needed for phase 1)
-
-1. ~~Chicken win~~ answered. Still open (phase 6): what the win summary shows
-   for a chicken win so it is not given away.
-2. ~~Fan limits~~ answered (host setting, default 3, cap 10).
-3. ~~Fan to chips table~~ answered.
-4. ~~Payments~~ answered.
-5. ~~Fan list~~ confirmed.
-6. **Two winners on one discard:** which player is "on the left"? And the
-   10-second window conflicts with "no turn timers" in the notes.
-7. ~~Default minimum fan~~ answered: 1.
-
-### Batch 2: later phases (heads-up, no answer needed yet)
-
-- A browser on a phone or tablet cannot run a server. See chat notes before phase 2.
-- When the dealer wins, does the dealer stay? (Standard HK: yes.)
-- Does the round end when the wall is fully empty, or are some tiles kept back?
+- **H1. Hosting on phones/tablets.** A web page cannot act as a server.
+  Options: (a) a laptop runs the server and any player can hold host controls;
+  (b) only laptops create games; (c) build an installable iPhone/iPad app that
+  can host. Kyle asked what (c) would need; explained in chat. Decide before phase 2.
 
 ## Top bar layout (updated)
 
