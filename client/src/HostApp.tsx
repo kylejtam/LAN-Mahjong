@@ -11,6 +11,7 @@ import type { HostMessage, ServerHostMessage } from '../../server/src/protocol';
 import type { HostGameView } from '../../server/src/game/view';
 import type { CpuDifficulty, TableColour } from '../../server/src/game/room';
 import { WIND_NAMES } from './i18n';
+import { APP_VERSION } from './version';
 
 const COLOURS: TableColour[] = ['green', 'black', 'white', 'red', 'blue'];
 
@@ -59,7 +60,7 @@ export function HostApp(): ReactElement {
   const [balance, setBalance] = useState(200);
   return (
     <div className="host">
-      <h1>LAN Mahjong · Host</h1>
+      <h1>LAN Mahjong · Host <span className="muted small app-version">v{APP_VERSION}</span></h1>
       {!open && <p className="muted">Connecting to the server…</p>}
       <div className="host-top card">
         <img className="host-qr" src="/api/qr.svg" alt="QR code to join" />

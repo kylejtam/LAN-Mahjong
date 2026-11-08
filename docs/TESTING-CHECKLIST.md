@@ -4,10 +4,8 @@ Tick each box as you go. If something goes wrong, see "What to send me" at the e
 
 ## Part A: install on the Windows laptop (once, and again for each update)
 
-- [ ] **Sign in to GitHub** in the laptop's browser (the project is private).
-- [ ] **Download the game:** <https://github.com/kylejtam/LAN-Mahjong/archive/refs/heads/main.zip>
-      and extract it (right-click → **Extract All**).
-- [ ] In the extracted folder, double-click **LAN-Mahjong-Setup.exe**.
+- [ ] **Download the installer:** <https://github.com/kylejtam/LAN-Mahjong/releases/latest/download/LAN-Mahjong-Setup.exe>
+- [ ] Double-click the downloaded **LAN-Mahjong-Setup.exe**.
 - [ ] Windows may say **"Windows protected your PC"**: click **More info → Run anyway**
       (this happens because the installer isn't paid-for "signed"; it is safe).
 - [ ] Click through the installer. Leave **"Start LAN Mahjong now"** ticked and click **Finish**.
@@ -16,8 +14,12 @@ Tick each box as you go. If something goes wrong, see "What to send me" at the e
 - [ ] **Stop the laptop going to sleep** while you play: Settings → System → Power →
       "When plugged in, put my device to sleep after" → **Never**.
 
-To update later: download the new ZIP and run the new **LAN-Mahjong-Setup.exe**; your saved
-games are kept. You don't need Node.js, the black command window, or `npm` any more.
+**Updates are automatic** from version 1.1.0 on: each time you start LAN Mahjong it checks for a
+newer version, installs it and restarts by itself (about 30 seconds; needs internet). Your saved
+games are kept. The version number is on the host page (top) and the join screen (bottom).
+- [ ] Host page title shows **v1.1.0** (or newer); the join screen shows it at the bottom.
+- [ ] When a newer release is out: start LAN Mahjong and watch the small window say
+      "A new version … is available", then "Installing…"; the game restarts by itself with the new number.
 
 ## Part B: start the game (every time you play)
 

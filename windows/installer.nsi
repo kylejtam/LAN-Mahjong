@@ -22,6 +22,7 @@ SetCompressorDictSize 64
 BrandingText "LAN Mahjong ${VERSION}"
 
 !include "MUI2.nsh"
+!include "FileFunc.nsh"
 !define MUI_ICON "lan-mahjong.ico"
 !define MUI_UNICON "lan-mahjong.ico"
 !define MUI_WELCOMEPAGE_TITLE "Install LAN Mahjong"
@@ -90,6 +91,13 @@ Section "Install"
   WriteRegStr HKCU "${REGKEY}" "UninstallString" '"$INSTDIR\Uninstall LAN Mahjong.exe"'
   WriteRegDWORD HKCU "${REGKEY}" "NoModify" 1
   WriteRegDWORD HKCU "${REGKEY}" "NoRepair" 1
+
+  ; Automatic update (/RELAUNCH): start LAN Mahjong again once the new files are in.
+  ${GetParameters} $R0
+  ClearErrors
+  ${GetOptions} $R0 "/RELAUNCH" $R1
+  IfErrors +2
+    Exec '"$SYSDIR\cmd.exe" /c ""$INSTDIR\LAN Mahjong.cmd""'
 SectionEnd
 
 Section "Uninstall"

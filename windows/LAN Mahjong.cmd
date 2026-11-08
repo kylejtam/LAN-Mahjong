@@ -5,5 +5,7 @@ cd /d "%~dp0"
 set "DATA_FILE=%LOCALAPPDATA%\LAN Mahjong\games.json"
 set "CLIENT_DIR=%~dp0app\client"
 set "OPEN_BROWSER=1"
+rem Check GitHub for a newer version each time the game starts.
+set "LAN_MAHJONG_UPDATES=1"
 "%~dp0node\node.exe" "%~dp0app\server.mjs"
 if errorlevel 1 pause

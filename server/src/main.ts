@@ -10,7 +10,9 @@
  */
 import { resolve } from 'node:path';
 import { spawn } from 'node:child_process';
+import { dirname } from 'node:path';
 import { startServer } from './server.js';
+import { APP_VERSION, updateIfAvailable } from './update.js';
 
 const port = Number(process.env.PORT ?? 3000);
 const dataFile = resolve(process.env.DATA_FILE ?? 'data/games.json');
@@ -26,6 +28,14 @@ function open(url: string): void {
     spawn(cmd as string, args as string[], { detached: true, stdio: 'ignore' }).unref();
   } catch {
     /* no browser available: the address is printed below anyway */
+  }
+}
+
+// The installed Windows app checks for a newer version before starting (never mid-game).
+if (process.env.LAN_MAHJONG_UPDATES === '1') {
+  console.log(`  LAN Mahjong ${APP_VERSION}: checking for updates...`);
+  if (await updateIfAvailable({ stateDir: dirname(dataFile), log: (line) => console.log(line) })) {
+    process.exit(0); // the installer takes over and starts the new version
   }
 }
 
@@ -47,7 +57,7 @@ try {
 }
 
 console.log('');
-console.log('  LAN Mahjong is running.');
+console.log(`  LAN Mahjong ${APP_VERSION} is running.`);
 console.log('');
 if (server.urls.length) {
   console.log('  On each phone or tablet (same Wi-Fi), scan the QR code on the host page, or open:');

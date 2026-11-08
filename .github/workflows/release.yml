@@ -1,0 +1,72 @@
+# Makes a new release whenever the version number in package.json changes on main.
+# It runs the checks, builds LAN-Mahjong-Setup.exe and publishes it (with its
+# SHA-256 fingerprint) on the Releases page. Installed copies of LAN Mahjong
+# find it there and update themselves the next time they start.
+name: Release
+
+on:
+  push:
+    branches: [main]
+    paths: [package.json]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Read the version number
+        id: version
+        run: echo "number=$(node -p "require('./package.json').version")" >> "$GITHUB_OUTPUT"
+
+      - name: Skip if this version is already released
+        id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view "v${{ steps.version.outputs.number }}" > /dev/null 2>&1; then
+            echo "Version ${{ steps.version.outputs.number }} is already released."
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Install the installer maker (NSIS)
+        if: steps.check.outputs.exists == 'false'
+        run: sudo apt-get update && sudo apt-get install -y nsis
+
+      - name: Install packages
+        if: steps.check.outputs.exists == 'false'
+        run: npm ci
+
+      - name: Run the checks
+        if: steps.check.outputs.exists == 'false'
+        run: npm run typecheck && npm test
+
+      - name: Build the Windows installer
+        if: steps.check.outputs.exists == 'false'
+        run: |
+          bash scripts/build-windows.sh
+          sha256sum LAN-Mahjong-Setup.exe | cut -d' ' -f1 > LAN-Mahjong-Setup.exe.sha256
+
+      - name: Publish the release
+        if: steps.check.outputs.exists == 'false'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          v="${{ steps.version.outputs.number }}"
+          gh release create "v$v" LAN-Mahjong-Setup.exe LAN-Mahjong-Setup.exe.sha256 \
+            --target "$GITHUB_SHA" --title "LAN Mahjong $v" --generate-notes
