@@ -8,7 +8,6 @@ import type { ReactElement } from 'react';
 import type { Connection } from './net';
 import { Prefs, t } from './i18n';
 import { Logo } from './Logo';
-import { AddToHomeButton } from './AddToHome';
 
 const NAME_KEY = 'lan-mahjong-name';
 
@@ -45,7 +44,6 @@ export function Lobby({ conn, prefs, setPrefs }: { conn: Connection; prefs: Pref
         <span>{t(lang, 'yourName')}</span>
         <input value={name} maxLength={20} onChange={(e) => setName(e.target.value)} placeholder={t(lang, 'displayName')} autoComplete="nickname" />
       </label>
-      <AddToHomeButton lang={lang} />
       <h2>{t(lang, 'games')}</h2>
       {conn.status !== 'open' && <p className="muted">{t(lang, 'connecting')}</p>}
       {conn.status === 'open' && conn.games.length === 0 && <p className="muted">{t(lang, 'noGames')}</p>}

@@ -4,7 +4,7 @@ import { CHIPS_TABLE, FAN_TABLE, MAX_FAN } from '@lan-mahjong/shared';
 import { t } from './i18n';
 import type { Lang } from './i18n';
 
-export function HelpPanel({ lang, onClose, onTutorial }: { lang: Lang; onClose: () => void; onTutorial?: () => void }): ReactElement {
+export function HelpPanel({ lang, onClose }: { lang: Lang; onClose: () => void }): ReactElement {
   const tr = (k: Parameters<typeof t>[1], v?: Record<string, string | number>): string => t(lang, k, v);
   return (
     <div className="overlay" onClick={onClose}>
@@ -44,10 +44,7 @@ export function HelpPanel({ lang, onClose, onTutorial }: { lang: Lang; onClose: 
             <p className="muted">{tr('helpNote', { n: MAX_FAN })}</p>
           </div>
         </div>
-        <div className="help-buttons">
-          {onTutorial && <button className="btn" onClick={onTutorial}>{tr('tutorial')}</button>}
-          <button className="btn" onClick={onClose}>{tr('close')}</button>
-        </div>
+        <button className="btn" onClick={onClose}>{tr('close')}</button>
       </div>
     </div>
   );
