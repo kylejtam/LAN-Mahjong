@@ -103,19 +103,6 @@ Write down which devices worked: ☐ iPhone ☐ iPad ☐ Samsung tablet ☐ lapt
 - [ ] A swap request shows "Waiting for … to answer"; if declined, the asker is told.
 - [ ] **Restart the server** (Ctrl + C, then `npm start`): everyone reconnects to the same game.
 
-### Controls tutorial (phase 9)
-- [ ] The **first time** you sit down on a device, 7 short cards appear with moving pictures
-      (draw, discard, arrange, take a discard, win, undo, help & settings).
-- [ ] **Next / Back / Skip**, the dots, and the **×** all work. After **Done** it doesn't come back.
-- [ ] **?** (Help) → **Controls tutorial** shows it again. Try it in 中文 too.
-
-### Home screen (phase 9)
-- [ ] On the join screen, tap **📲 Add to home screen**: it shows the steps for your device
-      (you can switch between iPhone / iPad, Android (Chrome) and Samsung Internet).
-- [ ] Follow the steps. The icon is the **bird** on a dark square, named **Mahjong**.
-- [ ] Open the game from the icon: it fills the screen (iPhone/iPad). Type your name to rejoin.
-- [ ] When opened from the icon, the **Add to home screen** button is gone.
-
 ## What to send me if something goes wrong
 
 1. **Which device** and browser (e.g. "iPad, Safari").

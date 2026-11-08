@@ -23,7 +23,6 @@ import { ACTION_LABELS, Prefs, WIND_CHARS, WIND_NAMES, WIND_SHORT, personName, t
 import type { StringKey } from './i18n';
 import { DragSource, Drop, useDrag } from './drag';
 import { HelpPanel } from './HelpPanel';
-import { Tutorial, tutorialSeen } from './Tutorial';
 import { ResultPanel } from './ResultPanel';
 
 /** The window size, kept up to date when the device turns or the window changes. */
@@ -72,11 +71,7 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
   const a = view.actions;
   const me = mySeat !== null ? view.seats[mySeat]! : null;
 
-  const [panel, setPanel] = useState<'help' | 'settings' | 'tutorial' | null>(null);
-  // First time someone sits down on this device: show the controls tutorial.
-  useEffect(() => {
-    if (mySeat !== null && !tutorialSeen()) setPanel((p) => p ?? 'tutorial');
-  }, [mySeat]);
+  const [panel, setPanel] = useState<'help' | 'settings' | null>(null);
   const screen = useScreenSize();
   /** After the win summary, players continue to the "Ready / Leave seat" popup. */
   const [showReady, setShowReady] = useState<string | null>(null);
@@ -627,8 +622,7 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
         </div>
       )}
 
-      {panel === 'help' && <HelpPanel lang={lang} onClose={() => setPanel(null)} onTutorial={() => setPanel('tutorial')} />}
-      {panel === 'tutorial' && <Tutorial lang={lang} onClose={() => setPanel(null)} />}
+      {panel === 'help' && <HelpPanel lang={lang} onClose={() => setPanel(null)} />}
       {panel === 'settings' && (
         <SettingsPanel
           view={view}
