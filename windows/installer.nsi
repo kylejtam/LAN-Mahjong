@@ -33,9 +33,12 @@ BrandingText "LAN Mahjong ${VERSION}"
 !insertmacro MUI_UNPAGE_INSTFILES
 !insertmacro MUI_LANGUAGE "English"
 
-; Close a running copy of the game (its window title starts with "LAN Mahjong").
+; Stop a running copy of the game before replacing or removing its files.
+; Only the game's own node.exe (the one inside the install folder) is stopped.
+; (Do NOT match on window titles: the installer's own window is called
+; "LAN Mahjong Setup", and an earlier version closed itself that way.)
 !macro StopRunningGame
-  nsExec::Exec 'taskkill /F /T /FI "WINDOWTITLE eq LAN Mahjong*"'
+  nsExec::Exec `powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -Command "Get-Process -Name node -ErrorAction SilentlyContinue | Where-Object { $$_.Path -like '$INSTDIR\node\node.exe' } | Stop-Process -Force -ErrorAction SilentlyContinue"`
   Pop $0
   Sleep 500
 !macroend
