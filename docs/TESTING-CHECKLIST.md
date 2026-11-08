@@ -5,7 +5,7 @@ Tick each box as you go. If something goes wrong, see "What to send me" at the e
 ## Part A: install on the Windows laptop (once, and again for each update)
 
 - [ ] **Sign in to GitHub** in the laptop's browser (the project is private).
-- [ ] **Download the game:** <https://github.com/kylejtam/LAN-Mahjong/archive/refs/heads/claude/nice-sagan-boolsz.zip>
+- [ ] **Download the game:** <https://github.com/kylejtam/LAN-Mahjong/archive/refs/heads/main.zip>
       and extract it (right-click → **Extract All**).
 - [ ] In the extracted folder, double-click **LAN-Mahjong-Setup.exe**.
 - [ ] Windows may say **"Windows protected your PC"**: click **More info → Run anyway**
