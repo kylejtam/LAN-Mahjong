@@ -7,6 +7,23 @@ browser, no app install.
 - How it is built and in what order: `mahjong-plan.md`
 - Decisions made while building: `PROJECT_NOTES.md`
 
+## Starting the server (on the laptop)
+
+You need Node.js installed (version 20 or newer).
+
+```
+npm install     # download the tools (first time only)
+npm start       # start the game server
+```
+
+The window shows an address such as `http://192.168.1.20:3000`. Open that
+address on any device on the same Wi-Fi, or open it on the laptop to show a
+QR code that other devices can scan. Keep the window open while playing;
+press Ctrl+C to stop. Games are saved to `data/games.json` and carry on after
+a restart.
+
+Settings: `PORT=4000 npm start` uses a different port.
+
 ## Running the tests
 
 You need Node.js installed (version 20 or newer).
@@ -20,5 +37,5 @@ npm run typecheck   # check the code for type mistakes
 ## Folders
 
 - `shared/` – the rules engine: tiles, wall, dealing, legal moves, winning hands, payments.
-- `server/` – the game server (phase 2, not built yet).
+- `server/` – the game server: rounds, full games, rooms, CPU players, network, saving.
 - `client/` – the screens (phase 3, not built yet).

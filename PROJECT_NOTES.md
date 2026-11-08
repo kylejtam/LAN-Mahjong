@@ -9,15 +9,17 @@ disagrees with those, the newest dated entry here wins.
 - Phase 1 (rules engine): **done**. Tile set and checks, shuffle, wall and dice
   break, dealing with flower replacement, winning-hand check, legal
   chow/pong/gong/win, two-winner rule, fan counting, payments.
-- Tests: 166 passing (`npm test`), including 60 rounds of random play that check no tile is ever lost or created.
-- Phase 2 (game server): in progress.
+- Tests: 176 passing (`npm test`), including 60 rounds of random play that check no tile is ever lost or created.
+- Phase 2 (game server): **done**.
   - Step 1 round engine (`server/src/game/round.ts`): **done**.
   - Step 2 full 16-round game (`server/src/game/match.ts`): **done**.
   - Step 3 room: players, seats, host, spectators, swaps, renames, start
     sequence, confirmations, what each device may see (`room.ts`, `view.ts`): **done**.
   - Step 3 also adds a TEMPORARY simple CPU (`cpu.ts`) so CPU seats and
     all-CPU tables work. Phase 7 replaces it with easy/medium/hard.
-  - Step 4 network (WebSockets, game list, QR code address, saving to file): to do.
+  - Step 4 network (`server.ts`): WebSockets, game list, start page with
+    QR code and address, saving to `data/games.json`: **done**. Start with `npm start`.
+- Phase 3 (basic interface): next.
 
 ## Decisions
 
@@ -54,6 +56,7 @@ disagrees with those, the newest dated entry here wins.
 | 2026-11-08 | **Spectator hand view:** a player's hand is hidden from spectators unless that player turns "show my hand to spectators" on. CPU hands are shown by default. All hands are shown to everyone when a round ends. | Claude (Kyle may change) |
 | 2026-11-08 | **Leaving the game:** the person keeps their seat (shown as disconnected) until they come back or the host fills it with a CPU. If the host leaves, the earliest-joined connected human becomes host. | Claude (from notes) |
 | 2026-11-08 | **Round end:** balances change only after every seated human presses confirm. CPUs never hold up a round. The host can only empty a seat between rounds. | Claude |
+| 2026-11-08 | **Server start:** `npm start` on the laptop. It prints the address(es) to open; the start page shows a QR code. Port 3000 by default. Games are saved within half a second of every change. | Claude |
 | 2026-11-08 | **First dealer** of a new game is seat 0 (East). | Claude (Kyle may change) |
 | 2026-11-08 | **Undo moves:** discard, 上, 碰, 槓, 胡. Draws are not separate moves. Undoing a discard puts the tile back in that player's hand and it is their turn again. | Kyle |
 | 2026-11-08 | **Several games at once:** one server can run many separate games, each with its own name. | Kyle |
