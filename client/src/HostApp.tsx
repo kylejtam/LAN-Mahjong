@@ -377,6 +377,11 @@ function GameCard({ game, send }: { game: HostGameView; send: (m: HostMessage) =
           <option value="stay">Dealer stays</option>
           <option value="advance">Dealer moves on</option>
         </select>
+        <label>Liability 包</label>
+        <select disabled={!between} value={settings.liabilityOn ? 'on' : 'off'} onChange={(e) => setSettings({ ...settings, liabilityOn: e.target.value === 'on' })}>
+          <option value="off">Off</option>
+          <option value="on">On: feeding a one-suit hand pays for everyone</option>
+        </select>
         <label>Starting balance</label>
         <input disabled={!between} type="number" min={0} value={startBal} onChange={(e) => setStartBal(Number(e.target.value))} />
         <label>CPU time per move</label>
@@ -386,6 +391,13 @@ function GameCard({ game, send }: { game: HostGameView; send: (m: HostMessage) =
           {COLOURS.map((c) => <option key={c} value={c}>{c[0]!.toUpperCase() + c.slice(1)}</option>)}
         </select>
       </div>
+      {settings.liabilityOn && (
+        <p className="muted small">
+          Liability 包: once a player has 3 face-up sets all of one suit (9 tiles showing), the first player to discard a tile of that suit
+          which they then use (for a set or the win) is liable. If that player then wins with a one-suit hand (清一色), the liable player pays
+          the whole amount and the others pay nothing. Not for chicken wins.
+        </p>
+      )}
       <div className="row" style={{ justifyContent: 'flex-start' }}>
         <button className="btn primary" disabled={!between} onClick={() => cmd({ type: 'hostUpdateSettings', settings, startingBalance: startBal })}>
           Save settings

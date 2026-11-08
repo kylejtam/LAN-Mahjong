@@ -327,6 +327,7 @@ function requireRound(room: Room): RoundState {
 function checkSettings(s: GameSettings): void {
   if (!Number.isInteger(s.minFan) || s.minFan < 0 || s.minFan > 10) fail('Minimum fan must be 0 to 10.');
   if (s.payoutMode !== 'everyonePays' && s.payoutMode !== 'discarderPays') fail('Unknown payout setting.');
+  if (s.liabilityOn !== undefined && typeof s.liabilityOn !== 'boolean') fail('Liability must be on or off.');
 }
 
 function setRound(room: Room, round: RoundState): void {

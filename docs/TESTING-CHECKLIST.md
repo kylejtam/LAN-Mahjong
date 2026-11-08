@@ -54,6 +54,7 @@ Write down which devices worked: ☐ iPhone ☐ iPad ☐ Samsung tablet ☐ lapt
 - [ ] Chips: change a number in a seat card, press **Set**, then **tap again** to confirm.
 - [ ] Change **CPU time per move** (e.g. 0.5 and 3) and watch the CPUs speed up / slow down.
 - [ ] Change the table colour; every device changes too.
+- [ ] Settings → **Liability 包** (Off / On). With it on: once someone shows 3 face-up sets of one suit, the first player to discard a tile of that suit which they use is liable; if they win with a one-suit hand, the summary says "包: … pays for everyone" and only that player pays.
 - [ ] After a few hands, open **History**: one column per seat, winner **green**,
       discarder **red** (on a self-draw all losers are red).
 - [ ] **Roll back to before this** (two taps) and **Change current game** (two taps).
