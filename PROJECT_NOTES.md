@@ -10,7 +10,7 @@ disagrees with those, the newest dated entry here wins.
   break, dealing with flower replacement, winning-hand check, legal
   chow/pong/gong/win, two-winner rule, fan counting, payments.
 - Tests: 93 passing (`npm test`).
-- Phase 2 (game server): waiting on Kyle's hosting decision (open question H1).
+- Phase 2 (game server): next. Hosting decided (option a).
 
 ## Decisions
 
@@ -34,6 +34,7 @@ disagrees with those, the newest dated entry here wins.
 | 2026-11-08 | Fan combining: 小三元 / 大三元 replace the separate dragon pong fan; 小四喜 replaces seat/round wind fan; 一台花 (2) replaces the 正花 from that set; 清一色 replaces 混一色; cap hands score 10 and nothing is added. When a hand can be split more than one way, the highest-scoring split is used. | Kyle (confirmed) |
 | 2026-11-08 | 坑坑胡 (all concealed pongs): no claimed sets; on a discard win the discard must finish the pair. 門前清 still counts with a concealed gong. | Claude (standard HK) |
 | 2026-11-08 | **New feature: Help button** in the top bar, immediately left of the settings button. Opens a screen showing the fan table and the fan to chips table. Built in phase 3; table contents live in `shared/src/fanTable.ts` and a test checks they match the scoring code. | Kyle |
+| 2026-11-08 | **Hosting (option a):** a laptop runs the game server in the background. Any player on any device (phone, tablet, laptop) can create a game and hold host controls. The server's laptop does not have to be a player. No app install. Replaces plan section 1 option C. An iPhone/iPad host app may be added later. | Kyle |
 | 2026-11-08 | **Joining:** players open the server's address once; it is also shown as a **QR code** to scan. The game list shows every game on that server. Replaces the network scan in plan section 3. | Kyle |
 | 2026-11-08 | **Saving:** the server saves the game to a file on its device, so a game survives a restart. Replaces "nothing is saved" in plan section 2. | Kyle |
 | 2026-11-08 | **Dealer stays when the dealer wins** (standard HK). Repeated hands (dealer stays after a win or a draw) do NOT count toward the 16 rounds. | Kyle |
@@ -42,10 +43,7 @@ disagrees with those, the newest dated entry here wins.
 
 ## Open questions for Kyle
 
-- **H1. Hosting on phones/tablets.** A web page cannot act as a server.
-  Options: (a) a laptop runs the server and any player can hold host controls;
-  (b) only laptops create games; (c) build an installable iPhone/iPad app that
-  can host. Kyle asked what (c) would need; explained in chat. Decide before phase 2.
+- Phase 2 questions: see chat (batch of 4).
 
 ## Top bar layout (updated)
 
