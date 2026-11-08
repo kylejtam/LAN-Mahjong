@@ -175,6 +175,16 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [view.swapResult?.at]);
 
+  // The host stopped the hand: tell everyone for a few seconds.
+  const [stopToast, setStopToast] = useState(false);
+  useEffect(() => {
+    const at = view.roundStoppedAt;
+    if (!at || Date.now() - at > 15000) return;
+    setStopToast(true);
+    const timer = setTimeout(() => setStopToast(false), 6000);
+    return () => clearTimeout(timer);
+  }, [view.roundStoppedAt]);
+
   // ---------- action buttons ----------
   const onWin = (): void => (a?.selfDrawWin ? command({ type: 'selfDrawWin' }) : doClaim({ kind: 'win' }));
   const onPong = (): void => doClaim({ kind: 'pong' });
@@ -659,6 +669,7 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
         </div>
       )}
       {swapToast && <div className="toast">{swapToast}</div>}
+      {stopToast && !swapToast && <div className="toast">{tr('handStopped')}</div>}
       {view.pendingSwap && view.pendingSwap.toName === view.you.name && (
         <div className="overlay">
           <div className="panel">

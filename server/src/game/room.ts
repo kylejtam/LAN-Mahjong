@@ -129,6 +129,8 @@ export interface Room {
   cpuSeconds?: number;
   /** CPUs wait until this time (after an undo, so players can undo again). */
   cpuPauseUntil?: number;
+  /** When the host last stopped a hand (players are told). */
+  roundStoppedAt?: number | null;
 }
 
 export type Command =
@@ -175,6 +177,7 @@ export type HostCommand =
   | { type: 'hostSetPosition'; roundWind: number; gameNumber: number }
   | { type: 'hostUpdateSettings'; settings: Partial<GameSettings>; startingBalance?: number }
   | { type: 'hostSetTableColour'; colour: TableColour }
+  | { type: 'hostStopRound' }
   | { type: 'hostEndGame' };
 
 /** How long CPUs wait after the last change before they move (milliseconds). */
@@ -719,6 +722,17 @@ export function handleHostCommand(prev: Room, cmd: HostCommand, now: number): Ro
       if (!TABLE_COLOURS.includes(cmd.colour)) fail('Unknown table colour.');
       room.tableColour = cmd.colour;
       break;
+    case 'hostStopRound': {
+      // Throw away the hand being played (or the dice roll before it): nobody
+      // pays, chips stay as they were, and the same game is dealt again once
+      // everyone presses Start. A finished hand (win summary) can't be stopped.
+      const round = room.match.round;
+      const inHand = room.phase === 'rolling' || (room.phase === 'playing' && !!round && round.core.phase !== 'ended');
+      if (!inHand) fail('There is no hand being played to stop.');
+      cancelRound(room);
+      room.roundStoppedAt = now;
+      break;
+    }
     case 'hostEndGame':
       room.ended = true;
       break;

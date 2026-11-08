@@ -57,6 +57,7 @@ Write down which devices worked: ☐ iPhone ☐ iPad ☐ Samsung tablet ☐ lapt
 - [ ] After a few hands, open **History**: one column per seat, winner **green**,
       discarder **red** (on a self-draw all losers are red).
 - [ ] **Roll back to before this** (two taps) and **Change current game** (two taps).
+- [ ] Mid-hand, **Stop this hand** (two taps): every device says the host stopped the hand; chips don't change. Change a setting (e.g. Minimum fan), press **Save settings**, press **Start** on the devices: the same game is dealt again.
 - [ ] **End game** (two taps): every device is told.
 
 ### Join screen (each phone / tablet)

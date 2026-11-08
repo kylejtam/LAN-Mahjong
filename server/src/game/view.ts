@@ -74,6 +74,8 @@ export interface RoomView {
   pendingSwap: (PendingSwap & { fromName: string; toName: string }) | null;
   /** If you asked someone to swap: their answer (accepted or declined), and when. */
   swapResult: { toName: string; accepted: boolean; at: number } | null;
+  /** When the host last stopped a hand (so devices can say so). */
+  roundStoppedAt: number | null;
   /** The tile you just drew (shown on the far right of your hand), or null. */
   justDrawnId: number | null;
   ended: boolean;
@@ -180,6 +182,7 @@ export function viewFor(room: Room, viewerKey: string, now: number): RoomView {
     spectatorsConfirm: mySeat === null && !!round && round.core.phase === 'ended' && room.seats.every((k) => !k || !!room.people[k]?.cpu),
     roundCanClose: !!round && round.core.phase === 'ended' && roundCanClose(room),
     pendingSwap: visibleSwap,
+    roundStoppedAt: room.roundStoppedAt ?? null,
     swapResult:
       room.swapResult && room.swapResult.fromKey === viewerKey
         ? { toName: room.swapResult.toName, accepted: room.swapResult.accepted, at: room.swapResult.at }
