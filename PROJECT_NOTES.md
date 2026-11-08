@@ -9,7 +9,7 @@ disagrees with those, the newest dated entry here wins.
 - Phase 1 (rules engine): **done**. Tile set and checks, shuffle, wall and dice
   break, dealing with flower replacement, winning-hand check, legal
   chow/pong/gong/win, two-winner rule, fan counting, payments.
-- Tests: 232 passing (`npm test`), including 60 rounds of random play that check no tile is ever lost or created.
+- Tests: 226 passing (`npm test`), including 60 rounds of random play that check no tile is ever lost or created.
 - Phase 2 (game server): **done**.
   - Step 1 round engine (`server/src/game/round.ts`): **done**.
   - Step 2 full 16-round game (`server/src/game/match.ts`): **done**.
