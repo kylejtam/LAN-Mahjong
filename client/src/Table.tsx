@@ -702,7 +702,7 @@ function SeatPicker({
 type Tr = (key: StringKey, vars?: Record<string, string | number>) => string;
 type Cmd = (c: Extract<ClientMessage, { type: 'command' }>['command']) => void;
 
-/** Each player's own settings: name, language, theme, drop out, leave. */
+/** Each player's own settings: name, language, leave seat, swap, leave game. */
 function SettingsPanel({
   view,
   tr,
@@ -723,11 +723,10 @@ function SettingsPanel({
   const [name, setName] = useState(view.you.name);
   const mySeat = view.you.seat;
   const nameChanged = name.trim() !== '' && name.trim() !== view.you.name;
-  const themes: Prefs['theme'][] = ['dark', 'light'];
-  const themeLabel: Record<Prefs['theme'], StringKey> = { light: 'themeLight', dark: 'themeDark' };
   return (
     <div className="overlay" onClick={onClose}>
       <div className="panel settings" onClick={(e) => e.stopPropagation()}>
+        <button className="panel-close" aria-label={tr('close')} onClick={onClose}>×</button>
         <h3>{tr('settings')}</h3>
         <p className="muted">{tr('playingIn', { name: view.name })}</p>
 
@@ -749,36 +748,21 @@ function SettingsPanel({
             <button className={prefs.lang === 'en' ? 'on' : ''} onClick={() => setPrefs({ ...prefs, lang: 'en' })}>English</button>
             <button className={prefs.lang === 'zh' ? 'on' : ''} onClick={() => setPrefs({ ...prefs, lang: 'zh' })}>中文</button>
           </div>
-
-          <span>{tr('theme')}</span>
-          <div className="segmented">
-            {themes.map((th) => (
-              <button key={th} className={prefs.theme === th ? 'on' : ''} onClick={() => setPrefs({ ...prefs, theme: th })}>
-                {tr(themeLabel[th])}
-              </button>
-            ))}
-          </div>
         </div>
 
-        {mySeat !== null && (
-          <>
-            <h4>{tr('dropOut')}</h4>
-            <p className="muted">{tr('dropOutText')}</p>
-            <div className="row">
-              <button className="btn" onClick={() => { command({ type: 'dropOut', replacement: { none: true } }); onClose(); }}>
-                {tr('leaveMySeat')}
-              </button>
-              {view.spectators.filter((s) => s.connected).map((s) => (
-                <button key={s.name} className="btn" onClick={() => { command({ type: 'dropOut', replacement: { spectator: s.name } }); onClose(); }}>
-                  {tr('swapWith', { name: s.name })}
-                </button>
-              ))}
-            </div>
-          </>
-        )}
         <div className="row">
+          {mySeat !== null && (
+            <button className="btn" onClick={() => { command({ type: 'dropOut', replacement: { none: true } }); onClose(); }}>
+              {tr('leaveMySeat')}
+            </button>
+          )}
+          {mySeat !== null &&
+            view.spectators.filter((s) => s.connected).map((s) => (
+              <button key={s.name} className="btn" onClick={() => { command({ type: 'dropOut', replacement: { spectator: s.name } }); onClose(); }}>
+                {tr('swapWith', { name: s.name })}
+              </button>
+            ))}
           <button className="btn danger" onClick={onLeave}>{tr('leaveGame')}</button>
-          <button className="btn" onClick={onClose}>{tr('close')}</button>
         </div>
       </div>
     </div>

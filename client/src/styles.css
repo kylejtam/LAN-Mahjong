@@ -1,4 +1,4 @@
-/* LAN Mahjong – clean, flat, minimal. Dark theme by default. */
+/* LAN Mahjong – clean, flat, minimal. Always dark. */
 :root {
   --bg: #111317;
   --fg: #e9ecef;
@@ -341,24 +341,11 @@ input { font: inherit; }
 .all-hands-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
 .all-hands-tiles { display: flex; flex-wrap: wrap; gap: 1px 0.5em; align-items: center; }
 
-/* ---------- light theme (each player chooses Light / Dark / System) ---------- */
-:root[data-theme='light'] {
-  --bg: #f3f4f6;
-  --fg: #1d2129;
-  --muted: #5f6773;
-  --panel: #ffffff;
-  --panel-border: #d6dae1;
-  --btn: #e9ecf1;
-  --input-bg: #f7f8fa;
-  color-scheme: light;
-}
-:root[data-theme='light'] .overlay { background: rgba(20, 24, 30, 0.35); }
-:root[data-theme='light'] .toast { background: #fdecec; }
-/* Name tags sit on the felt, so they stay light-on-dark in both themes. */
+/* Name tags sit on the felt, so they stay light-on-dark. */
 .nametag { color: #fff; }
 .felt-white .nametag { background: rgba(0, 0, 0, 0.55); }
 
-/* A row of buttons where one is selected (language, theme slider). */
+/* A row of buttons where one is selected (language). */
 .segmented { display: inline-flex; border: 1px solid var(--panel-border); border-radius: 999px; overflow: hidden; background: var(--btn); }
 .segmented button { border: none; background: transparent; padding: 0.4em 1em; cursor: pointer; }
 .segmented button.on { background: var(--accent); color: #fff; font-weight: 600; }
@@ -560,3 +547,16 @@ input { font: inherit; }
 .history td.cell-lose { background: rgba(224, 99, 99, 0.22); color: #ffb3b3; font-weight: 700; }
 .host-seat .chip-row { grid-template-columns: auto 1fr auto; }
 .host-seat .chip-row input { width: 100%; min-width: 0; }
+
+/* Settings panel: compact language buttons and name box; X to close. */
+.settings { position: relative; }
+.settings .segmented { justify-self: start; }
+.settings .name-row { justify-self: start; }
+.settings .name-row input { width: 11em; flex: none; }
+.panel-close {
+  position: absolute; top: 0.4em; right: 0.5em; width: 1.8em; height: 1.8em; border-radius: 50%;
+  border: none; background: transparent; color: var(--muted); font-size: 1.4em; line-height: 1; cursor: pointer;
+}
+.panel-close:hover { color: var(--fg); background: var(--btn); }
+/* Logo next to the title on the join screen. */
+.title-with-logo { display: flex; align-items: center; gap: 0.5em; }

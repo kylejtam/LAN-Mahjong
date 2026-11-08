@@ -5,24 +5,16 @@ import { Lobby } from './Lobby';
 import { Table } from './Table';
 import { LangContext, Prefs, cleanPrefs, loadPrefs, savePrefs, t, translateServerMessage } from './i18n';
 
-/** Apply the theme: light or dark (dark by default). */
-function useTheme(theme: Prefs['theme']): void {
-  useEffect(() => {
-    document.documentElement.dataset.theme = theme === 'light' ? 'light' : 'dark';
-  }, [theme]);
-}
-
 export function App(): ReactElement {
   const conn = useConnection();
   const [prefs, setPrefsState] = useState<Prefs>(loadPrefs);
   const [toast, setToast] = useState<string | null>(null);
-  useTheme(prefs.theme);
 
-  /** Change language/theme: remembered on this device and under your name on the server. */
+  /** Change language: remembered on this device and under your name on the server. */
   const setPrefs = (p: Prefs): void => {
     setPrefsState(p);
     savePrefs(p);
-    if (conn.view) conn.send({ type: 'command', command: { type: 'setPrefs', prefs: { lang: p.lang, theme: p.theme } } });
+    if (conn.view) conn.send({ type: 'command', command: { type: 'setPrefs', prefs: { lang: p.lang } } });
   };
 
   // When you join (or log in on another device), your saved choices follow your name.
@@ -30,12 +22,12 @@ export function App(): ReactElement {
   useEffect(() => {
     if (!conn.view) return;
     const fromServer = cleanPrefs(conn.view.you.prefs);
-    if (fromServer.lang || fromServer.theme) {
+    if (fromServer.lang) {
       const merged = { ...prefs, ...fromServer };
       setPrefsState(merged);
       savePrefs(merged);
     } else {
-      conn.send({ type: 'command', command: { type: 'setPrefs', prefs: { lang: prefs.lang, theme: prefs.theme } } });
+      conn.send({ type: 'command', command: { type: 'setPrefs', prefs: { lang: prefs.lang } } });
     }
     // Only when you join or change name.
     // eslint-disable-next-line react-hooks/exhaustive-deps

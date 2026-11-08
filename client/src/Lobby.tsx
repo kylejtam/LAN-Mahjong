@@ -7,6 +7,7 @@ import { useState } from 'react';
 import type { ReactElement } from 'react';
 import type { Connection } from './net';
 import { Prefs, t } from './i18n';
+import { Logo } from './Logo';
 
 const NAME_KEY = 'lan-mahjong-name';
 
@@ -30,7 +31,10 @@ export function Lobby({ conn, prefs, setPrefs }: { conn: Connection; prefs: Pref
   return (
     <div className="lobby">
       <div className="lobby-head">
-        <h1>{t(lang, 'appName')}</h1>
+        <h1 className="title-with-logo">
+          <Logo size="2.6rem" />
+          {t(lang, 'appName')}
+        </h1>
         <div className="segmented">
           <button className={lang === 'en' ? 'on' : ''} onClick={() => setPrefs({ ...prefs, lang: 'en' })}>English</button>
           <button className={lang === 'zh' ? 'on' : ''} onClick={() => setPrefs({ ...prefs, lang: 'zh' })}>中文</button>

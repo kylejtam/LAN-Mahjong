@@ -7,7 +7,6 @@
 import { createContext, useContext } from 'react';
 
 export type Lang = 'en' | 'zh';
-export type Theme = 'light' | 'dark';
 
 /** The 4 action buttons: pinyin in English, characters in Chinese. */
 export const ACTION_LABELS: Record<Lang, { chow: string; pong: string; gong: string; win: string }> = {
@@ -83,12 +82,6 @@ const en = {
   yourName: 'Your name',
   save: 'Save',
   language: 'Language',
-  theme: 'Theme',
-  themeLight: 'Light',
-  themeDark: 'Dark',
-  dropOut: 'Drop out',
-  dropOutText:
-    'You become a spectator and keep your chips. During a round, your tiles wait at the seat until the host adds a CPU. To hand your seat to a spectator instead, use a Swap button below.',
   leaveMySeat: 'Leave my seat',
   swapWith: 'Swap with {name}',
   leaveGame: 'Leave game',
@@ -191,11 +184,6 @@ const zh: Strings = {
   yourName: '你個名',
   save: '儲存',
   language: '語言',
-  theme: '主題',
-  themeLight: '淺色',
-  themeDark: '深色',
-  dropOut: '退出',
-  dropOutText: '你會變成旁觀，籌碼保留。打緊嗰陣，你啲牌會留喺個位，等主機加電腦。想交個位俾旁觀嘅人，就撳下面「換位」。',
   leaveMySeat: '離開座位',
   swapWith: '同 {name} 換位',
   leaveGame: '離開遊戲',
@@ -277,13 +265,13 @@ export function translateServerMessage(lang: Lang, message: string): string {
   return message;
 }
 
-// ---------- the player's own choices (language, theme) ----------
+// ---------- the player's own choices (language) ----------
 
+/** Each player's own choices (the app is always dark). */
 export interface Prefs {
   lang: Lang;
-  theme: Theme;
 }
-export const DEFAULT_PREFS: Prefs = { lang: 'en', theme: 'dark' };
+export const DEFAULT_PREFS: Prefs = { lang: 'en' };
 const PREFS_KEY = 'lan-mahjong-prefs';
 
 export function loadPrefs(): Prefs {
@@ -301,13 +289,12 @@ export function savePrefs(p: Prefs): void {
     /* storage may be blocked */
   }
 }
-/** Keep only valid language/theme values (e.g. from the server). */
+/** Keep only valid language values (e.g. from the server). */
 export function cleanPrefs(raw: unknown): Partial<Prefs> {
   const out: Partial<Prefs> = {};
   if (raw && typeof raw === 'object') {
     const r = raw as Record<string, unknown>;
     if (r.lang === 'en' || r.lang === 'zh') out.lang = r.lang;
-    if (r.theme === 'light' || r.theme === 'dark') out.theme = r.theme; // old 'system' → default dark
   }
   return out;
 }
