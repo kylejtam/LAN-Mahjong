@@ -620,3 +620,6 @@ canvas.celebration { position: fixed; inset: 0; width: 100%; height: 100%; point
 /* Version number (join screen and host page). */
 .app-version { font-weight: 400; font-variant-numeric: tabular-nums; }
 .lobby .app-version { margin-top: 2rem; text-align: center; }
+
+/* Version number in the bottom-left corner of the player Settings panel. */
+.settings-version { text-align: left; margin-top: 0.8em; font-size: 0.75em; color: var(--muted); font-variant-numeric: tabular-nums; }

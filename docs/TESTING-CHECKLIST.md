@@ -17,7 +17,7 @@ Tick each box as you go. If something goes wrong, see "What to send me" at the e
 **Updates are automatic** from version 1.1.0 on: each time you start LAN Mahjong it checks for a
 newer version, installs it and restarts by itself (about 30 seconds; needs internet). Your saved
 games are kept. The version number is on the host page (top) and the join screen (bottom).
-- [ ] Host page title shows **v1.1.0** (or newer); the join screen shows it at the bottom.
+- [ ] The version number shows in the host page title, at the bottom of the join screen, and in the bottom-left corner of ⚙ Settings.
 - [ ] When a newer release is out: start LAN Mahjong and watch the small window say
       "A new version … is available", then "Installing…"; the game restarts by itself with the new number.
 

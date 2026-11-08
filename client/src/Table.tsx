@@ -24,6 +24,7 @@ import type { StringKey } from './i18n';
 import { DragSource, Drop, useDrag } from './drag';
 import { HelpPanel } from './HelpPanel';
 import { ChipIcon } from './ChipIcon';
+import { APP_VERSION } from './version';
 import { CELEBRATION_STYLES, celebrate } from './celebrate';
 import { ResultPanel } from './ResultPanel';
 
@@ -899,6 +900,7 @@ function SettingsPanel({
             ))}
           <button className="btn danger" onClick={onLeave}>{tr('leaveGame')}</button>
         </div>
+        <div className="settings-version">LAN Mahjong v{APP_VERSION}</div>
       </div>
     </div>
   );
