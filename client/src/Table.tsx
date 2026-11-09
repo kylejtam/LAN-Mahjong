@@ -732,33 +732,32 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
             {renderDiscards('top')}
             {renderDiscards('left')}
             <div className="hub">
-              {round && claimable && round.offered && (
-                // The tile you can claim: tap it, or drag it into your hand.
-                <span className="claim-pile" onPointerDown={start({ kind: 'offered' })}>
-                  <TileView type={round.offered.tile.type} width="var(--draw-w)" />
-                  <span className="draw-label">{tr('take')}</span>
-                </span>
-              )}
               {round ? (
-                a?.draw || a?.drawReplacement ? (
-                  // Big glowing tile to tap or drag into your hand, next to the wall picture.
-                  <span className="hub-row">
-                  {lastDiscardTile}
-                  <WallBox round={round} sideOf={sideOf} perWall={view.settings.flowersOn ? 18 : 17} label={tr('tilesLeft')} />
-                  <span
-                    className="draw-pile"
-                    onPointerDown={start(a.draw ? { kind: 'wallFront' } : { kind: 'wallBack' })}
-                  >
-                    <TileView back width="var(--draw-w)" />
-                    <span className="draw-label">{a.draw ? tr('drawHere') : tr('replacementHere')}</span>
+                // Three fixed slots so the wall never moves: the tile you can take (or the
+                // last discard) on the left, the wall in the middle, Draw on the right.
+                <span className="hub-row">
+                  <span className="hub-slot hub-left">
+                    {claimable && round.offered ? (
+                      // The tile you can claim: tap it, or drag it into your hand.
+                      <span className="claim-pile" onPointerDown={start({ kind: 'offered' })}>
+                        <TileView type={round.offered.tile.type} width="var(--draw-w)" />
+                        <span className="draw-label">{tr('take')}</span>
+                      </span>
+                    ) : (
+                      !dealAnim && lastDiscardTile
+                    )}
                   </span>
+                  <WallBox round={round} sideOf={sideOf} perWall={perWall} label={tr('tilesLeft')} override={dealAnim?.wall} />
+                  <span className="hub-slot hub-right">
+                    {(a?.draw || a?.drawReplacement) && (
+                      // Big glowing tile to tap or drag into your hand.
+                      <span className="draw-pile" onPointerDown={start(a.draw ? { kind: 'wallFront' } : { kind: 'wallBack' })}>
+                        <TileView back width="var(--draw-w)" />
+                        <span className="draw-label">{a.draw ? tr('drawHere') : tr('replacementHere')}</span>
+                      </span>
+                    )}
                   </span>
-                ) : (
-                  <span className="hub-row">
-                    {!dealAnim && lastDiscardTile}
-                    <WallBox round={round} sideOf={sideOf} perWall={perWall} label={tr('tilesLeft')} override={dealAnim?.wall} />
-                  </span>
-                )
+                </span>
               ) : view.phase === 'rolling' ? (
                 iAmDealer ? <div className="hub-sub">{tr('swipeDiceHere')}</div> : <div className="hub-sub">{tr('waitingRoll', { name: personName(view.seats[view.match.dealer]?.name, lang) })}</div>
               ) : null}
