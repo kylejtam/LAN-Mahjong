@@ -74,7 +74,7 @@ Write down which devices worked: ☐ iPhone ☐ iPad ☐ Samsung tablet ☐ lapt
 ### Playing a hand
 - [ ] Press **Start**; the dealer swipes the dice; the dice then show next to the dealer's name.
 - [ ] The **deal animation** (~5 s): tiles slide to each player and the wall picture empties.
-- [ ] Your hand is **sorted** (fewest suit → most suit, 1–9, then winds E S W N, then dragons).
+- [ ] Your hand is **sorted once** when dealt (fewest suit → most suit, 1–9, then winds E S W N, then dragons). After that it never re-sorts: new tiles go on the right, and your order stays even after locking the phone or reloading.
 - [ ] Your name, chips (and dice if you deal) are at the **top left**.
 - [ ] The top bar shows the **minimum fan** next to the round name ("Min 1 fan" / "1番起糊"). Change it on the host page between hands: every device updates.
 - [ ] **Draw**: tap the glowing **Draw** tile in the middle, or drag it into your hand.
@@ -86,7 +86,7 @@ Write down which devices worked: ☐ iPhone ☐ iPad ☐ Samsung tablet ☐ lapt
       The flashing Soeng / Pung / Gong / Wu buttons also work, and so does tapping the discard.
 - [ ] Once the next player draws, the buttons and flashing **disappear**.
 - [ ] Flowers go to your public tiles (left of your hand) and you draw a **Replacement**.
-- [ ] When anyone makes a **Soeng / Pung / Gong** (also a gong from their own tiles), a pop-up shows the set big in the middle with a coloured badge and "N CPU Easy: Pung!" / "You: Pung!", and the new set glows gold. A win shows a big red **Wu** over the summary.
+- [ ] When anyone makes a **Soeng / Pung / Gong** (also a gong from their own tiles), a pop-up shows the set big in the middle with a coloured badge and "N CPU Easy: Pung!" / "You: Pung!", and the new set glows gold. These pop-ups stay for 3 seconds.
 - [ ] When anyone draws a flower (not during the deal), a big pop-up shows it in the middle ("N CPU Easy drew a flower" / "You drew a flower"), and the new flower glows gold where it lands.
 - [ ] Left / right players' tiles lie **sideways in columns**; their name tags are one small line.
 - [ ] The wall picture around "tiles left" shrinks as tiles are drawn.
@@ -99,7 +99,7 @@ Write down which devices worked: ☐ iPhone ☐ iPad ☐ Samsung tablet ☐ lapt
 - [ ] When someone wins, confetti goes off over the summary and a fanfare plays (iPhone/iPad: silent switch off). A draw has no celebration.
 - [ ] On the win summary and the Ready / Start pop-up, **?** and **⚙** in the top right still open Help and Settings.
 - [ ] ⚙ Settings → **Win celebration**: Confetti / Red & gold / Gold chips / Fireworks. Tapping one previews it; each device keeps its own choice.
-- [ ] Summary: winning conditions, the winner's sets grouped together, flowers,
+- [ ] Summary: the tile that won the hand is outlined in gold; winning conditions, the winner's sets grouped together, flowers,
       **+ / −** chips for each player.
 - [ ] Buttons are only **Ready** and **Leave seat** (plus **Undo chicken win** for a chicken win).
 - [ ] Each player's row shows when they are **Ready**; when everyone is, the next hand starts.

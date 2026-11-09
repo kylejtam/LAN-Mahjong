@@ -82,7 +82,10 @@ interface HandGap {
   otherIds: number[];
 }
 
-/** A pop-up in the middle of the table: a flower draw, a claim (Soeng / Pung / Gong) or a win (Wu). */
+/** How long the middle pop-ups (flowers, Soeng / Pung / Gong) stay on screen. Matches the CSS animation. */
+const POP_MS = 3000;
+
+/** A pop-up in the middle of the table: a flower draw or a claim (Soeng / Pung / Gong). */
 interface Pop {
   key: string;
   kind: 'flower' | 'chow' | 'pong' | 'gong' | 'win';
@@ -136,7 +139,26 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
   const serverHand = view.seats[bottomSeat]?.hand ?? null;
   const drawnId = mySeat !== null ? view.justDrawnId : null;
   const roundKey = `${view.match.handsPlayed}-${round?.dice.join('') ?? ''}`;
-  const [manual, setManual] = useState<{ key: string; ids: number[] } | null>(null);
+  // Your hand is sorted once, when it is dealt; after that it keeps the order
+  // you leave it in (new tiles go on the right). The order is remembered on
+  // this device, so locking the phone or reloading doesn't shuffle it.
+  const orderKey = `lan-mahjong-order:${view.id}:${view.you.name.toLowerCase()}`;
+  const [manual, setManualState] = useState<{ key: string; ids: number[] } | null>(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem(orderKey) ?? 'null') as { key: string; ids: number[] } | null;
+      return saved && typeof saved.key === 'string' && Array.isArray(saved.ids) ? saved : null;
+    } catch {
+      return null;
+    }
+  });
+  const setManual = (m: { key: string; ids: number[] }): void => {
+    setManualState(m);
+    try {
+      localStorage.setItem(orderKey, JSON.stringify(m));
+    } catch {
+      /* storage may be blocked: the order still holds until the page reloads */
+    }
+  };
   // The new tile stays apart until you drag it into your hand.
   const drawnApart = drawnId !== null && !(manual?.key === roundKey && manual.ids.includes(drawnId));
   const hand: Tile[] = useMemo(() => {
@@ -149,6 +171,12 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
     return [...ordered, ...extra];
   }, [serverHand, manual, roundKey, drawnId, drawnApart]);
   const drawnTile = drawnApart ? serverHand?.find((t) => t.id === drawnId) ?? null : null;
+  // Sort once at the start of each hand (the tile you just drew stays apart on the right).
+  useEffect(() => {
+    if (!serverHand || !round || manual?.key === roundKey) return;
+    setManual({ key: roundKey, ids: sortHand(serverHand.filter((t) => t.id !== drawnId)).map((t) => t.id) });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [roundKey, !!serverHand, !!round]);
 
   // Claim options on the offered tile (anything except your own turn moves).
   const claimOptions = !!a && (a.win || a.pong || a.gong || a.chow.length > 0) && !!round?.offered && round.offered.by !== mySeat;
@@ -287,7 +315,6 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
     celebrated.current = { key: roundKey, win: winNow };
     if (winNow && before.key === roundKey && !before.win && round?.result?.type === 'win') {
       celebrate(prefs.celebration);
-      showPops([{ key: `${roundKey}-win`, kind: 'win', seat: round.result.winner, types: [] }], []);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [winNow, roundKey]);
@@ -544,8 +571,8 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
     if (pops.length === 0) return;
     setFlowerPops((list) => [...list, ...pops].slice(-3));
     if (ids.length) setNewFlowerIds((old) => new Set([...old, ...ids]));
-    setTimeout(() => setFlowerPops((list) => list.filter((x) => !pops.some((n) => n.key === x.key))), 2000);
-    if (ids.length) setTimeout(() => setNewFlowerIds((old) => new Set([...old].filter((id) => !ids.includes(id)))), 3500);
+    setTimeout(() => setFlowerPops((list) => list.filter((x) => !pops.some((n) => n.key === x.key))), POP_MS);
+    if (ids.length) setTimeout(() => setNewFlowerIds((old) => new Set([...old].filter((id) => !ids.includes(id)))), POP_MS + 1500);
   };
   const [newFlowerIds, setNewFlowerIds] = useState<Set<number>>(() => new Set());
   const seenFlowers = useRef<{ key: string; ids: Set<number> }>({ key: '', ids: new Set() });
