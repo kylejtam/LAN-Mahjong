@@ -672,3 +672,13 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; }
 
 /* Win summary: the tile that completed the hand. */
 .winning-tile { position: relative; z-index: 1; border-radius: 4px; box-shadow: 0 0 0 3px #ffd447, 0 0 14px 4px rgba(255, 212, 71, 0.8); transform: translateY(-3px); }
+
+/* The dice roll before the deal: three dice bounce around the screen, then land in the middle. */
+.dice-roll { position: fixed; inset: 0; z-index: 42; pointer-events: none; }
+.dice-roll-die {
+  position: absolute; left: 0; top: 0; width: clamp(36px, 8vmin, 64px); height: clamp(36px, 8vmin, 64px);
+  filter: drop-shadow(0 6px 6px rgba(0, 0, 0, 0.45)); will-change: transform;
+}
+.dice-roll-die .face { display: none; width: 100%; height: 100%; }
+.dice-roll-die[data-value='1'] .face-1, .dice-roll-die[data-value='2'] .face-2, .dice-roll-die[data-value='3'] .face-3,
+.dice-roll-die[data-value='4'] .face-4, .dice-roll-die[data-value='5'] .face-5, .dice-roll-die[data-value='6'] .face-6 { display: block; }

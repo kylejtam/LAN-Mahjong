@@ -24,6 +24,7 @@ import type { StringKey } from './i18n';
 import { DragSource, Drop, useDrag } from './drag';
 import { HelpPanel } from './HelpPanel';
 import { ChipIcon } from './ChipIcon';
+import { DICE_MS, DiceRoll } from './DiceRoll';
 import { APP_VERSION } from './version';
 import { CELEBRATION_STYLES, celebrate } from './celebrate';
 import { ResultPanel } from './ResultPanel';
@@ -769,6 +770,9 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
         {renderOpponent('right')}
       </main>
 
+      {dealAnim?.rolling && round && (
+        <DiceRoll key={roundKey} values={round.dice as [number, number, number]} from={sideOf(view.match.dealer)} />
+      )}
       <footer className={`me${dealAnim ? ' dealing' : ''}`} style={rowSizes}>
         <div className="me-row">
           {/* Your public tiles (shown sets and flowers) sit to the left of your hand. */}
@@ -1167,6 +1171,8 @@ type WallStack = { seat: number; position: number; count: number };
 
 interface DealAnim {
   wall: { stacks: WallStack[]; count: number };
+  /** True while the dice are still rolling (the deal starts when they land). */
+  rolling?: boolean;
 }
 
 /**
@@ -1262,7 +1268,8 @@ function useDealAnimation(
       left: centre(document.querySelector('.opp-left .nametag')),
       right: centre(document.querySelector('.opp-right .nametag')),
     };
-    setPlan({ key: roundKey, start: performance.now(), steps, order, total, from: centre(document.querySelector('.hub')), to });
+    // The dice roll first; the deal starts when they land.
+    setPlan({ key: roundKey, start: performance.now() + DICE_MS, steps, order, total, from: centre(document.querySelector('.hub')), to });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [roundKey, !!round]);
 
@@ -1283,6 +1290,10 @@ function useDealAnimation(
 
   if (!plan || plan.key !== roundKey) return null;
   const elapsed = performance.now() - plan.start;
+  if (elapsed < 0) {
+    // Dice still rolling: the wall is still full.
+    return { wall: { stacks: plan.order.map((st) => ({ ...st, count: 2 })), count: plan.total }, rolling: true };
+  }
   const stepMs = DEAL_MS / plan.steps.length;
   const index = Math.min(plan.steps.length - 1, Math.floor(elapsed / stepMs));
   let f = 0;
