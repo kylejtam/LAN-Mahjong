@@ -637,6 +637,17 @@ export function handleCommand(prev: Room, key: string, cmd: Command, now: number
   return room;
 }
 
+/**
+ * Chips a seat is about to win or lose: while the win summary is showing, the
+ * payout is shown straight away, though it is only paid when the hand closes
+ * (so undoing a chicken win simply takes it back).
+ */
+export function pendingChange(room: Room, seat: number): number {
+  const round = room.phase === 'playing' ? room.match.round : null;
+  const result = round?.core.phase === 'ended' ? round.core.result : null;
+  return result?.type === 'win' ? result.changes[seat] ?? 0 : 0;
+}
+
 /** Host controls from the laptop's host page. */
 export function handleHostCommand(prev: Room, cmd: HostCommand, now: number): Room {
   if (prev.ended) fail('This game has ended.');
@@ -665,7 +676,10 @@ export function handleHostCommand(prev: Room, cmd: HostCommand, now: number): Ro
       const person = (cmd.key ? room.people[cmd.key] : undefined) ?? room.people[nameKey(String(cmd.name ?? ''))];
       if (!person) fail('There is nobody with that name in this game.');
       if (!Number.isInteger(cmd.balance) || Math.abs(cmd.balance) > 1_000_000_000) fail('Chips must be a whole number.');
-      person!.balance = cmd.balance;
+      // During a win summary the shown balance already includes the payout;
+      // set it so the player ends up with exactly the number typed.
+      const seat = room.seats.indexOf(person!.key);
+      person!.balance = cmd.balance - (seat >= 0 ? pendingChange(room, seat) : 0);
       break;
     }
     case 'hostSetCpuSeconds': {

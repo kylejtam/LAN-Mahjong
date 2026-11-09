@@ -14,7 +14,7 @@
 import { GameSettings, Meld, SEATS, Tile, tilesLeft } from '@lan-mahjong/shared';
 import { matchLabel } from './match.js';
 import { AvailableActions, DiscardEntry, Phase, RoundResult, availableActions, currentPlayer } from './round.js';
-import { CpuDifficulty, DEFAULT_CPU_SECONDS, HandRecord, PendingSwap, Room, RoomPhase, TableColour, roundCanClose, seatOf, undoableForSeat } from './room.js';
+import { CpuDifficulty, DEFAULT_CPU_SECONDS, HandRecord, PendingSwap, Room, RoomPhase, TableColour, pendingChange, roundCanClose, seatOf, undoableForSeat } from './room.js';
 import { sortHand } from '@lan-mahjong/shared';
 
 export interface SeatView {
@@ -111,7 +111,8 @@ export function viewFor(room: Room, viewerKey: string, now: number): RoomView {
       name: p?.name ?? null,
       cpu: p?.cpu ?? null,
       connected: p?.connected ?? false,
-      balance: p?.balance ?? null,
+      // While the win summary shows, include the payout straight away.
+      balance: p ? p.balance + pendingChange(room, seat) : null,
       isDealer: seat === dealer,
       wind: (seat - dealer + SEATS) % SEATS,
       handCount: hand.length,
@@ -249,7 +250,7 @@ export function hostViewOf(room: Room): HostGameView {
     },
     seats: room.seats.map((key, seat) => {
       const p = key ? room.people[key]! : null;
-      return { seat, key: p?.key ?? null, name: p?.name ?? null, cpu: p?.cpu ?? null, connected: p?.connected ?? false, balance: p?.balance ?? null };
+      return { seat, key: p?.key ?? null, name: p?.name ?? null, cpu: p?.cpu ?? null, connected: p?.connected ?? false, balance: p ? p.balance + pendingChange(room, seat) : null };
     }),
     spectators: Object.values(room.people)
       .filter((p) => !p.cpu && !seatedKeys.has(p.key))
