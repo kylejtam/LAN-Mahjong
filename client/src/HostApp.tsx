@@ -67,7 +67,11 @@ export function HostApp(): ReactElement {
         <div>
           <p>Players scan the code, or open this address on the same Wi-Fi:</p>
           {urls.length ? urls.map((u) => <div key={u} className="host-url">{u}</div>) : <div className="muted">No network address found</div>}
-          <p className="muted small">To play on this laptop too, open that address in another tab and join like everyone else.</p>
+          <div className="row" style={{ justifyContent: 'flex-start' }}>
+            {/* Opens the player screen in a new tab, so this computer can play too. */}
+            <a className="btn primary" href="/" target="_blank" rel="noopener">Play on this computer</a>
+          </div>
+          <p className="muted small">Opens the player screen in a new tab. Join a game there like everyone else.</p>
         </div>
       </div>
 

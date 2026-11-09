@@ -14,7 +14,7 @@ export interface GameSettings {
   /**
    * Liability 包 for one-suit hands: once a player has 3 face-up sets of one
    * suit, whoever discards a tile of that suit that they then use pays the
-   * whole amount if they win with a one-suit hand. Off by default.
+   * whole amount if they win with a one-suit hand. On by default.
    */
   liabilityOn: boolean;
 }
@@ -24,5 +24,5 @@ export const DEFAULT_SETTINGS: Readonly<GameSettings> = {
   minFan: 1,
   payoutMode: 'everyonePays',
   dealerAdvancesOnDraw: false,
-  liabilityOn: false,
+  liabilityOn: true,
 };
