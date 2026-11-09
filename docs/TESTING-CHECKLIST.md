@@ -40,6 +40,7 @@ games are kept. The version number is on the host page (top) and the join screen
 Do this on each device: iPhone, iPad, Samsung tablet, and the laptop itself.
 
 - [ ] The device is on the **same Wi-Fi** as the laptop (not a guest network).
+- [ ] iPhone held sideways: nothing (names, tiles, buttons, pop-ups) hides under the camera island.
 - [ ] Scan the QR code on the host page with the camera, or type the address
       into Safari (iPhone/iPad) or Chrome (Samsung).
 - [ ] The start screen appears. (On the laptop: press **Play on this computer** on the host page; it opens in a new tab.)
@@ -83,6 +84,7 @@ Write down which devices worked: ☐ iPhone ☐ iPad ☐ Samsung tablet ☐ lapt
       The flashing Soeng / Pung / Gong / Wu buttons also work, and so does tapping the discard.
 - [ ] Once the next player draws, the buttons and flashing **disappear**.
 - [ ] Flowers go to your public tiles (left of your hand) and you draw a **Replacement**.
+- [ ] When anyone makes a **Soeng / Pung / Gong** (also a gong from their own tiles), a pop-up shows the set big in the middle with a coloured badge and "N CPU Easy: Pung!" / "You: Pung!", and the new set glows gold. A win shows a big red **Wu** over the summary.
 - [ ] When anyone draws a flower (not during the deal), a big pop-up shows it in the middle ("N CPU Easy drew a flower" / "You drew a flower"), and the new flower glows gold where it lands.
 - [ ] Left / right players' tiles lie **sideways in columns**; their name tags are one small line.
 - [ ] The wall picture around "tiles left" shrinks as tiles are drawn.
