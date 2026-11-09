@@ -79,7 +79,7 @@ Write down which devices worked: ☐ iPhone ☐ iPad ☐ Samsung tablet ☐ lapt
 - [ ] The top bar shows the **minimum fan** next to the round name ("Min 1 fan" / "1番起糊"). Change it on the host page between hands: every device updates.
 - [ ] **Draw**: tap the glowing **Draw** tile in the middle, or drag it into your hand.
 - [ ] The new tile sits **apart on the right**; drag it into your hand and it joins it.
-- [ ] Drag tiles to **reorder** your hand.
+- [ ] Drag tiles to **reorder** your hand: while you drag, the other tiles slide apart to show where it will land.
 - [ ] **Discard**: drag a tile to the middle; it slides into place. Other players' discards slide in too.
 - [ ] The **last discard** also shows big in the middle (next to "tiles left") with who threw it; it goes away when someone claims it.
 - [ ] When you can claim, the tile shows big in the middle as **Take**; tap or drag it.

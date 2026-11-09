@@ -226,9 +226,15 @@ input { font: inherit; }
 }
 .me-info { grid-area: info; display: flex; flex-direction: column; gap: 0.3em; align-items: flex-start; max-width: 28vw; }
 .hand { grid-area: hand; display: flex; justify-content: center; gap: 2px; min-height: calc(var(--hand-w) * 4 / 3); touch-action: none; }
-.hand-tile { cursor: grab; touch-action: none; transition: transform 0.1s; }
+/* The hand row is the reference for each tile's natural position (offsetLeft). */
+.hand { position: relative; }
+.hand-tile { cursor: grab; touch-action: none; }
 .hand-tile:active { transform: translateY(-6px); }
 .hand-tile.dragging { opacity: 0.3; }
+/* While you drag over your hand, the other tiles slide apart to open a gap. */
+.hand.reordering .hand-tile { transition: transform 0.15s ease; }
+.hand-tile.dragging.gap { opacity: 0; }
+@media (prefers-reduced-motion: reduce) { .hand.reordering .hand-tile { transition: none; } }
 .hint { grid-area: hint; text-align: center; font-size: 0.85em; color: var(--muted); min-height: 1.2em; }
 
 .actions { grid-area: actions; display: flex; gap: 0.4em; align-items: center; }

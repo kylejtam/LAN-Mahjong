@@ -68,6 +68,20 @@ function useScreenSize(): { w: number; h: number } {
 
 type Side = 'bottom' | 'right' | 'top' | 'left';
 
+/** While dragging a tile over your hand: where it would land. */
+interface HandGap {
+  /** Is the finger over the hand row? */
+  over: boolean;
+  /** The dragged tile's place in the row (-1 for the drawn tile, which sits apart). */
+  from: number;
+  /** Where it would go among the other tiles (0 = far left). */
+  target: number;
+  /** Distance from one tile to the next, in pixels. */
+  slot: number;
+  /** The other tiles, left to right. */
+  otherIds: number[];
+}
+
 /** A pop-up in the middle of the table: a flower draw, a claim (Soeng / Pung / Gong) or a win (Wu). */
 interface Pop {
   key: string;
@@ -142,10 +156,20 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
   const claimable = claimOptions && !round?.offeredDrawn;
   const ownGongs = a ? a.concealedGongs.length + a.addedGongs.length : 0;
 
+  /** Your hand row, and where a dragged tile would land in it (updated while dragging). */
+  const handRef = useRef<HTMLDivElement>(null);
+  const reorderRef = useRef<HandGap | null>(null);
+
   const onDrop = (src: DragSource, drop: Drop): void => {
     if (src.kind === 'hand') {
+      const gap = reorderRef.current;
       if (drop.zone === 'discard' && a?.discard) {
         command({ type: 'discard', tileId: src.tileId });
+      } else if (gap?.over) {
+        // Reorder (on this device only): drop it into the gap the other tiles made.
+        const ids = [...gap.otherIds];
+        ids.splice(gap.target, 0, src.tileId);
+        setManual({ key: roundKey, ids });
       } else if (drop.zone === 'hand') {
         // Reorder (on this device only): put the tile where it was dropped.
         const els = [...document.querySelectorAll<HTMLElement>('[data-hand-tile]')].filter(
@@ -183,6 +207,38 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
     else if (src.kind === 'offered') onTapOffered();
   };
   const { drag, start } = useDrag(onDrop, onTap);
+
+  // ---------- rearranging your hand: tiles slide apart to show where it will land ----------
+  // Natural positions (offsetLeft) are not affected by the sliding, so they stay steady.
+  const handGap: HandGap | null = (() => {
+    if (!drag?.moved || drag.src.kind !== 'hand' || mySeat === null) return null;
+    const box = handRef.current;
+    if (!box) return null;
+    const els = [...box.querySelectorAll<HTMLElement>('[data-hand-tile]')].filter((el) => el.dataset.drawn !== 'true');
+    if (els.length === 0) return null;
+    const ids = els.map((el) => Number(el.dataset.handTile));
+    const draggedId = drag.src.tileId;
+    const from = ids.indexOf(draggedId); // -1 = the drawn tile, from outside the row
+    const otherIds = ids.filter((id) => id !== draggedId);
+    const first = els[0]!;
+    const w = first.offsetWidth;
+    const h = first.offsetHeight;
+    const slot = els.length > 1 ? els[1]!.offsetLeft - first.offsetLeft : w + 2;
+    const r = box.getBoundingClientRect();
+    const over = drag.y > r.top - h * 0.9 && drag.y < r.bottom + h * 0.6 && drag.x > r.left - w * 1.5 && drag.x < r.right + w * 1.5;
+    const rel = drag.x - (r.left + first.offsetLeft);
+    // The gap opens at the place nearest the finger (the tile's middle follows the finger).
+    const target = Math.max(0, Math.min(otherIds.length, Math.round((rel - w / 2) / slot)));
+    return { over, from, target, slot, otherIds };
+  })();
+  reorderRef.current = handGap;
+  /** How far a hand tile slides sideways to open the gap (0 = stays put). */
+  const slideOf = (tileId: number, index: number): number => {
+    if (!handGap?.over || tileId === (drag?.src.kind === 'hand' ? drag.src.tileId : -1)) return 0;
+    const o = handGap.from >= 0 && index > handGap.from ? index - 1 : index; // its place without the dragged tile
+    const wanted = o < handGap.target ? o : o + 1;
+    return (wanted - index) * handGap.slot;
+  };
 
   // A tapped draw glides from the middle into its place on the right of your hand.
   const drawFlyFrom = useRef<{ x: number; y: number; at: number } | null>(null);
@@ -690,13 +746,14 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
         <div className="me-row">
           {/* Your public tiles (shown sets and flowers) sit to the left of your hand. */}
           {renderMelds(bottom.melds, bottom.flowers, 'var(--mine-w)')}
-          <div className="hand" data-drop="hand">
+          <div className={`hand${handGap?.over ? ' reordering' : ''}`} data-drop="hand" ref={handRef}>
           {serverHand
-            ? hand.map((t) => (
+            ? hand.map((t, i) => (
                 <span
                   key={t.id}
                   data-hand-tile={t.id}
-                  className={`hand-tile${drag?.moved && drag.src.kind === 'hand' && drag.src.tileId === t.id ? ' dragging' : ''}`}
+                  className={`hand-tile${drag?.moved && drag.src.kind === 'hand' && drag.src.tileId === t.id ? (handGap?.over ? ' dragging gap' : ' dragging') : ''}`}
+                  style={slideOf(t.id, i) ? { transform: `translateX(${slideOf(t.id, i)}px)` } : undefined}
                   onPointerDown={mySeat !== null ? start({ kind: 'hand', tileId: t.id, type: t.type }) : undefined}
                 >
                   <TileView type={t.type} width="var(--hand-w)" />
