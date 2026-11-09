@@ -102,6 +102,7 @@ Write down which devices worked: ☐ iPhone ☐ iPad ☐ Samsung tablet ☐ lapt
 - [ ] ⚙ Settings → **Win celebration**: Confetti / Red & gold / Gold chips / Fireworks. Tapping one previews it; each device keeps its own choice.
 - [ ] Summary: the tile that won the hand is outlined in gold; winning conditions, the winner's sets grouped together, flowers,
       **+ / −** chips for each player.
+- [ ] As soon as the summary shows, everyone's chips (top right, name tags, host page) already include the win.
 - [ ] Buttons are only **Ready** and **Leave seat** (plus **Undo chicken win** for a chicken win).
 - [ ] Each player's row shows when they are **Ready**; when everyone is, the next hand starts.
 

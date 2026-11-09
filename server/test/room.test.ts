@@ -455,6 +455,26 @@ describe('history, roll back and changing the current game (host page)', () => {
     expect(() => host(won, { type: 'hostStopRound' })).toThrow(/no hand/);
   });
 
+  it('balances show the payout as soon as the win summary appears (paid once, when the hand closes)', () => {
+    const playing = startedTable();
+    const round = playing.match.round!;
+    let r: Room = {
+      ...playing,
+      match: { ...playing.match, round: { ...round, core: { ...round.core, phase: 'ended', result: { type: 'win', winner: 1, discarder: 0, fan: 3, items: [], capHand: false, isChicken: false, changes: [-16, 32, -8, -8] } } } },
+    };
+    // Summary showing: every screen already shows the new balances; nothing is paid yet.
+    expect(viewFor(r, 'kyle', tick()).seats.map((s) => s.balance)).toEqual([984, 1032, 992, 992]);
+    expect(hostViewOf(r).seats.map((s) => s.balance)).toEqual([984, 1032, 992, 992]);
+    expect(r.people.amy!.balance).toBe(1000);
+    // The host corrects Amy to 1050 during the summary: she ends up with exactly 1050.
+    r = host(r, { type: 'hostSetBalance', name: 'Amy', balance: 1050 });
+    expect(viewFor(r, 'kyle', tick()).seats[1]!.balance).toBe(1050);
+    // Everyone confirms: paid once, the numbers don't change again.
+    for (const n of ['Kyle', 'Amy', 'Ben', 'Cat']) r = cmd(r, n, { type: 'confirmRound' });
+    expect([r.people.kyle, r.people.amy, r.people.ben, r.people.cat].map((x) => x!.balance)).toEqual([984, 1050, 992, 992]);
+    expect(viewFor(r, 'kyle', tick()).seats.map((s) => s.balance)).toEqual([984, 1050, 992, 992]);
+  });
+
   it('can jump to any wind and game number without touching chips', () => {
     let r = finishWith(startedTable(), 1, 0, [-16, 32, -8, -8]);
     r = playAgain(r);

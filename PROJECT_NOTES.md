@@ -161,6 +161,7 @@ disagrees with those, the newest dated entry here wins.
 | 2026-11-10 | **1.8.0:** flowers stay hidden (everyone's, incl. the spectators' All hands view) during the dice roll and the deal; they appear when the deal finishes and everyone sees their own tiles. | Kyle |
 | 2026-11-10 | **1.9.0:** during the deal your own tiles appear as they are dealt (4 at a time, then 1), re-sorted as each batch arrives; the dealer's 14th tile sits apart on the right as it does after the deal, so nothing jumps when the deal ends. The hint line stays empty during the deal. | Kyle |
 | 2026-11-10 | **1.10.0:** the middle of the table has three fixed slots (same width each side): last discard or Take on the left, the wall and tiles-left count in the centre, Draw on the right. The wall no longer shifts when Draw / Take appear or disappear. | Kyle |
+| 2026-11-10 | **1.11.0:** balances (your chips, name tags, host page) include the payout as soon as the win summary shows. The payout itself is still applied once, when the hand closes, so undoing a chicken win takes it back; a host chip correction during the summary sets exactly the number typed. | Kyle |
 | 2026-11-08 | **Shàng sets are shown in order**, lowest number first. | Kyle |
 | 2026-11-08 | **After the win summary:** seated players press Continue, then a popup like the seat picker shows who is ready, with Ready / Leave seat (and Back to summary). | Kyle |
 | 2026-11-08 | **Chips appear once:** only at the top right; your top-left name tag has no chips. | Kyle |
