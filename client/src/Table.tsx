@@ -773,12 +773,31 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
       {dealAnim?.rolling && round && (
         <DiceRoll key={roundKey} values={round.dice as [number, number, number]} from={sideOf(view.match.dealer)} />
       )}
-      <footer className={`me${dealAnim ? ' dealing' : ''}`} style={rowSizes}>
+      <footer className={`me${dealAnim?.rolling ? ' dealing' : ''}`} style={rowSizes}>
         <div className="me-row">
           {/* Your public tiles (shown sets and flowers) sit to the left of your hand. */}
           {renderMelds(bottom.melds, dealAnim ? [] : bottom.flowers, 'var(--mine-w)')}
           <div className={`hand${handGap?.over ? ' reordering' : ''}`} data-drop="hand" ref={handRef}>
-          {serverHand
+          {dealAnim && serverHand && bottomSeat !== null ? (
+            // During the deal: your tiles arrive 4 at a time and are sorted as they come in.
+            // The dealer's 14th tile sits apart on the right, as it will after the deal.
+            (() => {
+              const dealtSoFar = serverHand.slice(0, Math.min(serverHand.length, dealAnim.dealt[bottomSeat] ?? 0));
+              const extra = dealtSoFar.find((t) => t.id === drawnId);
+              return [
+                ...sortHand(dealtSoFar.filter((t) => t.id !== drawnId)).map((t) => (
+                  <span key={t.id} className="hand-tile dealt-tile">
+                    <TileView type={t.type} width="var(--hand-w)" />
+                  </span>
+                )),
+                extra && (
+                  <span key={extra.id} className="hand-tile drawn-tile dealt-tile">
+                    <TileView type={extra.type} width="var(--hand-w)" />
+                  </span>
+                ),
+              ];
+            })()
+          ) : serverHand
             ? hand.map((t, i) => (
                 <span
                   key={t.id}
@@ -791,7 +810,7 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
                 </span>
               ))
             : Array.from({ length: bottom.handCount }, (_, i) => <TileView key={i} back width="var(--hand-w)" />)}
-          {drawnTile && (
+          {drawnTile && !dealAnim && (
             // The tile you just drew, a little apart on the far right.
             <span
               key={drawnTile.id}
@@ -814,7 +833,7 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
         </div>
         <div className="me-bottom">
           {mySeat === null && nameTag(bottom)}
-          <span className="hint">{hint}</span>
+          <span className="hint">{dealAnim ? '' : hint}</span>
         </div>
       </footer>
 
@@ -1173,6 +1192,8 @@ interface DealAnim {
   wall: { stacks: WallStack[]; count: number };
   /** True while the dice are still rolling (the deal starts when they land). */
   rolling?: boolean;
+  /** How many tiles each seat has been dealt so far (4 at a time, then 1). */
+  dealt: number[];
 }
 
 /**
@@ -1292,16 +1313,19 @@ function useDealAnimation(
   const elapsed = performance.now() - plan.start;
   if (elapsed < 0) {
     // Dice still rolling: the wall is still full.
-    return { wall: { stacks: plan.order.map((st) => ({ ...st, count: 2 })), count: plan.total }, rolling: true };
+    return { wall: { stacks: plan.order.map((st) => ({ ...st, count: 2 })), count: plan.total }, rolling: true, dealt: [0, 0, 0, 0] };
   }
   const stepMs = DEAL_MS / plan.steps.length;
   const index = Math.min(plan.steps.length - 1, Math.floor(elapsed / stepMs));
   let f = 0;
   let b = 0;
+  const dealt = [0, 0, 0, 0];
   for (let i = 0; i <= index; i++) {
     const st = plan.steps[i]!;
-    if (st.from === 'front') f += st.n;
-    else b += st.n;
+    if (st.from === 'front') {
+      f += st.n;
+      dealt[st.seat]! += st.n; // a flower's replacement takes its place, so only these count
+    } else b += st.n;
   }
   const N = plan.order.length;
   const clamp = (x: number): number => Math.max(0, Math.min(2, x));
@@ -1312,7 +1336,7 @@ function useDealAnimation(
     const step = plan.steps[index]!;
     flyBacks(plan.from, plan.to[sideOf(step.seat)], step.n, Math.max(150, stepMs * 0.9));
   }
-  return { wall: { stacks, count: plan.total - f - b } };
+  return { wall: { stacks, count: plan.total - f - b }, dealt };
 }
 
 /** Make an element glide from (dx, dy) away back to where it belongs. */
