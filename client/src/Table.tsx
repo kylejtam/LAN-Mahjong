@@ -28,11 +28,34 @@ import { APP_VERSION } from './version';
 import { CELEBRATION_STYLES, celebrate } from './celebrate';
 import { ResultPanel } from './ResultPanel';
 
-/** The window size, kept up to date when the device turns or the window changes. */
+/**
+ * The iPhone's safe-area strips (the camera island and the home bar), in
+ * pixels. Read from the --safe-* CSS values, which come from the phone.
+ */
+function safeInsets(): { l: number; r: number; t: number; b: number } {
+  const probe = document.createElement('div');
+  probe.style.cssText =
+    'position:fixed;visibility:hidden;pointer-events:none;padding:var(--safe-t) var(--safe-r) var(--safe-b) var(--safe-l)';
+  document.body.appendChild(probe);
+  const cs = getComputedStyle(probe);
+  const px = (v: string): number => Number.parseFloat(v) || 0;
+  const out = { l: px(cs.paddingLeft), r: px(cs.paddingRight), t: px(cs.paddingTop), b: px(cs.paddingBottom) };
+  probe.remove();
+  return out;
+}
+
+/**
+ * The usable window size (minus the iPhone's camera-island and home-bar
+ * strips), kept up to date when the device turns or the window changes.
+ */
 function useScreenSize(): { w: number; h: number } {
-  const [size, setSize] = useState({ w: window.innerWidth, h: window.innerHeight });
+  const measure = (): { w: number; h: number } => {
+    const s = safeInsets();
+    return { w: window.innerWidth - s.l - s.r, h: window.innerHeight - s.t - s.b };
+  };
+  const [size, setSize] = useState(measure);
   useEffect(() => {
-    const update = (): void => setSize({ w: window.innerWidth, h: window.innerHeight });
+    const update = (): void => setSize(measure());
     window.addEventListener('resize', update);
     window.addEventListener('orientationchange', update);
     return () => {
@@ -44,6 +67,16 @@ function useScreenSize(): { w: number; h: number } {
 }
 
 type Side = 'bottom' | 'right' | 'top' | 'left';
+
+/** A pop-up in the middle of the table: a flower draw, a claim (Soeng / Pung / Gong) or a win (Wu). */
+interface Pop {
+  key: string;
+  kind: 'flower' | 'chow' | 'pong' | 'gong' | 'win';
+  seat: number;
+  types: TileType[];
+  /** A concealed gong shows two of its tiles face down. */
+  concealed?: boolean;
+}
 const SIDES: Side[] = ['bottom', 'right', 'top', 'left'];
 
 interface Props {
@@ -196,7 +229,10 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
   useEffect(() => {
     const before = celebrated.current;
     celebrated.current = { key: roundKey, win: winNow };
-    if (winNow && before.key === roundKey && !before.win) celebrate(prefs.celebration);
+    if (winNow && before.key === roundKey && !before.win && round?.result?.type === 'win') {
+      celebrate(prefs.celebration);
+      showPops([{ key: `${roundKey}-win`, kind: 'win', seat: round.result.winner, types: [] }], []);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [winNow, roundKey]);
 
@@ -249,7 +285,7 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
       {melds.map((m, i) => (
         <span className="meld" key={i}>
           {m.tiles.map((t, j) => (
-            <TileView key={t.id} type={t.type} back={m.concealed && (j === 0 || j === 3)} width={size} sideways={sideways} />
+            <TileView key={t.id} type={t.type} back={m.concealed && (j === 0 || j === 3)} width={size} sideways={sideways} className={newFlowerIds.has(t.id) ? 'flower-new' : undefined} />
           ))}
         </span>
       ))}
@@ -394,7 +430,16 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
   // ---------- flowers: make a newly drawn flower obvious to everyone ----------
   // A pop-up in the middle ("Kyle drew a flower") and a gold glow where it lands.
   // Flowers handed out during the deal don't pop up.
-  const [flowerPops, setFlowerPops] = useState<{ key: string; seat: number; types: TileType[] }[]>([]);
+  // The same pop-up is used for claims (Soeng / Pung / Gong) and wins (Wu): see below.
+  const [flowerPops, setFlowerPops] = useState<Pop[]>([]);
+  /** Show pop-ups for a few seconds (each one always finishes, even if more arrive). */
+  const showPops = (pops: Pop[], ids: number[]): void => {
+    if (pops.length === 0) return;
+    setFlowerPops((list) => [...list, ...pops].slice(-3));
+    if (ids.length) setNewFlowerIds((old) => new Set([...old, ...ids]));
+    setTimeout(() => setFlowerPops((list) => list.filter((x) => !pops.some((n) => n.key === x.key))), 2000);
+    if (ids.length) setTimeout(() => setNewFlowerIds((old) => new Set([...old].filter((id) => !ids.includes(id)))), 3500);
+  };
   const [newFlowerIds, setNewFlowerIds] = useState<Set<number>>(() => new Set());
   const seenFlowers = useRef<{ key: string; ids: Set<number> }>({ key: '', ids: new Set() });
   const flowerSig = view.seats.map((sv) => sv.flowers.map((f) => f.id).join(',')).join('|');
@@ -407,16 +452,37 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
     const pops = view.seats
       .map((sv) => ({ seat: sv.seat, tiles: sv.flowers.filter((f) => !seen.ids.has(f.id)) }))
       .filter((x) => x.tiles.length > 0)
-      .map((x) => ({ key: `${roundKey}-${x.tiles.map((t) => t.id).join('-')}`, seat: x.seat, types: x.tiles.map((t) => t.type) }));
-    if (pops.length === 0) return;
-    const ids = pops.flatMap((x) => view.seats[x.seat]!.flowers.filter((f) => !seen.ids.has(f.id)).map((f) => f.id));
-    setFlowerPops((list) => [...list.filter((x) => !pops.some((n) => n.seat === x.seat)), ...pops]);
-    setNewFlowerIds((old) => new Set([...old, ...ids]));
-    // Timers are not cancelled when the next state arrives, so each pop-up always finishes.
-    setTimeout(() => setFlowerPops((list) => list.filter((x) => !pops.some((n) => n.key === x.key))), 2000);
-    setTimeout(() => setNewFlowerIds((old) => new Set([...old].filter((id) => !ids.includes(id)))), 3500);
+      .map((x): Pop => ({ key: `${roundKey}-f-${x.tiles.map((t) => t.id).join('-')}`, kind: 'flower', seat: x.seat, types: x.tiles.map((t) => t.type) }));
+    const ids = pops.length ? view.seats.flatMap((sv) => sv.flowers.filter((f) => !seen.ids.has(f.id)).map((f) => f.id)) : [];
+    showPops(pops, ids);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [flowerSig, roundKey, !!dealAnim]);
+
+  // ---------- claims: Soeng / Pung / Gong are just as obvious ----------
+  // When a new set appears in front of a player (claimed from a discard, or a
+  // gong from their own tiles), show it big in the middle and make it glow.
+  const seenMelds = useRef<{ key: string; sigs: string[][]; counts: number[] }>({ key: '', sigs: [], counts: [] });
+  const meldSigs = view.seats.map((sv) => sv.melds.map((m) => `${m.kind}:${m.tiles.map((t) => t.id).join('.')}`));
+  useEffect(() => {
+    const before = seenMelds.current;
+    seenMelds.current = { key: roundKey, sigs: meldSigs, counts: view.seats.map((sv) => sv.melds.length) };
+    if (before.key !== roundKey || !round || round.phase === 'ended') return;
+    const pops: Pop[] = [];
+    const ids: number[] = [];
+    view.seats.forEach((sv) => {
+      sv.melds.forEach((m, i) => {
+        const sig = meldSigs[sv.seat]![i]!;
+        if (before.sigs[sv.seat]?.includes(sig)) return;
+        // A brand-new set, or a pong that became a gong (robbing a gong turns
+        // a gong back into a pong: that is not a claim, so it is skipped).
+        if (sv.melds.length <= (before.counts[sv.seat] ?? 0) && m.kind !== 'gong') return;
+        pops.push({ key: `${roundKey}-m-${sig}`, kind: m.kind, seat: sv.seat, types: m.tiles.map((t) => t.type), concealed: m.concealed });
+        ids.push(...m.tiles.map((t) => t.id));
+      });
+    });
+    showPops(pops, ids);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [JSON.stringify(meldSigs), roundKey]);
 
   useEffect(() => {
     const counts = view.seats.map((sv) => sv.handCount);
@@ -503,19 +569,22 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
         {flowerPops.length > 0 && (
           <div className="flower-pops" aria-live="polite">
             {flowerPops.map((fp) => (
-              <div key={fp.key} className="flower-pop">
+              <div key={fp.key} className={`flower-pop pop-${fp.kind}`}>
                 <div className="flower-pop-tiles">
-                  {fp.types.map((type, i) => <TileView key={i} type={type} width="clamp(40px, 6vw, 72px)" />)}
+                  {fp.kind !== 'flower' && <span className={`act pop-badge act-${fp.kind}`}>{labels[fp.kind]}</span>}
+                  {fp.types.map((type, i) => (
+                    <TileView key={i} type={type} back={!!fp.concealed && (i === 0 || i === 3)} width="clamp(40px, 6vw, 72px)" />
+                  ))}
                 </div>
                 <div className="flower-pop-text">
-                  {fp.seat === mySeat ? (
-                    tr('youDrewFlower')
-                  ) : (
-                    <>
-                      <span className="flower-pop-wind">{WIND_SHORT[lang][view.seats[fp.seat]!.wind]}</span>
-                      {tr('drewFlower', { name: personName(view.seats[fp.seat]?.name, lang) })}
-                    </>
-                  )}
+                  {fp.seat !== mySeat && <span className="flower-pop-wind">{WIND_SHORT[lang][view.seats[fp.seat]!.wind]}</span>}
+                  {fp.kind === 'flower'
+                    ? fp.seat === mySeat
+                      ? tr('youDrewFlower')
+                      : tr('drewFlower', { name: personName(view.seats[fp.seat]?.name, lang) })
+                    : fp.seat === mySeat
+                      ? tr('youClaimed', { action: labels[fp.kind] })
+                      : tr('playerClaimed', { name: personName(view.seats[fp.seat]?.name, lang), action: labels[fp.kind] })}
                 </div>
               </div>
             ))}

@@ -30,6 +30,13 @@
 }
 
 * { box-sizing: border-box; }
+/* The iPhone's camera island / home bar strips (0 elsewhere). Kept in one place so tests can fake them. */
+:root {
+  --safe-t: env(safe-area-inset-top, 0px);
+  --safe-r: env(safe-area-inset-right, 0px);
+  --safe-b: env(safe-area-inset-bottom, 0px);
+  --safe-l: env(safe-area-inset-left, 0px);
+}
 html, body, #root { margin: 0; height: 100%; }
 body {
   background: var(--bg);
@@ -69,7 +76,7 @@ input { font: inherit; }
 .tile-dim { opacity: 0.5; }
 
 /* ---------- start screen ---------- */
-.lobby { max-width: 34rem; margin: 0 auto; padding: 1.5rem 1rem; }
+.lobby { max-width: 34rem; margin: 0 auto; padding: 1.5rem 1rem; padding-left: max(1rem, var(--safe-l)); padding-right: max(1rem, var(--safe-r)); }
 .lobby h1 { margin: 0 0 1rem; font-weight: 700; }
 .lobby h2 { font-size: 1.05rem; margin: 1.4rem 0 0.5rem; }
 .name-field { display: flex; flex-direction: column; gap: 0.35rem; }
@@ -98,11 +105,11 @@ input { font: inherit; }
 
 .topbar {
   display: grid; grid-template-columns: 1fr auto 1fr; align-items: center;
-  padding: 0.25em 0.6em; padding-top: max(0.25em, env(safe-area-inset-top));
+  padding: 0.25em 0.6em; padding-top: max(0.25em, var(--safe-t));
   background: var(--bg);
 }
-.topbar-left { display: flex; gap: 0.5em; padding-left: env(safe-area-inset-left); }
-.topbar-right { display: flex; gap: 0.5em; justify-content: flex-end; align-items: center; padding-right: env(safe-area-inset-right); }
+.topbar-left { display: flex; gap: 0.5em; padding-left: var(--safe-l); }
+.topbar-right { display: flex; gap: 0.5em; justify-content: flex-end; align-items: center; padding-right: var(--safe-r); }
 /* Help and Settings stay tappable above the pop-ups (win summary, Ready / Start), whose dark layer is z-index 20. */
 .topbar-right .btn.icon { position: relative; z-index: 21; }
 .topbar-centre { display: flex; align-items: center; gap: 0.6em; }
@@ -125,6 +132,8 @@ input { font: inherit; }
   min-height: 0;
   gap: 0.3em;
   padding: 0.3em 0.5em;
+  /* Keep players' names and tiles clear of the iPhone's camera island. */
+  padding-left: max(0.5em, var(--safe-l)); padding-right: max(0.5em, var(--safe-r));
 }
 .opp { display: flex; flex-direction: column; align-items: center; gap: 0.25em; min-width: 0; min-height: 0; }
 .opp-top { grid-area: top; flex-direction: row; flex-wrap: wrap; justify-content: center; }
@@ -211,8 +220,8 @@ input { font: inherit; }
   grid-template-rows: auto auto;
   grid-template-areas: 'info hand actions' 'hint hint hint';
   align-items: end; gap: 0.2em 0.5em;
-  padding: 0.3em 0.6em; padding-bottom: max(0.3em, env(safe-area-inset-bottom));
-  padding-left: max(0.6em, env(safe-area-inset-left)); padding-right: max(0.6em, env(safe-area-inset-right));
+  padding: 0.3em 0.6em; padding-bottom: max(0.3em, var(--safe-b));
+  padding-left: max(0.6em, var(--safe-l)); padding-right: max(0.6em, var(--safe-r));
   background: var(--bg);
 }
 .me-info { grid-area: info; display: flex; flex-direction: column; gap: 0.3em; align-items: flex-start; max-width: 28vw; }
@@ -252,6 +261,7 @@ input { font: inherit; }
 .overlay {
   position: fixed; inset: 0; background: rgba(0, 0, 0, 0.55); z-index: 20;
   display: grid; place-items: center; padding: 1em;
+  padding-left: max(1em, var(--safe-l)); padding-right: max(1em, var(--safe-r)); padding-bottom: max(1em, var(--safe-b));
 }
 .panel {
   background: var(--panel); border: 1px solid var(--panel-border); border-radius: 14px;
@@ -581,7 +591,7 @@ input { font: inherit; }
 
 /* A newly drawn flower: big pop-up in the middle of the table, then a gold glow where it lands. */
 .flower-pops {
-  position: fixed; left: 50%; top: 45%; transform: translate(-50%, -50%); z-index: 14;
+  position: fixed; left: 50%; top: 45%; transform: translate(-50%, -50%); z-index: 45;
   display: flex; gap: 1em; pointer-events: none;
 }
 .flower-pop {
@@ -626,3 +636,12 @@ canvas.celebration { position: fixed; inset: 0; width: 100%; height: 100%; point
 
 /* Links styled as buttons (e.g. "Play on this computer" on the host page). */
 a.btn { text-decoration: none; display: inline-flex; align-items: center; }
+
+/* Claims and wins in the middle pop-up: a round badge like the action button. */
+.pop-badge { display: inline-flex; align-items: center; justify-content: center; align-self: center; margin-right: 0.4em; font-size: clamp(14px, 1.9vw, 22px); animation: none; }
+.flower-pop-tiles { align-items: center; }
+.pop-win .pop-badge { font-size: clamp(22px, 3.4vw, 40px); margin: 0; }
+.pop-chow { border-color: #2f8f5b; box-shadow: 0 0 22px 4px rgba(47, 143, 91, 0.6), 0 8px 18px rgba(0, 0, 0, 0.5); }
+.pop-pong { border-color: #2f6fbf; box-shadow: 0 0 22px 4px rgba(47, 111, 191, 0.6), 0 8px 18px rgba(0, 0, 0, 0.5); }
+.pop-gong { border-color: #8a4fc0; box-shadow: 0 0 22px 4px rgba(138, 79, 192, 0.6), 0 8px 18px rgba(0, 0, 0, 0.5); }
+.pop-win { border-color: #d23b3b; box-shadow: 0 0 26px 6px rgba(210, 59, 59, 0.65), 0 8px 18px rgba(0, 0, 0, 0.5); }
