@@ -623,3 +623,6 @@ canvas.celebration { position: fixed; inset: 0; width: 100%; height: 100%; point
 
 /* Version number in the bottom-left corner of the player Settings panel. */
 .settings-version { text-align: left; margin-top: 0.8em; font-size: 0.75em; color: var(--muted); font-variant-numeric: tabular-nums; }
+
+/* Links styled as buttons (e.g. "Play on this computer" on the host page). */
+a.btn { text-decoration: none; display: inline-flex; align-items: center; }
