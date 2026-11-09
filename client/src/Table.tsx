@@ -648,7 +648,12 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
   const maxHand = Math.min(screen.w * 0.059, screen.h * 0.11);
   const PUBLIC_RATIO = 0.72;
   const handW = Math.max(14, Math.min(maxHand, rowW / (handCount + publicCount * PUBLIC_RATIO + groups * 0.3 + 0.6)));
-  const rowSizes = { '--hand-w': `${handW.toFixed(1)}px`, '--mine-w': `${(handW * PUBLIC_RATIO).toFixed(1)}px` } as CSSProperties;
+  // --hand-max: the biggest your tiles can be, so your row keeps the same height all hand.
+  const rowSizes = {
+    '--hand-w': `${handW.toFixed(1)}px`,
+    '--mine-w': `${(handW * PUBLIC_RATIO).toFixed(1)}px`,
+    '--hand-max': `${Math.max(14, maxHand).toFixed(1)}px`,
+  } as CSSProperties;
   const showButtons = !!a && round?.phase !== 'ended';
   const dealerSeat = round ? view.seats.findIndex((s) => s.isDealer) : view.match.dealer;
   const iAmDealer = mySeat !== null && mySeat === view.match.dealer;
