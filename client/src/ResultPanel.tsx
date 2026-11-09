@@ -65,6 +65,8 @@ export function ResultPanel({ view, lang, command, canClaimWin, onWin, winLabel,
     );
   }
   const result = view.round?.result;
+  /** The tile that completed the winning hand: highlighted. */
+  const winningTileId = result?.type === 'win' ? result.winningTileId : undefined;
   if (!result) return <></>;
   const me = view.you.seat !== null ? view.seats[view.you.seat] : null;
   const waitingFor = view.seats.filter((s) => s.name && !s.cpu && !s.confirmed).map((s) => personName(s.name, lang));
@@ -119,7 +121,9 @@ export function ResultPanel({ view, lang, command, canClaimWin, onWin, winLabel,
                 <span className="result-tiles">
                   {(isWinner ? groupWinningHand(s.hand ?? [], s.melds) : [sortHand(s.hand ?? [])]).map((g, gi) => (
                     <span key={`g${gi}`} className="meld">
-                      {g.map((t) => <TileView key={t.id} type={t.type} width="var(--result-w)" />)}
+                      {g.map((t) => (
+                        <TileView key={t.id} type={t.type} width="var(--result-w)" className={t.id === winningTileId ? 'winning-tile' : undefined} />
+                      ))}
                     </span>
                   ))}
                   {s.melds.map((m, i) => (

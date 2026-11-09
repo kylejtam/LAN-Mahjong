@@ -605,19 +605,19 @@ input { font: inherit; }
   display: flex; flex-direction: column; align-items: center; gap: 0.4em;
   background: rgba(17, 19, 23, 0.82); border: 2px solid #f5c542; border-radius: 14px;
   padding: 0.6em 1em; box-shadow: 0 0 22px 4px rgba(245, 197, 66, 0.55), 0 8px 18px rgba(0, 0, 0, 0.5);
-  animation: flower-pop 2s ease-out forwards;
+  animation: flower-pop 3s ease-out forwards;
 }
 .flower-pop-tiles { display: flex; gap: 0.3em; }
 .flower-pop-text { color: #fff; font-weight: 700; font-size: 1.05em; white-space: nowrap; }
 .flower-pop-wind { font-family: serif; margin-right: 0.4em; color: #f5c542; }
 @keyframes flower-pop {
   0% { opacity: 0; transform: scale(0.4); }
-  12% { opacity: 1; transform: scale(1.12); }
-  22% { transform: scale(1); }
-  80% { opacity: 1; transform: scale(1); }
+  8% { opacity: 1; transform: scale(1.12); }
+  15% { transform: scale(1); }
+  85% { opacity: 1; transform: scale(1); }
   100% { opacity: 0; transform: scale(0.92); }
 }
-.flower-new { animation: flower-glow 0.6s ease-in-out 6 alternate; border-radius: 4px; position: relative; z-index: 1; }
+.flower-new { animation: flower-glow 0.6s ease-in-out 8 alternate; border-radius: 4px; position: relative; z-index: 1; }
 @keyframes flower-glow {
   from { box-shadow: 0 0 0 2px #f5c542, 0 0 4px 2px rgba(245, 197, 66, 0.4); }
   to { box-shadow: 0 0 0 3px #f5c542, 0 0 16px 6px rgba(245, 197, 66, 0.9); }
@@ -669,3 +669,6 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; }
   font-size: 0.5em; font-weight: 600; padding: 0.25em 0.7em; border-radius: 999px;
   background: var(--btn); color: var(--fg); font-variant-numeric: tabular-nums;
 }
+
+/* Win summary: the tile that completed the hand. */
+.winning-tile { position: relative; z-index: 1; border-radius: 4px; box-shadow: 0 0 0 3px #ffd447, 0 0 14px 4px rgba(255, 212, 71, 0.8); transform: translateY(-3px); }

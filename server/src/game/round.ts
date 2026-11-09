@@ -91,6 +91,8 @@ export type RoundResult =
       changes: number[];
       /** Liability 包: this seat paid the whole amount for everyone. */
       liableSeat?: number | null;
+      /** The tile that completed the hand (highlighted on the summary). */
+      winningTileId?: number;
     }
   | { type: 'draw' };
 
@@ -496,7 +498,7 @@ export function claim(prev: RoundState, seat: number, c: Claim, now: number): Ro
     const noMeldsYet = w.base.melds.every((ms) => ms.length === 0);
     const earthly =
       w.source === 'discard' && w.by === core.dealer && w.base.discardCount === 1 && noMeldsYet;
-    endWithWin(core, seat, w.by, {
+    endWithWin(core, seat, w.by, tile.id, {
       winningTile: tile.type,
       selfDraw: false,
       robbingGong: w.source === 'addedGong',
@@ -538,7 +540,7 @@ export function selfDrawWin(prev: RoundState, seat: number, now: number): RoundS
   const hand = core.hands[seat]!;
   const heavenly =
     seat === core.dealer && core.discardCount === 0 && core.melds.every((m) => m.length === 0);
-  endWithWin(core, seat, null, {
+  endWithWin(core, seat, null, hand[hand.length - 1]!.id, {
     winningTile: hand[hand.length - 1]!.type,
     selfDraw: true,
     gongReplacement: core.lastDraw === 'gongReplacement',
@@ -552,6 +554,7 @@ function endWithWin(
   core: RoundCore,
   winner: number,
   discarder: number | null,
+  winningTileId: number,
   extra: {
     winningTile: Tile['type'];
     selfDraw: boolean;
@@ -602,6 +605,7 @@ function endWithWin(
     isChicken: pay.isChicken,
     changes,
     liableSeat,
+    winningTileId,
   };
 }
 

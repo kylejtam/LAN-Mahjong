@@ -302,6 +302,20 @@ describe('winning', () => {
     expect(res.changes.reduce((a, b) => a + b)).toBe(0);
   });
 
+  it('remembers which tile completed the hand (for the summary highlight)', () => {
+    const hands: Setup['hands'] = [S[0], 'm2 m3 m4 p5 p6 p7 s3 s4 s5 wE wE wE dG', S[2], S[3]];
+    let r = dealerDiscards(setupRound({ hands, front: 'dG' }), 's1');
+    r = draw(r, 1, 0);
+    const drawn = r.core.hands[1]!.at(-1)!;
+    r = selfDrawWin(r, 1, 0);
+    expect(r.core.result).toMatchObject({ type: 'win', winningTileId: drawn.id });
+    // Winning on a discard: the discarded tile.
+    const t = table();
+    const dR = idOf(t, 0, 'dR');
+    const won = claim(dealerDiscards(t, 'dR'), 3, { kind: 'win' }, 0);
+    expect(won.core.result).toMatchObject({ type: 'win', winningTileId: dR });
+  });
+
   it('cannot self-draw win without having just drawn', () => {
     const r = claim(dealerDiscards(table(), 'dR'), 2, { kind: 'pong' }, 0);
     expect(() => selfDrawWin(r, 2, 0)).toThrow();
