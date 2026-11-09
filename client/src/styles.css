@@ -695,3 +695,24 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; }
 .hub-left { justify-content: flex-end; }
 .hub-right { justify-content: flex-start; }
 .hub-slot .claim-pile { margin-right: 0; }
+
+/* Keep the middle row still and inside its own space:
+   - the middle column always makes room for it (side discards shrink instead of being overlapped);
+   - Take / last discard / Draw each fill their whole slot with the tile centred, so a longer
+     label (a player's name, "Replacement") can never shift the tile. */
+.pond { grid-template-columns: minmax(0, 1fr) minmax(max-content, 1.5fr) minmax(0, 1fr); }
+.hub-slot { justify-content: center; }
+.hub-slot > .last-discard, .hub-slot > .claim-pile, .hub-slot > .draw-pile { width: 100%; box-sizing: border-box; margin: 0; }
+.hub-slot .draw-label, .hub-slot .last-discard-label { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Fixed heights above and below the table, so the middle of the table never moves:
+   the top bar, the top player's row and your row keep the same height all hand. */
+.topbar { height: calc(2.95em + var(--safe-t)); box-sizing: border-box; }
+.opp-top { height: max(1.9em, calc(var(--public-w) * 4 / 3 + 2px)); overflow: visible; }
+/* Your row: as tall as your biggest possible tiles or the claim buttons (whichever is taller). */
+.me { grid-template-rows: max(calc(var(--hand-max) * 4 / 3 + 10px), 3.8em) 1.6em; }
+.me-bottom { height: 1.6em; min-height: 0; overflow: hidden; }
+.me-bottom .hint { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* Same label size under Take, the last discard and Draw, so their tiles sit at the same height. */
+.hub-slot .draw-label, .hub-slot .last-discard-label { font-size: 0.8em; line-height: 1.25; height: 1.25em; }
+.hub-slot > .last-discard, .hub-slot > .claim-pile, .hub-slot > .draw-pile { gap: 0.15em; padding: 0.3em 0.4em; }
