@@ -682,3 +682,7 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; }
 .dice-roll-die .face { display: none; width: 100%; height: 100%; }
 .dice-roll-die[data-value='1'] .face-1, .dice-roll-die[data-value='2'] .face-2, .dice-roll-die[data-value='3'] .face-3,
 .dice-roll-die[data-value='4'] .face-4, .dice-roll-die[data-value='5'] .face-5, .dice-roll-die[data-value='6'] .face-6 { display: block; }
+
+/* During the deal: your tiles pop in as they arrive (4 at a time), sorted. */
+.hand-tile.dealt-tile { pointer-events: none; animation: dealt-in 0.25s ease-out; }
+@keyframes dealt-in { from { transform: translateY(-30%) scale(0.85); opacity: 0.3; } to { transform: none; opacity: 1; } }
