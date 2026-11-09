@@ -427,6 +427,57 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
   const perWall = view.settings.flowersOn ? 18 : 17;
   const dealAnim = useDealAnimation(round, roundKey, perWall, sideOf);
 
+  // ---------- the last discard, shown big in the middle ----------
+  // Set when a tile is discarded; cleared when it is claimed (it leaves the
+  // discards). Undoing a claim puts it back, so it shows again.
+  const [lastDiscard, setLastDiscard] = useState<{ id: number; type: TileType; by: number } | null>(null);
+  const discardsSeen = useRef<{ key: string; count: number }>({ key: '', count: 0 });
+  const discardList = round?.discards ?? [];
+  useEffect(() => {
+    const before = discardsSeen.current;
+    const last = discardList[discardList.length - 1];
+    discardsSeen.current = { key: roundKey, count: discardList.length };
+    const latest = last ? { id: last.tile.id, type: last.tile.type, by: last.by } : null;
+    if (before.key !== roundKey || discardList.length > before.count) setLastDiscard(latest);
+    else if (discardList.length < before.count) setLastDiscard(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [roundKey, discardList.length]);
+  const showLastDiscard =
+    !!round && round.phase !== 'ended' && !!lastDiscard && !(claimable && round.offered?.tile.id === lastDiscard.id);
+  const lastDiscardTile = showLastDiscard ? (
+    <span className="last-discard" title={tr('lastDiscard')}>
+      <TileView type={lastDiscard!.type} width="var(--draw-w)" />
+      <span className="last-discard-label">
+        {lastDiscard!.by === mySeat ? tr('you') : `${WIND_SHORT[lang][view.seats[lastDiscard!.by]!.wind]} ${personName(view.seats[lastDiscard!.by]?.name, lang)}`}
+      </span>
+    </span>
+  ) : null;
+
+  // ---------- side players: shrink their tiles if they don't all fit ----------
+  // On small screens (iPhone) the side columns are narrow; when a player's
+  // tiles would need more columns than fit, make them smaller instead of
+  // cutting them off.
+  const sideTilesSig = (['left', 'right'] as const)
+    .map((side) => {
+      const sv = view.seats[seatAt(side)]!;
+      return `${sv.melds.reduce((n, m) => n + m.tiles.length, 0)}/${sv.flowers.length}/${sv.hand?.length ?? 0}`;
+    })
+    .join('|');
+  useLayoutEffect(() => {
+    for (const side of ['left', 'right'] as const) {
+      const section = document.querySelector<HTMLElement>(`.opp-${side}`);
+      const box = section?.querySelector<HTMLElement>('.opp-tiles');
+      if (!section || !box) continue;
+      let fit = 1;
+      section.style.setProperty('--fit', '1');
+      for (let i = 0; i < 12 && box.scrollWidth > box.clientWidth + 1 && fit > 0.35; i++) {
+        fit = Math.max(0.35, fit * Math.max(0.6, Math.min(0.95, box.clientWidth / box.scrollWidth)));
+        section.style.setProperty('--fit', fit.toFixed(3));
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sideTilesSig, screen.w, screen.h, roundKey]);
+
   // ---------- flowers: make a newly drawn flower obvious to everyone ----------
   // A pop-up in the middle ("Kyle drew a flower") and a gold glow where it lands.
   // Flowers handed out during the deal don't pop up.
@@ -608,6 +659,7 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
                 a?.draw || a?.drawReplacement ? (
                   // Big glowing tile to tap or drag into your hand, next to the wall picture.
                   <span className="hub-row">
+                  {lastDiscardTile}
                   <WallBox round={round} sideOf={sideOf} perWall={view.settings.flowersOn ? 18 : 17} label={tr('tilesLeft')} />
                   <span
                     className="draw-pile"
@@ -618,7 +670,10 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
                   </span>
                   </span>
                 ) : (
-                  <WallBox round={round} sideOf={sideOf} perWall={perWall} label={tr('tilesLeft')} override={dealAnim?.wall} />
+                  <span className="hub-row">
+                    {!dealAnim && lastDiscardTile}
+                    <WallBox round={round} sideOf={sideOf} perWall={perWall} label={tr('tilesLeft')} override={dealAnim?.wall} />
+                  </span>
                 )
               ) : view.phase === 'rolling' ? (
                 iAmDealer ? <div className="hub-sub">{tr('swipeDiceHere')}</div> : <div className="hub-sub">{tr('waitingRoll', { name: personName(view.seats[view.match.dealer]?.name, lang) })}</div>

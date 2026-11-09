@@ -505,7 +505,8 @@ input { font: inherit; }
 .opp-left, .opp-right { justify-content: flex-start; min-height: 0; }
 .opp-left .opp-tiles, .opp-right .opp-tiles { flex: 1 1 auto; min-height: 0; height: 0; align-self: stretch; justify-content: center; }
 .opp-left .melds-sideways, .opp-right .melds-sideways { height: 100%; max-height: none; }
-.opp-left, .opp-right { --public-w: min(2.4vw, 4.8vh); --opp-w: min(2.2vw, 4.4vh); }
+/* --fit (set by the table code) shrinks side players' tiles when they don't all fit. */
+.opp-left, .opp-right { --public-w: calc(min(2.4vw, 4.8vh) * var(--fit, 1)); --opp-w: calc(min(2.2vw, 4.4vh) * var(--fit, 1)); }
 
 /* ---------- Kyle's next round of changes ---------- */
 /* Side players' name tags: one small line, like the player at the top. */
@@ -645,3 +646,20 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; }
 .pop-pong { border-color: #2f6fbf; box-shadow: 0 0 22px 4px rgba(47, 111, 191, 0.6), 0 8px 18px rgba(0, 0, 0, 0.5); }
 .pop-gong { border-color: #8a4fc0; box-shadow: 0 0 22px 4px rgba(138, 79, 192, 0.6), 0 8px 18px rgba(0, 0, 0, 0.5); }
 .pop-win { border-color: #d23b3b; box-shadow: 0 0 26px 6px rgba(210, 59, 59, 0.65), 0 8px 18px rgba(0, 0, 0, 0.5); }
+
+/* The last discard, big in the middle next to the tiles-left box. */
+.last-discard {
+  display: inline-flex; flex-direction: column; align-items: center; gap: 0.15em;
+  padding: 0.3em 0.5em; border-radius: 10px; background: rgba(255, 255, 255, 0.1);
+  outline: 2px solid rgba(255, 255, 255, 0.55);
+}
+.last-discard .tile { box-shadow: 0 0 0 2px #ffd447, 0 4px 10px rgba(0, 0, 0, 0.4); border-radius: 4px; }
+.last-discard-label { font-size: 0.72em; font-weight: 700; color: #fff; white-space: nowrap; max-width: 8em; overflow: hidden; text-overflow: ellipsis; }
+.felt-white .last-discard-label { color: #222; }
+
+/* Host page: version label next to the title. */
+.host-title { display: flex; align-items: center; gap: 0.6em; flex-wrap: wrap; }
+.version-badge {
+  font-size: 0.5em; font-weight: 600; padding: 0.25em 0.7em; border-radius: 999px;
+  background: var(--btn); color: var(--fg); font-variant-numeric: tabular-nums;
+}

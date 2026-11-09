@@ -60,7 +60,9 @@ export function HostApp(): ReactElement {
   const [balance, setBalance] = useState(200);
   return (
     <div className="host">
-      <h1>LAN Mahjong · Host <span className="muted small app-version">v{APP_VERSION}</span></h1>
+      <h1 className="host-title">
+        LAN Mahjong · Host <span className="version-badge">Version {APP_VERSION}</span>
+      </h1>
       {!open && <p className="muted">Connecting to the server…</p>}
       <div className="host-top card">
         <img className="host-qr" src="/api/qr.svg" alt="QR code to join" />
