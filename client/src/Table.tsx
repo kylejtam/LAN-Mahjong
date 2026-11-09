@@ -496,7 +496,7 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
         {nameTag(sv)}
         {/* Public tiles (shown sets and flowers); hidden tiles only when a spectator chose "Show". */}
         <div className="opp-tiles">
-          {renderMelds(sv.melds, sv.flowers, 'var(--public-w)', sideways)}
+          {renderMelds(sv.melds, dealAnim ? [] : sv.flowers, 'var(--public-w)', sideways)}
           {sv.hand && (
             <div className={`opp-hand${sideways ? ' melds-sideways' : ''}`}>
               {sortHand(sv.hand).map((t) => <TileView key={t.id} type={t.type} width="var(--opp-w)" sideways={sideways} />)}
@@ -776,7 +776,7 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
       <footer className={`me${dealAnim ? ' dealing' : ''}`} style={rowSizes}>
         <div className="me-row">
           {/* Your public tiles (shown sets and flowers) sit to the left of your hand. */}
-          {renderMelds(bottom.melds, bottom.flowers, 'var(--mine-w)')}
+          {renderMelds(bottom.melds, dealAnim ? [] : bottom.flowers, 'var(--mine-w)')}
           <div className={`hand${handGap?.over ? ' reordering' : ''}`} data-drop="hand" ref={handRef}>
           {serverHand
             ? hand.map((t, i) => (
@@ -840,7 +840,7 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
         />
       )}
       {view.you.watchAll && mySeat === null && round && (
-        <AllHands view={view} tr={tr} newFlowerIds={newFlowerIds} onClose={() => command({ type: 'setWatchAll', visible: false })} />
+        <AllHands view={view} tr={tr} newFlowerIds={newFlowerIds} hideFlowers={!!dealAnim} onClose={() => command({ type: 'setWatchAll', visible: false })} />
       )}
       {(round?.phase === 'ended' || view.phase === 'finished') && (
         showReady === roundKey && mySeat !== null && view.phase !== 'finished' ? (
@@ -940,7 +940,7 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
 }
 
 /** Spectators: every player's hand, flowers and shown sets, and nothing else. */
-function AllHands({ view, tr, newFlowerIds, onClose }: { view: RoomView; tr: Tr; newFlowerIds: Set<number>; onClose: () => void }): ReactElement {
+function AllHands({ view, tr, newFlowerIds, hideFlowers, onClose }: { view: RoomView; tr: Tr; newFlowerIds: Set<number>; hideFlowers: boolean; onClose: () => void }): ReactElement {
   const lang = useLang();
   return (
     <div className="overlay all-hands-overlay">
@@ -958,7 +958,7 @@ function AllHands({ view, tr, newFlowerIds, onClose }: { view: RoomView; tr: Tr;
                   {m.tiles.map((t, j) => <TileView key={t.id} type={t.type} back={m.concealed && (j === 0 || j === 3)} width="var(--allhands-w)" />)}
                 </span>
               ))}
-              {s.flowers.length > 0 && (
+              {!hideFlowers && s.flowers.length > 0 && (
                 <span className="meld flowers">
                   {s.flowers.map((t) => <TileView key={t.id} type={t.type} width="var(--allhands-w)" className={newFlowerIds.has(t.id) ? 'flower-new' : undefined} />)}
                 </span>

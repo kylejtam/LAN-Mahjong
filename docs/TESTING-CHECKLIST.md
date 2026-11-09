@@ -73,7 +73,7 @@ Write down which devices worked: ☐ iPhone ☐ iPad ☐ Samsung tablet ☐ lapt
 
 ### Playing a hand
 - [ ] Press **Start**; the dealer swipes the dice; on every screen three dice bounce around, then land in the middle on the rolled numbers (red 1 and 4); then the deal starts. The dice also show next to the dealer's name.
-- [ ] The **deal animation** (~5 s): tiles slide to each player and the wall picture empties.
+- [ ] The **deal animation** (~5 s): tiles slide to each player and the wall picture empties. Nobody's flowers show until the deal has finished.
 - [ ] Your hand is **sorted once** when dealt (fewest suit → most suit, 1–9, then winds E S W N, then dragons). After that it never re-sorts: new tiles go on the right, and your order stays even after locking the phone or reloading.
 - [ ] Your name, chips (and dice if you deal) are at the **top left**.
 - [ ] The top bar shows the **minimum fan** next to the round name ("Min 1 fan" / "1番起糊"). Change it on the host page between hands: every device updates.
