@@ -686,3 +686,12 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; }
 /* During the deal: your tiles pop in as they arrive (4 at a time), sorted. */
 .hand-tile.dealt-tile { pointer-events: none; animation: dealt-in 0.25s ease-out; }
 @keyframes dealt-in { from { transform: translateY(-30%) scale(0.85); opacity: 0.3; } to { transform: none; opacity: 1; } }
+
+/* The middle of the table: three fixed slots, so the wall stays centred whether or not
+   the last discard / Take (left) and Draw (right) are showing. */
+.hub-row { display: grid; grid-template-columns: var(--hub-slot) auto var(--hub-slot); align-items: center; gap: 0.6em; }
+.hub { --hub-slot: calc(var(--draw-w) + 2.6em); }
+.hub-slot { display: flex; align-items: center; min-width: 0; height: calc(var(--draw-w) * 4 / 3 + 2.6em); }
+.hub-left { justify-content: flex-end; }
+.hub-right { justify-content: flex-start; }
+.hub-slot .claim-pile { margin-right: 0; }

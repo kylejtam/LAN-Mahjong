@@ -81,6 +81,7 @@ Write down which devices worked: ☐ iPhone ☐ iPad ☐ Samsung tablet ☐ lapt
 - [ ] The new tile sits **apart on the right**; drag it into your hand and it joins it.
 - [ ] Drag tiles to **reorder** your hand: while you drag, the other tiles slide apart to show where it will land.
 - [ ] **Discard**: drag a tile to the middle; it slides into place. Other players' discards slide in too.
+- [ ] The middle of the table: last discard (or **Take**) on the left, the wall and "tiles left" in the centre, **Draw** on the right. The wall stays still when Draw / Take appear or go.
 - [ ] The **last discard** also shows big in the middle (next to "tiles left") with who threw it; it goes away when someone claims it.
 - [ ] When you can claim, the tile shows big in the middle as **Take**; tap or drag it.
       The flashing Soeng / Pung / Gong / Wu buttons also work, and so does tapping the discard.
