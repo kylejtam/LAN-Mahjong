@@ -209,6 +209,7 @@ disagrees with those, the newest dated entry here wins.
 | 2026-11-10 | **1.17.0: editable history (host page).** Tap any chip change in the history to type a new number. Only the difference is applied to that player's chips now (nothing is worked out again, so hand-typed chips are kept). Edited numbers get an orange outline and "was …", the game an Edited tag, a warning if it no longer adds up to 0, and a timed line in an edit list. Roll back keeps edits (later hands' starting chips are shifted by the difference). | Kyle |
 | 2026-11-10 | **1.17.0: game tiles (host page).** Each game is a tile (name, wind/game, playing or waiting, tiles left, players and chips), newest first. Tap to open its seats, current game, history and settings; several can be open. A newly created game opens by itself and glows gold briefly. Open tiles are remembered on the host computer. | Kyle |
 | 2026-11-10 | **1.17.0: win summary names.** The winner's name is green and the name of the player who threw the winning tile is red (heading and hand rows). | Kyle |
+| 2026-11-10 | **1.17.1 (bug fix): the discard slide-in animation was missing.** A new discard was marked to slide in, but the screen redrew again at once and the mark was dropped before the animation could play. Now a new discard keeps its slide-in for the length of the animation (0.4 s), so extra redraws can't cut it off. | Kyle |
 
 ## Open questions for Kyle
 
