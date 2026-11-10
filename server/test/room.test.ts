@@ -430,6 +430,23 @@ describe('history, roll back and changing the current game (host page)', () => {
     expect(() => host(r, { type: 'hostRollBack', toHand: 0 })).toThrow(/no such game/);
   });
 
+  it('the host can edit a chip change in the history: only the difference is applied, and it is marked', () => {
+    let r = finishWith(startedTable(), 1, 0, [-16, 32, -8, -8]); // game 1: Kyle 984, Amy 1032, Ben 992, Cat 992
+    r = host(r, { type: 'hostSetBalance', name: 'Ben', balance: 5000 }); // a manual change: must be kept
+    r = finishWith(playAgain(r), 2, null, [-16, -16, 48, -16]); // game 2: Ben 5048
+    r = host(r, { type: 'hostEditHistory', hand: 0, seat: 2, change: -20 }); // Ben in game 1: -8 → -20
+    expect(r.people.ben!.balance).toBe(5036); // 5048 - 12, not worked out again from the start
+    expect(r.people.kyle!.balance).toBe(968); // nobody else changes
+    const h = hostViewOf(r).history[0]!;
+    expect(h).toMatchObject({ seatChanges: [-16, 32, -20, -8], originalSeatChanges: [-16, 32, -8, -8] });
+    expect(hostViewOf(r).historyEdits[0]).toMatchObject({ hand: 0, seat: 2, name: 'Ben', from: -8, to: -20 });
+    // Rolling back to before game 2 keeps the edit (and the manual 5000).
+    r = host(r, { type: 'hostRollBack', toHand: 1 });
+    expect(r.people.ben!.balance).toBe(4988);
+    expect(() => host(r, { type: 'hostEditHistory', hand: 5, seat: 0, change: 1 })).toThrow(/no such game/);
+    expect(() => host(r, { type: 'hostEditHistory', hand: 0, seat: 0, change: 1.5 })).toThrow(/whole number/);
+  });
+
   it('roll back still works after someone changes their name', () => {
     let r = finishWith(startedTable(), 1, 0, [-16, 32, -8, -8]);
     r = cmd(r, 'Amy', { type: 'rename', newName: 'Amelia' });

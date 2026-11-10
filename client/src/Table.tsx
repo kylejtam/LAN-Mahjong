@@ -138,6 +138,12 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
   /** Spectators can close the seat picker and just watch. */
   const [justWatching, setJustWatching] = useState(false);
   const [chooser, setChooser] = useState<Chooser>(null);
+  /**
+   * Choosing which Soeng (when there is more than one): the tiles you could use glow
+   * in your hand. `first` is a tile already tapped that is in two runs: then only
+   * its partner tiles stay lit until you tap one of them.
+   */
+  const [chowPick, setChowPick] = useState<{ offerId: number; first: TileType | null } | null>(null);
   const command = (c: Extract<ClientMessage, { type: 'command' }>['command']): void => send({ type: 'command', command: c });
   const doClaim = (claim: Claim): void => command({ type: 'claim', claim });
 
@@ -209,10 +215,22 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
   const handRef = useRef<HTMLDivElement>(null);
   const reorderRef = useRef<HandGap | null>(null);
 
+  /**
+   * Discarding: a hand tile pushed up until the whole (dragged) tile is out of the
+   * dark hand area at the bottom. The dragged tile is drawn centred a little above
+   * the finger (see .drag-ghost), so its bottom edge is about 0.45 tile-heights below it.
+   */
+  const discardReadyAt = (y: number): boolean => {
+    if (!a?.discard) return false;
+    const me = document.querySelector('.me')?.getBoundingClientRect();
+    const tileH = handRef.current?.querySelector<HTMLElement>('[data-hand-tile]')?.offsetHeight ?? 0;
+    return !!me && y + tileH * 0.45 < me.top;
+  };
+
   const onDrop = (src: DragSource, drop: Drop): void => {
     if (src.kind === 'hand') {
       const gap = reorderRef.current;
-      if (drop.zone === 'discard' && a?.discard) {
+      if (a?.discard && (discardReadyAt(drop.y) || drop.zone === 'discard')) {
         command({ type: 'discard', tileId: src.tileId });
       } else if (gap?.over) {
         // Reorder (on this device only): drop it into the gap the other tiles made.
@@ -246,6 +264,7 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
   };
   /** Tapping the Draw / Replacement tile draws it too (dragging also works). */
   const onTap = (src: DragSource): void => {
+    if (src.kind === 'hand' && chowPick) return pickChowTile(src.type);
     if ((src.kind === 'wallFront' && a?.draw) || (src.kind === 'wallBack' && a?.drawReplacement)) {
       // Remember where the tile starts, so it can glide into your hand.
       const r = document.querySelector('.draw-pile')?.getBoundingClientRect();
@@ -274,7 +293,8 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
     const h = first.offsetHeight;
     const slot = els.length > 1 ? els[1]!.offsetLeft - first.offsetLeft : w + 2;
     const r = box.getBoundingClientRect();
-    const over = drag.y > r.top - h * 0.9 && drag.y < r.bottom + h * 0.6 && drag.x > r.left - w * 1.5 && drag.x < r.right + w * 1.5;
+    // Pushed out of the hand area to discard: no gap in the hand.
+    const over = !discardReadyAt(drag.y) && drag.y > r.top - h * 0.9 && drag.y < r.bottom + h * 0.6 && drag.x > r.left - w * 1.5 && drag.x < r.right + w * 1.5;
     const rel = drag.x - (r.left + first.offsetLeft);
     // The gap opens at the place nearest the finger (the tile's middle follows the finger).
     const target = Math.max(0, Math.min(otherIds.length, Math.round((rel - w / 2) / slot)));
@@ -364,6 +384,16 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [endSig]);
   const showMoment = !!moment && moment.sig === endSig;
+  // Tap anywhere (not on a button) to skip straight to the summary. Only on this screen.
+  useEffect(() => {
+    if (!showMoment) return;
+    const skip = (e: PointerEvent): void => {
+      if ((e.target as Element | null)?.closest?.('button, a, input, select')) return;
+      setMoment(null);
+    };
+    window.addEventListener('pointerdown', skip);
+    return () => window.removeEventListener('pointerdown', skip);
+  }, [showMoment]);
 
   // ---------- action buttons ----------
   const onWin = (): void => (a?.selfDrawWin ? command({ type: 'selfDrawWin' }) : doClaim({ kind: 'win' }));
@@ -379,8 +409,41 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
   const onChow = (): void => {
     if (!a) return;
     if (a.chow.length === 1) doClaim({ kind: 'chow', tileIds: a.chow[0]! });
-    else setChooser({ kind: 'chow', options: a.chow });
+    else if (chowPick) setChowPick(null); // tapping Soeng again stops choosing
+    else if (round?.offered) setChowPick({ offerId: round.offered.tile.id, first: null });
   };
+  /** Each Soeng you could make: the two tile ids and their types. */
+  const chowOptions = (a?.chow ?? []).map((ids) => ({ ids, types: ids.map((id) => serverHand?.find((t) => t.id === id)?.type) as TileType[] }));
+  /** While choosing a Soeng: the tile types that glow in your hand. */
+  const chowLit = ((): Set<TileType> | null => {
+    if (!chowPick) return null;
+    const opts = chowPick.first ? chowOptions.filter((o) => o.types.includes(chowPick.first!)) : chowOptions;
+    return new Set(opts.flatMap((o) => o.types));
+  })();
+  /** Tapping a tile in your hand while choosing a Soeng. */
+  const pickChowTile = (type: TileType): void => {
+    if (!chowPick || !chowLit) return;
+    if (!chowLit.has(type) || type === chowPick.first) return setChowPick({ ...chowPick, first: null }); // start again
+    const first = chowPick.first;
+    const matches = chowOptions.filter((o) => o.types.includes(type) && (!first || o.types.includes(first)));
+    if (matches.length === 1) {
+      setChowPick(null);
+      doClaim({ kind: 'chow', tileIds: matches[0]!.ids });
+    } else setChowPick({ ...chowPick, first: type }); // in two runs: keep only its partners lit
+  };
+  // Stop choosing when the chance to claim has gone (or a different tile is offered).
+  useEffect(() => {
+    if (chowPick && (!claimable || !a?.chow.length || round?.offered?.tile.id !== chowPick.offerId)) setChowPick(null);
+  });
+  // Tapping anywhere outside your hand starts the choice again.
+  useEffect(() => {
+    if (!chowPick?.first) return;
+    const away = (e: PointerEvent): void => {
+      if (!(e.target as Element | null)?.closest?.('[data-hand-tile], .act-chow')) setChowPick((p) => (p ? { ...p, first: null } : p));
+    };
+    window.addEventListener('pointerdown', away);
+    return () => window.removeEventListener('pointerdown', away);
+  }, [chowPick?.first]);
   /** Tapping the offered discard claims it (or shows the choices). */
   const onTapOffered = (): void => {
     if (!a || !claimOptions) return;
@@ -399,7 +462,8 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
   const waitingOnEmptySeat = !!round && round.phase !== 'ended' && !turnName;
   let hint = '';
   if (view.phase === 'playing' && round && round.phase !== 'ended') {
-    if (a?.draw) hint = tr('hintDraw');
+    if (chowPick) hint = tr('hintPickChow');
+    else if (a?.draw) hint = tr('hintDraw');
     else if (a?.drawReplacement) hint = tr('hintReplace');
     else if (a?.discard) hint = tr('hintDiscard');
     else if (a?.pass) hint = tr('hintLastTile');
@@ -520,7 +584,8 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
     <div className={`nametag${round && round.turn === sv.seat && round.phase !== 'ended' ? ' nametag-turn' : ''}`}>
       <span className="wind-badge">{WIND_SHORT[lang][sv.wind]}</span>
       <span className="nametag-name">{sv.name ? personName(sv.name, lang) : tr('empty')}</span>
-      {sv.cpu && !sv.name?.startsWith('CPU') && <span className="cpu-badge">{tr('cpu')}</span>}
+      {/* CPU names already end in "(CPU)"; older names don't. */}
+      {sv.cpu && !sv.name?.startsWith('CPU') && !sv.name?.endsWith('(CPU)') && <span className="cpu-badge">{tr('cpu')}</span>}
       {sv.name && !sv.connected && !sv.cpu && <span className="offline">{tr('offline')}</span>}
       {sv.balance !== null && !hideChips && <span className="chips">{sv.balance}</span>}
       {round && sv.isDealer && (
@@ -775,6 +840,10 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
       </header>
 
       <main className="board">
+        {/* Whose turn: the table edge in front of that player glows gold (their name tag pulses too). */}
+        {round && round.phase !== 'ended' && !dealAnim && view.seats[round.turn]?.name && (
+          <div className={`turn-edge turn-edge-${sideOf(round.turn)}`} aria-hidden="true" />
+        )}
         {flowerPops.some((fp) => fp.kind !== 'flower') &&
           flowerPops
             .filter((fp) => fp.kind !== 'flower')
@@ -848,8 +917,15 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
                   <WallBox round={round} sideOf={sideOf} perWall={perWall} label={tr('tilesLeft')} override={dealAnim?.wall} />
                   <span className="hub-slot hub-right">
                     {(a?.draw || a?.drawReplacement) && (
-                      // Big glowing tile to tap or drag into your hand.
-                      <span className="draw-pile" onPointerDown={start(a.draw ? { kind: 'wallFront' } : { kind: 'wallBack' })}>
+                      // Big glowing tile: pressing it draws straight away (no need to drag or let go).
+                      <span
+                        className="draw-pile"
+                        onPointerDown={(e) => {
+                          if (e.button !== 0 && e.pointerType === 'mouse') return;
+                          e.preventDefault();
+                          onTap(a.draw ? { kind: 'wallFront' } : { kind: 'wallBack' });
+                        }}
+                      >
                         <TileView back width="var(--draw-w)" />
                         <span className="draw-label">{a.draw ? tr('drawHere') : tr('replacementHere')}</span>
                       </span>
@@ -899,7 +975,9 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
                 <span
                   key={t.id}
                   data-hand-tile={t.id}
-                  className={`hand-tile${drag?.moved && drag.src.kind === 'hand' && drag.src.tileId === t.id ? (handGap?.over ? ' dragging gap' : ' dragging') : ''}`}
+                  className={`hand-tile${drag?.moved && drag.src.kind === 'hand' && drag.src.tileId === t.id ? (handGap?.over ? ' dragging gap' : ' dragging') : ''}${
+                    chowLit ? (chowLit.has(t.type) ? (t.type === chowPick?.first ? ' chow-pick chow-first' : ' chow-pick') : ' chow-faded') : ''
+                  }`}
                   style={slideOf(t.id, i) ? { transform: `translateX(${slideOf(t.id, i)}px)` } : undefined}
                   onPointerDown={mySeat !== null ? start({ kind: 'hand', tileId: t.id, type: t.type }) : undefined}
                 >
@@ -960,6 +1038,7 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
       {view.you.watchAll && mySeat === null && round && (
         <AllHands view={view} tr={tr} newFlowerIds={newFlowerIds} hideFlowers={!!dealAnim} onClose={() => command({ type: 'setWatchAll', visible: false })} />
       )}
+      {showMoment && <div className="tap-to-continue">{tr('tapToContinue')}</div>}
       {showMoment && moment.kind === 'tie' && (
         <div className="tie-stamp-at" aria-live="polite">
           <div className="tie-stamp">
@@ -1062,7 +1141,8 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
       )}
 
       {drag?.moved && (
-        <div className="drag-ghost" style={{ left: drag.x, top: drag.y }}>
+        // A hand tile pushed far enough to discard glows red: letting go throws it.
+        <div className={`drag-ghost${drag.src.kind === 'hand' && discardReadyAt(drag.y) ? ' discard-ready' : ''}`} style={{ left: drag.x, top: drag.y }}>
           {drag.src.kind === 'hand' ? (
             <TileView type={drag.src.type} width="var(--hand-w)" />
           ) : drag.src.kind === 'dice' ? (

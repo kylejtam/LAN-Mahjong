@@ -92,6 +92,10 @@ export interface HandRecord {
   changes: Record<string, number>;
   /** Chip change per seat 0-3, and who won / discarded (seat numbers). Missing in old saves. */
   seatChanges?: number[];
+  /** Who sat in seats 0-3 (person keys). Missing in old saves. */
+  seatKeys?: (string | null)[];
+  /** The chip changes as first played, once the host has edited any of them. */
+  originalSeatChanges?: number[];
   winnerSeat?: number | null;
   discarderSeat?: number | null;
   /** Everyone's chips just before this hand was paid out (used to roll back). */
@@ -135,6 +139,18 @@ export interface Room {
   cpuPauseUntil?: number;
   /** When the host last stopped a hand (players are told). */
   roundStoppedAt?: number | null;
+  /** Chip changes the host edited in the history, newest last. */
+  historyEdits?: HistoryEdit[];
+}
+
+export interface HistoryEdit {
+  at: number;
+  /** History index of the hand (0 = first). */
+  hand: number;
+  seat: number;
+  name: string;
+  from: number;
+  to: number;
 }
 
 export type Command =
@@ -179,6 +195,8 @@ export type HostCommand =
   | { type: 'hostSetBalance'; name: string; key?: string; balance: number }
   /** Go back to just before hand `toHand` was played: chips, wind and dealer as they were then. */
   | { type: 'hostRollBack'; toHand: number }
+  /** Change one player's chip win / loss in a finished hand. Only the difference is applied to their chips now. */
+  | { type: 'hostEditHistory'; hand: number; seat: number; change: number }
   /** Seconds every CPU waits before each move (the same for all levels). */
   | { type: 'hostSetCpuSeconds'; seconds: number }
   /** Jump to a wind (0 East ... 3 North) and game number (1-4). Chips are not changed. */
@@ -438,6 +456,7 @@ function maybeCloseRound(room: Room): void {
           : { type: 'win', winner: nameAt(result.winner) ?? '', discarder: nameAt(result.discarder), fan: result.fan, isChicken: result.isChicken },
       changes: changesByKey,
       seatChanges: changes.slice(),
+      seatKeys: room.seats.slice(),
       winnerSeat: result.type === 'win' ? result.winner : null,
       discarderSeat: result.type === 'win' ? result.discarder : null,
       balancesBefore: Object.fromEntries(Object.values(room.people).map((p) => [p.key, p.balance])),
@@ -598,7 +617,12 @@ export function handleCommand(prev: Room, key: string, cmd: Command, now: number
       // Keep the hand history pointing at the same person.
       const rekeyRecord = (r: Record<string, number>): Record<string, number> =>
         Object.fromEntries(Object.entries(r).map(([k, v]) => [rekey(k), v]));
-      room.history = (room.history ?? []).map((h) => ({ ...h, changes: rekeyRecord(h.changes), balancesBefore: rekeyRecord(h.balancesBefore) }));
+      room.history = (room.history ?? []).map((h) => ({
+        ...h,
+        changes: rekeyRecord(h.changes),
+        balancesBefore: rekeyRecord(h.balancesBefore),
+        seatKeys: h.seatKeys?.map((k) => (k === null ? null : rekey(k))),
+      }));
       break;
     }
     case 'dropOut': {
@@ -718,6 +742,7 @@ export function handleHostCommand(prev: Room, cmd: HostCommand, now: number): Ro
       if (!Number.isInteger(cmd.toHand) || !target) fail('There is no such game in the history.');
       for (const p of Object.values(room.people)) p.balance = target!.balancesBefore[p.key] ?? room.startingBalance;
       room.history = history.slice(0, cmd.toHand);
+      room.historyEdits = (room.historyEdits ?? []).filter((e) => e.hand < cmd.toHand);
       room.match = {
         ...room.match,
         roundWind: target!.roundWind,
@@ -728,6 +753,37 @@ export function handleHostCommand(prev: Room, cmd: HostCommand, now: number): Ro
         lastResult: null,
       };
       cancelRound(room);
+      break;
+    }
+    case 'hostEditHistory': {
+      const history = room.history ?? [];
+      const h = history[cmd.hand];
+      if (!Number.isInteger(cmd.hand) || !h) fail('There is no such game in the history.');
+      if (!Number.isInteger(cmd.seat) || cmd.seat < 0 || cmd.seat >= SEATS || !h!.seatNames[cmd.seat]) fail('Nobody sat there in that game.');
+      if (!Number.isInteger(cmd.change) || Math.abs(cmd.change) > 1_000_000_000) fail('Chips must be a whole number.');
+      const seatChanges = (h!.seatChanges ?? [0, 0, 0, 0]).slice();
+      const diff = cmd.change - seatChanges[cmd.seat]!;
+      if (diff === 0) break;
+      // Who was it? The recorded key, or (old saves) the CPU in that seat / the person with that name.
+      const name = h!.seatNames[cmd.seat]!;
+      const key =
+        h!.seatKeys?.[cmd.seat] ??
+        (room.people[`cpu#${cmd.seat}`]?.name === name ? `cpu#${cmd.seat}` : Object.values(room.people).find((p) => p.name === name)?.key ?? null);
+      const person = key ? room.people[key] : undefined;
+      if (!person) fail('That player is no longer in this game.');
+      const updated: HandRecord = {
+        ...h!,
+        originalSeatChanges: h!.originalSeatChanges ?? seatChanges.slice(),
+        seatChanges: seatChanges.map((c, i) => (i === cmd.seat ? cmd.change : c)),
+        changes: { ...h!.changes, [person!.key]: cmd.change },
+      };
+      // Only the difference: nothing else is worked out again, so chips typed in by hand are kept.
+      person!.balance += diff;
+      // Rolling back to a later hand must keep this edit too.
+      room.history = history.map((x, i) =>
+        i === cmd.hand ? updated : i > cmd.hand ? { ...x, balancesBefore: { ...x.balancesBefore, [person!.key]: (x.balancesBefore[person!.key] ?? room.startingBalance) + diff } } : x,
+      );
+      room.historyEdits = [...(room.historyEdits ?? []), { at: now, hand: cmd.hand, seat: cmd.seat, name, from: seatChanges[cmd.seat]!, to: cmd.change }];
       break;
     }
     case 'hostSetPosition': {

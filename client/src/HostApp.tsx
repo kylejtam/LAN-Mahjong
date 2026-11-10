@@ -20,6 +20,8 @@ function useHostConnection() {
   const [urls, setUrls] = useState<string[]>([]);
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  /** The game this page just created (its tile opens by itself). */
+  const [created, setCreated] = useState<string | null>(null);
   const ws = useRef<WebSocket | null>(null);
   useEffect(() => {
     let stopped = false;
@@ -32,6 +34,8 @@ function useHostConnection() {
         if (msg.type === 'hostState') {
           setGames(msg.games);
           setUrls(msg.urls);
+        } else if (msg.type === 'hostCreated') {
+          setCreated(msg.gameId);
         } else if (msg.type === 'error') {
           setError(msg.message);
           setTimeout(() => setError(null), 4000);
@@ -49,11 +53,38 @@ function useHostConnection() {
     };
   }, []);
   const send = (m: HostMessage): void => ws.current?.send(JSON.stringify(m));
-  return { games, urls, open, error, send };
+  return { games, urls, open, error, send, created };
 }
 
 export function HostApp(): ReactElement {
-  const { games, urls, open, error, send } = useHostConnection();
+  const { games, urls, open, error, send, created } = useHostConnection();
+  // Which game tiles are open (remembered on this computer).
+  const [openIds, setOpenIds] = useState<Set<string>>(() => {
+    try {
+      return new Set<string>(JSON.parse(localStorage.getItem('hostOpenGames') ?? '[]') as string[]);
+    } catch {
+      return new Set<string>();
+    }
+  });
+  const toggle = (id: string, on?: boolean): void =>
+    setOpenIds((old) => {
+      const next = new Set(old);
+      if (on ?? !next.has(id)) next.add(id);
+      else next.delete(id);
+      try {
+        localStorage.setItem('hostOpenGames', JSON.stringify([...next]));
+      } catch {
+        // Not saved: fine.
+      }
+      return next;
+    });
+  // A new game opens by itself, straight to its seats, history and settings.
+  useEffect(() => {
+    if (!created) return;
+    toggle(created, true);
+    setTimeout(() => document.querySelector(`[data-game="${created}"]`)?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [created]);
   const [gameName, setGameName] = useState('');
   const [balance, setBalance] = useState(200);
   return (
@@ -97,9 +128,16 @@ export function HostApp(): ReactElement {
         </div>
       </div>
 
-      {games.map((g) => (
-        <GameCard key={g.id} game={g} send={send} />
-      ))}
+      {games.length > 0 && <h2>Games</h2>}
+      <div className="game-tiles">
+        {[...games]
+          .sort((x, y) => y.createdAt - x.createdAt) // newest first
+          .map((g) => (
+            <GameTile key={g.id} game={g} open={openIds.has(g.id)} fresh={g.id === created} onToggle={() => toggle(g.id)}>
+              <GameCard game={g} send={send} />
+            </GameTile>
+          ))}
+      </div>
       {error && <div className="toast">{error}</div>}
     </div>
   );
@@ -123,6 +161,75 @@ function CpuNameRow({ name, onSet }: { name: string; onSet: (name: string) => vo
       <span className="muted small">(CPU)</span>
       <button className="btn primary" type="submit" disabled={!changed}>Set</button>
     </form>
+  );
+}
+
+const signed = (n: number): string => (n > 0 ? `+${n}` : n < 0 ? `−${Math.abs(n)}` : '0');
+
+/** One chip change in the history. Tap it to type a new number; edited numbers are outlined in orange. */
+function HistoryCell({ cls, change, was, editable, onSave, children }: {
+  cls: string; change: number; was?: number; editable: boolean; onSave: (value: number) => void; children?: ReactElement | false | null | '';
+}): ReactElement {
+  const [editing, setEditing] = useState(false);
+  const [value, setValue] = useState(String(change));
+  const n = Number(value.replace('−', '-'));
+  const valid = value.trim() !== '' && Number.isInteger(n);
+  if (editing) {
+    return (
+      <td className={`num ${cls}`}>
+        <form
+          className="history-editor"
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (!valid) return;
+            if (n !== change) onSave(n);
+            setEditing(false);
+          }}
+        >
+          <input autoFocus inputMode="numeric" value={value} onChange={(e) => setValue(e.target.value)} aria-label="New chip change" onKeyDown={(e) => e.key === 'Escape' && setEditing(false)} />
+          <button className="btn primary" type="submit" disabled={!valid}>Save</button>
+          <button className="btn" type="button" onClick={() => setEditing(false)}>Cancel</button>
+        </form>
+      </td>
+    );
+  }
+  return (
+    <td
+      className={`num ${cls}${editable ? ' history-cell' : ''}${was !== undefined ? ' edited' : ''}`}
+      tabIndex={editable ? 0 : undefined}
+      title={editable ? 'Tap to change' : undefined}
+      onClick={editable ? () => { setValue(String(change)); setEditing(true); } : undefined}
+      onKeyDown={editable ? (e) => { if (e.key === 'Enter') { setValue(String(change)); setEditing(true); } } : undefined}
+    >
+      {signed(change)}
+      {was !== undefined && <span className="was">was {signed(was)}</span>}
+      {children}
+    </td>
+  );
+}
+
+/** One game: a tile showing where it's up to and who is playing; tap it to open its seats, history and settings. */
+function GameTile({ game, open, fresh, onToggle, children }: { game: HostGameView; open: boolean; fresh: boolean; onToggle: () => void; children: ReactElement }): ReactElement {
+  const playing = game.phase === 'playing' || game.phase === 'rolling';
+  const state =
+    game.phase === 'finished'
+      ? 'Finished'
+      : playing
+        ? `${game.label.en} · playing${game.round && game.round.phase !== 'ended' ? ` · ${game.round.wallCount} tiles left` : ''}`
+        : `${game.label.en} · waiting to start`;
+  const seated = game.seats.filter((s) => s.name);
+  return (
+    <section className={`game-tile${open ? ' open' : ''}${fresh ? ' fresh' : ''}`} data-game={game.id}>
+      <button className="game-tile-head" type="button" aria-expanded={open} onClick={onToggle}>
+        <span className="game-tile-name">{game.name}</span>
+        <span className="game-tile-chev" aria-hidden="true">›</span>
+        <span className="game-tile-state"><span className={`dot${playing ? '' : ' wait'}`} />{state}</span>
+        <span className="game-tile-players">
+          {seated.length ? seated.map((s) => `${s.name} ${s.balance ?? ''}`).join(' · ') : <span className="muted">Nobody seated yet</span>}
+        </span>
+      </button>
+      {open && children}
+    </section>
   );
 }
 
@@ -258,6 +365,10 @@ function PositionAndHistory({ game, cmd }: { game: HostGameView; cmd: (c: Extrac
                   {h.result.type === 'draw'
                     ? 'Draw'
                     : `${h.result.winner} won ${h.result.fan} fan ${h.result.discarder ? `on ${h.result.discarder}'s discard` : 'by self-draw'}${h.result.isChicken ? ' (chicken)' : ''}`}
+                  {h.originalSeatChanges && h.originalSeatChanges.some((c, i) => c !== h.seatChanges[i]) && <span className="edited-tag">Edited</span>}
+                  {h.seatChanges.reduce((x, y) => x + y, 0) !== 0 && (
+                    <span className="edited-warn">This game now adds up to {signed(h.seatChanges.reduce((x, y) => x + y, 0))}, not 0.</span>
+                  )}
                 </td>
                 {h.seatChanges.map((change, seat) => {
                   // Winner green; discarder red; on a self-draw every loser is red.
@@ -268,11 +379,18 @@ function PositionAndHistory({ game, cmd }: { game: HostGameView; cmd: (c: Extrac
                       : change < 0 ? 'cell-lose' : '';
                   const who = h.seatNames[seat];
                   const current = game.seats[seat]?.name;
+                  const was = h.originalSeatChanges?.[seat];
                   return (
-                    <td key={seat} className={`num ${cls}`}>
-                      {change > 0 ? `+${change}` : change < 0 ? `−${Math.abs(change)}` : '0'}
+                    <HistoryCell
+                      key={seat}
+                      cls={cls}
+                      change={change}
+                      was={was !== undefined && was !== change ? was : undefined}
+                      editable={!!who}
+                      onSave={(value) => cmd({ type: 'hostEditHistory', hand: h.index, seat, change: value })}
+                    >
                       {who && who !== current && <div className="muted small">{who}</div>}
-                    </td>
+                    </HistoryCell>
                   );
                 })}
                 <td>
@@ -287,7 +405,19 @@ function PositionAndHistory({ game, cmd }: { game: HostGameView; cmd: (c: Extrac
           </tbody>
         </table>
       )}
-      <p className="muted small">Rolling back puts everyone's chips, the wind and the dealer back to just before that game, and removes the games after it.</p>
+      <p className="muted small">
+        Tap a number to change it. Only the difference is added to (or taken from) that player's chips now; nothing else is worked out again, so chips typed in by hand are kept.
+        Rolling back puts everyone's chips, the wind and the dealer back to just before that game (keeping any edits to earlier games), and removes the games after it.
+      </p>
+      {game.historyEdits.length > 0 && (
+        <ol className="edit-log">
+          {game.historyEdits.map((e, i) => (
+            <li key={i}>
+              {new Date(e.at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}: game {e.hand + 1}, {e.name} {signed(e.from)} → {signed(e.to)}, so {signed(e.to - e.from)} chips.
+            </li>
+          ))}
+        </ol>
+      )}
       </details>
     </>
   );
@@ -303,13 +433,9 @@ function GameCard({ game, send }: { game: HostGameView; send: (m: HostMessage) =
   // A hand being played (or its dice roll) can be stopped; a finished hand (win summary) can't.
   const inHand = game.phase === 'rolling' || (game.phase === 'playing' && !!game.round && game.round.phase !== 'ended');
   const dealer = game.match.dealer;
-  const phaseText = { betweenRounds: 'Between rounds', rolling: 'Rolling dice', playing: 'Playing', finished: 'Finished' }[game.phase];
 
   return (
-    <div className="card">
-      <h2 style={{ marginTop: 0 }}>
-        {game.name} <span className="muted small">· {game.label.en} · {phaseText}{game.round ? ` · ${game.round.wallCount} tiles left` : ''}</span>
-      </h2>
+    <div className="game-body">
       <div className="host-seats">
         {game.seats.map((s) => (
           <div key={s.seat} className="host-seat">

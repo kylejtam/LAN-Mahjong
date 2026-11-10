@@ -150,7 +150,19 @@ input { font: inherit; }
   background: rgba(0, 0, 0, 0.35); border-radius: 999px; white-space: nowrap; max-width: 100%;
   border: 2px solid transparent;
 }
-.nametag-turn { border-color: #ffd447; }
+.nametag-turn { border-color: #ffd447; animation: turn-pulse 0.8s ease-in-out infinite alternate; }
+@keyframes turn-pulse {
+  from { box-shadow: 0 0 0 1px #ffd447, 0 0 6px 1px rgba(255, 212, 71, 0.5); }
+  to { box-shadow: 0 0 0 2px #ffd447, 0 0 16px 5px rgba(255, 212, 71, 0.75); }
+}
+/* The table edge in front of whoever is playing glows gold. */
+.board { position: relative; }
+.turn-edge { position: absolute; pointer-events: none; z-index: 1; }
+.turn-edge-top { left: 0; right: 0; top: 0; height: 12px; background: linear-gradient(180deg, rgba(255, 212, 71, 0.9), rgba(255, 212, 71, 0)); }
+.turn-edge-bottom { left: 0; right: 0; bottom: 0; height: 12px; background: linear-gradient(0deg, rgba(255, 212, 71, 0.9), rgba(255, 212, 71, 0)); }
+.turn-edge-left { top: 0; bottom: 0; left: 0; width: 12px; background: linear-gradient(90deg, rgba(255, 212, 71, 0.9), rgba(255, 212, 71, 0)); }
+.turn-edge-right { top: 0; bottom: 0; right: 0; width: 12px; background: linear-gradient(270deg, rgba(255, 212, 71, 0.9), rgba(255, 212, 71, 0)); }
+@media (prefers-reduced-motion: reduce) { .nametag-turn { animation: none; box-shadow: 0 0 0 2px #ffd447; } }
 .nametag-name { overflow: hidden; text-overflow: ellipsis; font-weight: 600; }
 .wind-badge { font-family: 'Noto Serif TC', 'Songti TC', serif; font-weight: 700; }
 .cpu-badge { font-size: 0.75em; background: #445; border-radius: 4px; padding: 0 0.3em; }
@@ -812,3 +824,57 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; }
   .tie-stamp { transform: rotate(-8deg); }
   .win-glow { animation: none; box-shadow: 0 0 0 4px #f5c542; }
 }
+
+/* Win summary: the winner's name green, the player who threw the winning tile red. */
+.name-winner { color: #5fd38d; font-weight: 700; }
+.name-discarder { color: #ff7b7b; font-weight: 700; }
+
+/* Wu moment / Tie stamp: tapping anywhere skips to the summary. */
+.tap-to-continue {
+  position: fixed; left: 50%; top: 68%; transform: translateX(-50%); z-index: 46; pointer-events: none;
+  color: #fff; background: rgba(0, 0, 0, 0.55); padding: 0.25em 0.95em; border-radius: 999px; font-size: clamp(12px, 1.6vw, 16px);
+  white-space: nowrap; animation: tap-in 0.6s 1s ease-out both;
+}
+@keyframes tap-in { from { opacity: 0; } to { opacity: 0.92; } }
+
+/* A hand tile pushed out of the hand area: ready to discard (letting go throws it). */
+.drag-ghost.discard-ready { filter: drop-shadow(0 0 6px #e8463f) drop-shadow(0 0 14px rgba(232, 70, 63, 0.85)) drop-shadow(0 6px 8px rgba(0, 0, 0, 0.5)); }
+
+/* Choosing which Soeng: the tiles you could use lift up and glow green; the rest fade. */
+.hand-tile.chow-pick { transform: translateY(-14%); border-radius: 5px; box-shadow: 0 0 0 2px #2f8f5b, 0 0 12px 3px rgba(47, 143, 91, 0.85); cursor: pointer; transition: transform 0.15s; }
+.hand-tile.chow-first { box-shadow: 0 0 0 3px #f5c542, 0 0 12px 3px rgba(245, 197, 66, 0.8); }
+.hand-tile.chow-faded { opacity: 0.4; }
+
+/* Host page: each game is a tile; tap it to open its seats, history and settings. */
+.game-tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 18rem), 1fr)); gap: 0.8rem; align-items: start; margin-bottom: 1rem; }
+.game-tile { background: var(--panel); border: 1px solid var(--panel-border); border-radius: 12px; overflow: hidden; }
+.game-tile.open { grid-column: 1 / -1; border-color: #46505d; }
+.game-tile.fresh { animation: tile-arrive 1.6s ease-out; }
+@keyframes tile-arrive { 0% { box-shadow: 0 0 0 3px #f5c542; } 100% { box-shadow: 0 0 0 0 rgba(245, 197, 66, 0); } }
+.game-tile-head {
+  display: grid; grid-template-columns: 1fr auto; gap: 0.2rem 0.8rem; width: 100%; text-align: left;
+  background: none; border: none; color: inherit; font: inherit; padding: 0.85rem 1rem; cursor: pointer;
+}
+.game-tile-head:hover { background: rgba(255, 255, 255, 0.03); }
+.game-tile-head:focus-visible { outline: 2px solid #f5c542; outline-offset: -2px; }
+.game-tile-name { font-weight: 700; font-size: 1.1rem; }
+.game-tile-chev { grid-row: span 3; align-self: center; font-size: 1.3rem; color: var(--muted); transition: transform 0.2s; }
+.game-tile.open .game-tile-chev { transform: rotate(90deg); }
+.game-tile-state { font-size: 0.88rem; color: var(--muted); }
+.game-tile-state .dot { display: inline-block; width: 0.55em; height: 0.55em; border-radius: 50%; background: #3fb56f; margin-right: 0.35em; vertical-align: 1px; }
+.game-tile-state .dot.wait { background: #f5c542; }
+.game-tile-players { font-size: 0.88rem; }
+.game-body { border-top: 1px solid var(--panel-border); padding: 0.8rem 1rem 1rem; }
+
+/* Host history: tap a chip change to edit it; edits are marked in orange. */
+.history td.history-cell { cursor: pointer; }
+.history td.history-cell:hover { outline: 1px solid #4a5260; outline-offset: -1px; }
+.history td.history-cell:focus-visible { outline: 2px solid #f0a73c; outline-offset: -2px; }
+.history td.edited { box-shadow: inset 0 0 0 2px #f0a73c; }
+.history .was { display: block; font-size: 0.72em; font-weight: 600; color: #f0a73c; }
+.edited-tag { display: inline-block; margin-left: 0.4em; font-size: 0.75em; font-weight: 700; color: #1b1405; background: #f0a73c; border-radius: 999px; padding: 0 0.55em; }
+.edited-warn { display: block; font-size: 0.78em; color: #f0a73c; margin-top: 0.15em; }
+.history-editor { display: flex; gap: 0.3em; justify-content: flex-end; align-items: center; }
+.history-editor input { width: 5em; background: var(--input-bg); color: var(--fg); border: 1px solid #f0a73c; border-radius: 6px; padding: 0.2em 0.4em; font: inherit; text-align: right; }
+.history-editor .btn { font-size: 0.8em; padding: 0.2em 0.5em; }
+.edit-log { margin: 0.4rem 0 0; padding-left: 1.1rem; color: var(--muted); font-size: 0.85rem; }
