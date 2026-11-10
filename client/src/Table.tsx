@@ -661,8 +661,15 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
     else if (discardList.length < before.count) setLastDiscard(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [roundKey, discardList.length]);
+  // Shown only while that tile is still on offer: once the next player draws, or someone
+  // claims it, it disappears. (If you can claim it, the "Take" tile shows instead.)
   const showLastDiscard =
-    !!round && round.phase !== 'ended' && !!lastDiscard && !(claimable && round.offered?.tile.id === lastDiscard.id);
+    !!round &&
+    round.phase !== 'ended' &&
+    !!lastDiscard &&
+    round.offered?.tile.id === lastDiscard.id &&
+    !round.offeredDrawn &&
+    !claimable;
   const lastDiscardTile = showLastDiscard ? (
     <span className="last-discard" title={tr('lastDiscard')}>
       <TileView type={lastDiscard!.type} width="var(--draw-w)" />
