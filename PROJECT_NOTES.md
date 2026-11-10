@@ -212,6 +212,7 @@ disagrees with those, the newest dated entry here wins.
 | 2026-11-10 | **1.17.1 (bug fix): the discard slide-in animation was missing.** A new discard was marked to slide in, but the screen redrew again at once and the mark was dropped before the animation could play. Now a new discard keeps its slide-in for the length of the animation (0.4 s), so extra redraws can't cut it off. | Kyle |
 | 2026-11-10 | **1.17.2: the big last discard in the middle disappears** as soon as the next player draws or someone claims it. It shows only while that tile is still on offer. (If you can claim it, the "Take" tile shows instead, as before.) | Kyle |
 | 2026-11-10 | **1.17.3 (bug fix, iPad): whose-turn name glow.** The pulsing glow spilled outside the name tag, so it was cut off square by the edge of the left / right players' areas and ran into the gold table-edge glow. The glow is now inside the tag (gold border, pulsing inner glow and background), and name tags sit above the table-edge glow. | Kyle |
+| 2026-11-10 | **1.17.4 (bug fix): tile glows never cover other tiles.** The glows on claim pop-ups (and new flowers, the winning tile on the summary and in the Wu moment, and the Soeng choice in your hand) spread over neighbouring tiles. Every glow is now drawn on a layer underneath the tiles of its row. | Kyle |
 
 ## Open questions for Kyle
 
