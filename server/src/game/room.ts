@@ -57,6 +57,8 @@ export interface Person {
   connected: boolean;
   balance: number;
   cpu: CpuDifficulty | null;
+  /** A CPU's name typed on the host page (shown with " (CPU)" after it). Missing = named by its level. */
+  cpuName?: string;
   /** As a spectator: the seats whose hands this person has chosen to see. */
   watchingSeats: number[];
   /** As a spectator: the "All hands" screen is open (every hand is sent). */
@@ -166,6 +168,8 @@ export type Command =
 export type HostCommand =
   /** Put a CPU in a seat (replacing whoever is there), or empty the seat (cpu: null): removes a CPU or forces a player out. */
   | { type: 'hostSetSeat'; seat: number; cpu: CpuDifficulty | null }
+  /** Give the CPU in this seat a name (empty = name it by its level again). */
+  | { type: 'hostNameCpu'; seat: number; name: string }
   | { type: 'hostResetBalances' }
   /** Type in a person's chip count (the only way to change chips by hand). */
   | { type: 'hostSetBalance'; name: string; key?: string; balance: number }
@@ -203,8 +207,11 @@ export function cleanName(name: string): string {
   return n;
 }
 
-/** CPU players are named by their level; two CPUs may share a name. */
-const CPU_LEVEL_NAMES: Record<CpuDifficulty, string> = { easy: 'CPU Easy', medium: 'CPU Medium', hard: 'CPU Hard' };
+/** CPU players are named by their level unless the host names them; " (CPU)" is always added. Two CPUs may share a name. */
+const CPU_LEVEL_NAMES: Record<CpuDifficulty, string> = { easy: 'Easy', medium: 'Medium', hard: 'Hard' };
+export function cpuDisplayName(person: Pick<Person, 'cpu' | 'cpuName'>): string {
+  return `${person.cpuName ?? CPU_LEVEL_NAMES[person.cpu ?? 'easy']} (CPU)`;
+}
 
 /**
  * Copy a room so it can be changed. The round itself is never changed in
@@ -325,7 +332,7 @@ function requireRound(room: Room): RoundState {
 }
 
 function checkSettings(s: GameSettings): void {
-  if (!Number.isInteger(s.minFan) || s.minFan < 0 || s.minFan > 10) fail('Minimum fan must be 0 to 10.');
+  if (!Number.isInteger(s.minFan) || s.minFan < 0 || s.minFan > 3) fail('Minimum fan must be 0 to 3.');
   if (s.payoutMode !== 'everyonePays' && s.payoutMode !== 'discarderPays') fail('Unknown payout setting.');
   if (s.liabilityOn !== undefined && typeof s.liabilityOn !== 'boolean') fail('Liability must be on or off.');
 }
@@ -340,16 +347,15 @@ function setRound(room: Room, round: RoundState): void {
 function makeCpu(room: Room, seat: number, difficulty: CpuDifficulty): string {
   // Each seat has its own CPU record (so names can repeat and the CPU keeps its chips).
   const key = `cpu#${seat}`;
-  const name = CPU_LEVEL_NAMES[difficulty];
   const existing = room.people[key];
   if (existing) {
     existing.cpu = difficulty;
-    existing.name = name;
+    existing.name = cpuDisplayName(existing);
     return key;
   }
   room.people[key] = {
     key,
-    name,
+    name: cpuDisplayName({ cpu: difficulty }),
     joinOrder: room.nextJoinOrder++,
     connected: true,
     balance: room.startingBalance,
@@ -669,6 +675,17 @@ export function handleHostCommand(prev: Room, cmd: HostCommand, now: number): Ro
       }
       break;
     }
+    case 'hostNameCpu': {
+      const key = room.seats[cmd.seat];
+      const person = key ? room.people[key] : undefined;
+      if (!person?.cpu) fail('There is no CPU in that seat.');
+      // People sometimes type the "(CPU)" too; it is always added for them.
+      const typed = String(cmd.name ?? '').replace(/\(\s*cpu\s*\)\s*$/i, '').trim();
+      if (typed) person!.cpuName = cleanName(typed);
+      else delete person!.cpuName;
+      person!.name = cpuDisplayName(person!);
+      break;
+    }
     case 'hostResetBalances':
       for (const p of Object.values(room.people)) p.balance = room.startingBalance;
       break;
@@ -851,7 +868,9 @@ export function cpuTick(prev: Room, now: number, rng: Rng): Room {
       return prev;
     }
     for (const { k, seat } of cpuSeats) {
-      const move = cpuMove(round, seat, availableActions(round, seat, now), prev.people[k]!.cpu!, rng, now);
+      // The CPU keeps its plan for this hand (the key names the seat and the hand).
+      const memoryKey = `${prev.id}|${prev.match.handsPlayed}|${round.core.dice.join('')}|${seat}`;
+      const move = cpuMove(round, seat, availableActions(round, seat, now), prev.people[k]!.cpu!, rng, now, memoryKey);
       if (move) {
         try {
           return act(k, move);

@@ -213,7 +213,7 @@ export interface HostGameView {
   /** Seconds each CPU waits before a move. */
   cpuSeconds: number;
   match: RoomView['match'];
-  seats: { seat: number; key: string | null; name: string | null; cpu: CpuDifficulty | null; connected: boolean; balance: number | null }[];
+  seats: { seat: number; key: string | null; name: string | null; cpu: CpuDifficulty | null; cpuName: string | null; connected: boolean; balance: number | null }[];
   /** Everyone in the game who is not seated (not CPUs). */
   spectators: { key: string; name: string; connected: boolean; balance: number }[];
   /** Short summary of the round, with no hidden tiles. */
@@ -254,7 +254,7 @@ export function hostViewOf(room: Room): HostGameView {
     },
     seats: room.seats.map((key, seat) => {
       const p = key ? room.people[key]! : null;
-      return { seat, key: p?.key ?? null, name: p?.name ?? null, cpu: p?.cpu ?? null, connected: p?.connected ?? false, balance: p ? p.balance + pendingChange(room, seat) : null };
+      return { seat, key: p?.key ?? null, name: p?.name ?? null, cpu: p?.cpu ?? null, cpuName: p?.cpuName ?? null, connected: p?.connected ?? false, balance: p ? p.balance + pendingChange(room, seat) : null };
     }),
     spectators: Object.values(room.people)
       .filter((p) => !p.cpu && !seatedKeys.has(p.key))

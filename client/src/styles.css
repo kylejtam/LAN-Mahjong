@@ -567,6 +567,8 @@ input { font: inherit; }
 .history td.cell-lose { background: rgba(224, 99, 99, 0.22); color: #ffb3b3; font-weight: 700; }
 .host-seat .chip-row { grid-template-columns: auto 1fr auto; }
 .host-seat .chip-row input { width: 100%; min-width: 0; }
+.cpu-name-row { display: grid; grid-template-columns: auto 1fr auto auto; gap: 0.5rem; align-items: center; }
+.cpu-name-row input { width: 100%; min-width: 0; }
 
 /* Settings panel: compact language buttons and name box; X to close. */
 .settings { position: relative; }

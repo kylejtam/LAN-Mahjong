@@ -22,7 +22,6 @@ import { CLAIM_AFTER_DRAW_MS, GRACE_MS, GameError, WIN_OVERRIDE_MS } from './gam
 import { Room, cpuTick, createRoom, disconnect, handleCommand, handleHostCommand, joinRoom, nameKey } from './game/room.js';
 import { matchLabel } from './game/match.js';
 import { hostViewOf, viewFor } from './game/view.js';
-import { CPU_LEVEL_DESCRIPTIONS } from './game/cpu.js';
 import { ClientMessage, GameListEntry, HostMessage, ServerHostMessage, ServerMessage } from './protocol.js';
 import { loadRooms, saveRooms } from './storage.js';
 import { lanAddresses } from './addresses.js';
@@ -188,7 +187,6 @@ export async function startServer(opts: ServerOptions): Promise<RunningServer> {
       type: 'hostState',
       games: [...rooms.values()].sort((a, b) => a.createdAt - b.createdAt).map(hostViewOf),
       urls: urlsFor(actualPortOf()),
-      cpuLevels: CPU_LEVEL_DESCRIPTIONS,
     };
     for (const ws of hostSockets) send(ws, msg);
   };

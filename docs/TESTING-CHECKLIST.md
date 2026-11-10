@@ -52,8 +52,11 @@ Write down which devices worked: ☐ iPhone ☐ iPad ☐ Samsung tablet ☐ lapt
 
 ### Host page (laptop, `http://localhost:3000/host`)
 - [ ] Create a game: the starting balance shows **200** by default.
-- [ ] "CPU levels" and "History" start **closed**; click to open them.
-- [ ] Put CPUs in seats (easy / medium / hard). **Remove CPU** empties a seat.
+- [ ] "History" starts **closed**; click to open it. There is no "CPU levels" section any more.
+- [ ] Put CPUs in seats (easy / medium / hard). They are called "Easy (CPU)" etc. **Remove CPU** empties a seat.
+- [ ] Type a name in a CPU seat's **Name** box and press Set: everyone sees e.g. "Auntie May (CPU)". Typing "(CPU)" yourself does not double it. Clear the box and press Set: back to "Hard (CPU)". Change the level: the name stays.
+- [ ] **Minimum fan** is a drop-down with only 0, 1, 2 and 3.
+- [ ] Play a few hands at fan 3 with each level: Hard usually goes for one suit or pongs and wins bigger hands; Medium claims less often; Easy never calls chow / pong / gong.
 - [ ] **Remove player** takes a person out of their seat (they become a spectator).
 - [ ] Chips: change a number in a seat card, press **Set**, then **tap again** to confirm.
 - [ ] Change **CPU time per move** (e.g. 0.5 and 3) and watch the CPUs speed up / slow down.
@@ -88,7 +91,7 @@ Write down which devices worked: ☐ iPhone ☐ iPad ☐ Samsung tablet ☐ lapt
 - [ ] After the next player draws, you can still claim for **10 seconds**, or until that player discards (whichever is sooner); the buttons stay until then.
 - [ ] Flowers go to your public tiles (left of your hand) and you draw a **Replacement**.
 - [ ] When anyone makes a **Soeng / Pung / Gong** (also a gong from their own tiles), a coloured bubble ("Pung!") pops up next to that player's name tag and the set's tiles show big in the middle, glowing in the claim's colour (Soeng green, Pung blue, Gong purple), for 3 seconds. Flowers keep their own pop-up.
-- [ ] When anyone draws a flower (not during the deal), a big pop-up shows it in the middle ("N CPU Easy drew a flower" / "You drew a flower"), and the new flower glows gold where it lands.
+- [ ] When anyone draws a flower (not during the deal), a big pop-up shows it in the middle ("N Easy (CPU) drew a flower" / "You drew a flower"), and the new flower glows gold where it lands.
 - [ ] Left / right players' tiles lie **sideways in columns**; their name tags are one small line. The right player's discards and sets read from the bottom up (oldest at the bottom).
 - [ ] The wall picture around "tiles left" shrinks as tiles are drawn.
 - [ ] **Undo** after a discard. When it's a CPU's turn, you can undo for it.

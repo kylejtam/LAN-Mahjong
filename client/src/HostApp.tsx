@@ -20,7 +20,6 @@ function useHostConnection() {
   const [urls, setUrls] = useState<string[]>([]);
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [cpuLevels, setCpuLevels] = useState<Record<CpuDifficulty, string[]> | null>(null);
   const ws = useRef<WebSocket | null>(null);
   useEffect(() => {
     let stopped = false;
@@ -33,7 +32,6 @@ function useHostConnection() {
         if (msg.type === 'hostState') {
           setGames(msg.games);
           setUrls(msg.urls);
-          setCpuLevels(msg.cpuLevels);
         } else if (msg.type === 'error') {
           setError(msg.message);
           setTimeout(() => setError(null), 4000);
@@ -51,11 +49,11 @@ function useHostConnection() {
     };
   }, []);
   const send = (m: HostMessage): void => ws.current?.send(JSON.stringify(m));
-  return { games, urls, open, error, send, cpuLevels };
+  return { games, urls, open, error, send };
 }
 
 export function HostApp(): ReactElement {
-  const { games, urls, open, error, send, cpuLevels } = useHostConnection();
+  const { games, urls, open, error, send } = useHostConnection();
   const [gameName, setGameName] = useState('');
   const [balance, setBalance] = useState(200);
   return (
@@ -99,26 +97,32 @@ export function HostApp(): ReactElement {
         </div>
       </div>
 
-      {cpuLevels && (
-        <details className="card collapsible">
-          <summary><h2>CPU levels</h2></summary>
-          <p className="muted small">CPUs only see what a real player in their seat could see, and never declare a win below the minimum fan.</p>
-          <div className="cpu-levels">
-            {(['easy', 'medium', 'hard'] as CpuDifficulty[]).map((lvl) => (
-              <div key={lvl} className="cpu-level">
-                <h3>{lvl[0]!.toUpperCase() + lvl.slice(1)}</h3>
-                <ul>{cpuLevels[lvl].map((line) => <li key={line}>{line}</li>)}</ul>
-              </div>
-            ))}
-          </div>
-        </details>
-      )}
-
       {games.map((g) => (
         <GameCard key={g.id} game={g} send={send} />
       ))}
       {error && <div className="toast">{error}</div>}
     </div>
+  );
+}
+
+/** Name a CPU. "(CPU)" is always added after the name; an empty name goes back to the level (e.g. "Hard (CPU)"). */
+function CpuNameRow({ name, onSet }: { name: string; onSet: (name: string) => void }): ReactElement {
+  const [value, setValue] = useState(name);
+  useEffect(() => setValue(name), [name]);
+  const changed = value.trim() !== name;
+  return (
+    <form
+      className="cpu-name-row"
+      onSubmit={(e) => {
+        e.preventDefault();
+        if (changed) onSet(value.trim());
+      }}
+    >
+      <span className="chip-name">Name</span>
+      <input value={value} maxLength={20} placeholder="e.g. Auntie May" onChange={(e) => setValue(e.target.value)} aria-label="CPU name" />
+      <span className="muted small">(CPU)</span>
+      <button className="btn primary" type="submit" disabled={!changed}>Set</button>
+    </form>
   );
 }
 
@@ -317,6 +321,9 @@ function GameCard({ game, send }: { game: HostGameView; send: (m: HostMessage) =
 
               {s.name && !s.cpu && !s.connected ? <span className="offline"> · offline</span> : ''}
             </span>
+            {s.cpu && (
+              <CpuNameRow name={s.cpuName ?? ''} onSet={(name) => cmd({ type: 'hostNameCpu', seat: s.seat, name })} />
+            )}
             {s.name && s.balance !== null && (
               <ChipRow label="Chips" name={s.name} balance={s.balance} onSet={(balance) => cmd({ type: 'hostSetBalance', name: s.name!, key: s.key ?? undefined, balance })} />
             )}
@@ -373,7 +380,10 @@ function GameCard({ game, send }: { game: HostGameView; send: (m: HostMessage) =
           <option value="off">Off (136 tiles)</option>
         </select>
         <label>Minimum fan</label>
-        <input disabled={!between} type="number" min={0} max={10} value={settings.minFan} onChange={(e) => setSettings({ ...settings, minFan: Number(e.target.value) })} />
+        <select disabled={!between} value={settings.minFan} onChange={(e) => setSettings({ ...settings, minFan: Number(e.target.value) })}>
+          {[0, 1, 2, 3].map((n) => <option key={n} value={n}>{n} fan</option>)}
+          {settings.minFan > 3 && <option value={settings.minFan}>{settings.minFan} fan (old setting, choose 0-3)</option>}
+        </select>
         <label>Payout</label>
         <select disabled={!between} value={settings.payoutMode} onChange={(e) => setSettings({ ...settings, payoutMode: e.target.value as GameSettings['payoutMode'] })}>
           <option value="everyonePays">Everyone pays, discarder pays double</option>
