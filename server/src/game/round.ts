@@ -51,6 +51,12 @@ import {
 } from '@lan-mahjong/shared';
 
 export const GRACE_MS = 3000;
+/**
+ * After the next player draws, others can still claim the discard (Pung,
+ * Gong, Wu) for this long, unless that player discards (or makes a gong or
+ * wins) first.
+ */
+export const CLAIM_AFTER_DRAW_MS = 10000;
 export const WIN_OVERRIDE_MS = 10000;
 
 export class GameError extends Error {}
@@ -374,6 +380,7 @@ export function concealedGong(prev: RoundState, seat: number, type: NormalType, 
   void now;
   requireTurn(prev.core, seat, 'mustDiscard');
   const state = startEdit(prev);
+  state.window = null; // the discard before can no longer be claimed
   pushHistory(state, 'gong', seat);
   const { core } = state;
   const tiles = removeTypes(core.hands[seat]!, type, 4);
@@ -424,7 +431,7 @@ export function claimProblem(state: RoundState, seat: number, claim: Claim, now:
   const s = w.status;
   // The player who drew has chosen to draw: they can no longer claim that tile.
   if (s.type === 'drawn' && w.source === 'discard' && seat === next(w.by)) return 'You have already drawn.';
-  if (s.type === 'drawn' && now - s.at > GRACE_MS) return 'Too late to claim that tile.';
+  if (s.type === 'drawn' && now - s.at > CLAIM_AFTER_DRAW_MS) return 'Too late to claim that tile.';
   if (s.type === 'claimed') {
     if (s.seat === seat) return 'You already claimed that tile.';
     const stronger =
@@ -535,6 +542,7 @@ export function selfDrawWin(prev: RoundState, seat: number, now: number): RoundS
   if (c.lastDraw === null) fail('You can only win by self-draw straight after drawing.');
   if (!canWinSelfDraw(c.hands[seat]!, c.melds[seat]!)) fail('Your hand is not complete.');
   const state = startEdit(prev);
+  state.window = null; // the discard before can no longer be claimed
   pushHistory(state, 'win', seat);
   const { core } = state;
   const hand = core.hands[seat]!;

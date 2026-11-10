@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { NORMAL_TYPES, seededRng, sortHand } from '@lan-mahjong/shared';
 import { Command, HostCommand, Room, cpuTick, createRoom, disconnect, handleCommand, handleHostCommand, joinRoom } from '../src/game/room.js';
 import { hostViewOf, viewFor } from '../src/game/view.js';
+import { discard, draw } from '../src/game/round.js';
+import { idOf, setupRound } from './helpers.js';
 
 const rng = seededRng(99);
 let clock = 1000;
@@ -473,6 +475,26 @@ describe('history, roll back and changing the current game (host page)', () => {
     for (const n of ['Kyle', 'Amy', 'Ben', 'Cat']) r = cmd(r, n, { type: 'confirmRound' });
     expect([r.people.kyle, r.people.amy, r.people.ben, r.people.cat].map((x) => x!.balance)).toEqual([984, 1050, 992, 992]);
     expect(viewFor(r, 'kyle', tick()).seats.map((s) => s.balance)).toEqual([984, 1050, 992, 992]);
+  });
+
+  it('after the next player draws, others still see their Pung for up to 10 seconds', () => {
+    // Kyle (dealer) throws a red dragon; Ben (seat 2) holds two and could Pung it; Amy (next) draws.
+    let round = setupRound({
+      hands: ['m1 m2 m3 m4 m5 m6 m7 m8 m9 p1 p2 p3 s1 dR', 'p4 p5 p6 p7 p8 p9 s2 s3 s4 s5 s6 s7 wE', 'dR dR s8 s9 m1 m1 wS wS wS wW wW wW p2', 'm5 m6 m7 p1 p2 p3 s6 s7 s8 wN wN wN wE'],
+      front: 'm9 p9 s9 m8',
+    });
+    round = discard(round, 0, idOf(round, 0, 'dR'), 0);
+    round = draw(round, 1, 1000);
+    const room: Room = { ...startedTable(), match: { ...startedTable().match, round } };
+    const at6 = viewFor(room, 'ben', 6000);
+    expect(at6.actions?.pong).toBe(true);
+    expect(at6.round?.claimMsLeft).toBe(5000);
+    const at12 = viewFor(room, 'ben', 12000);
+    expect(at12.actions?.pong).toBe(false);
+    expect(at12.round?.claimMsLeft).toBe(0);
+    // As soon as Amy discards, the chance is gone.
+    const afterDiscard: Room = { ...room, match: { ...room.match, round: discard(round, 1, idOf(round, 1, 'wE'), 2000) } };
+    expect(viewFor(afterDiscard, 'ben', 2500).actions?.pong ?? false).toBe(false);
   });
 
   it('can jump to any wind and game number without touching chips', () => {

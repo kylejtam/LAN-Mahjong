@@ -96,19 +96,19 @@ describe('claims', () => {
   });
 });
 
-describe('3-second grace period after the next player draws', () => {
-  it('lets a claim undo the draw within 3 seconds', () => {
+describe('claiming after the next player draws (10 seconds, until they discard)', () => {
+  it('lets a claim undo the draw within 10 seconds', () => {
     let r = dealerDiscards(table(), 'dR', 0);
     const wallBefore = tilesLeft(r.core.wall);
     r = draw(r, 1, 1000);
     expect(tilesLeft(r.core.wall)).toBe(wallBefore - 1);
-    r = claim(r, 2, { kind: 'pong' }, 3900);
+    r = claim(r, 2, { kind: 'pong' }, 10900);
     expect(tilesLeft(r.core.wall)).toBe(wallBefore); // tile went back
     expect(r.core.hands[1]).toHaveLength(13);
     expect(r.core.turn).toBe(2);
   });
 
-  it('the player who drew can no longer claim the tile (others still can for 3 s)', () => {
+  it('the player who drew can no longer claim the tile (others still can for 10 s)', () => {
     // Dealer throws s1; seat 1 could Soeng it but draws instead.
     let r = dealerDiscards(table(), 's1', 0);
     expect(availableActions(r, 1, 0).chow).toHaveLength(1);
@@ -117,10 +117,19 @@ describe('3-second grace period after the next player draws', () => {
     expect(() => claim(r, 1, { kind: 'chow', tileIds: [idOf(r, 1, 's2'), idOf(r, 1, 's3')] }, 1500)).toThrow(/already drawn/);
   });
 
-  it('refuses after 3 seconds', () => {
+  it('refuses after 10 seconds', () => {
     let r = dealerDiscards(table(), 'dR', 0);
     r = draw(r, 1, 1000);
-    expect(() => claim(r, 2, { kind: 'pong' }, 4001)).toThrow(/Too late/);
+    expect(() => claim(r, 2, { kind: 'pong' }, 11001)).toThrow(/Too late/);
+  });
+
+  it('ends early if the player who drew makes a hidden gong or wins instead of discarding', () => {
+    // Seat 1 draws a fourth wE and makes a hidden gong: the dealer's discard can't be claimed any more.
+    const hands: Setup['hands'] = [S[0], 'p4 p5 p6 p7 p8 p9 s2 s3 s4 wE wE wE s7', S[2], S[3]];
+    let r = dealerDiscards(setupRound({ hands, front: 'wE', back: 'm9' }), 'dR', 0);
+    r = draw(r, 1, 1000);
+    r = concealedGong(r, 1, 'wE', 1500);
+    expect(() => claim(r, 2, { kind: 'pong' }, 1600)).toThrow();
   });
 
   it('ends as soon as the next tile is discarded', () => {

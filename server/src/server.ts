@@ -18,7 +18,7 @@ import { randomUUID, getRandomValues } from 'node:crypto';
 import QRCode from 'qrcode';
 import { WebSocketServer, WebSocket } from 'ws';
 import { Rng } from '@lan-mahjong/shared';
-import { GRACE_MS, GameError, WIN_OVERRIDE_MS } from './game/round.js';
+import { CLAIM_AFTER_DRAW_MS, GRACE_MS, GameError, WIN_OVERRIDE_MS } from './game/round.js';
 import { Room, cpuTick, createRoom, disconnect, handleCommand, handleHostCommand, joinRoom, nameKey } from './game/room.js';
 import { matchLabel } from './game/match.js';
 import { hostViewOf, viewFor } from './game/view.js';
@@ -475,7 +475,7 @@ export async function startServer(opts: ServerOptions): Promise<RunningServer> {
       const w = room.match.round?.window;
       if (w && w.status.type !== 'open') {
         const sent = lastSent.get(room.id) ?? 0;
-        const deadlines = [w.status.at + GRACE_MS, w.status.at + WIN_OVERRIDE_MS];
+        const deadlines = [w.status.at + GRACE_MS, w.status.at + WIN_OVERRIDE_MS, w.status.at + CLAIM_AFTER_DRAW_MS];
         if (deadlines.some((d) => d > sent && d <= t)) broadcast(room.id);
       }
     }

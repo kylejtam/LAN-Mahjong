@@ -85,11 +85,11 @@ Write down which devices worked: ☐ iPhone ☐ iPad ☐ Samsung tablet ☐ lapt
 - [ ] The **last discard** also shows big in the middle (next to "tiles left") with who threw it; it goes away when someone claims it.
 - [ ] When you can claim, the tile shows big in the middle as **Take**; tap or drag it.
       The flashing Soeng / Pung / Gong / Wu buttons also work, and so does tapping the discard.
-- [ ] Once the next player draws, the buttons and flashing **disappear**.
+- [ ] After the next player draws, you can still claim for **10 seconds**, or until that player discards (whichever is sooner); the buttons stay until then.
 - [ ] Flowers go to your public tiles (left of your hand) and you draw a **Replacement**.
-- [ ] When anyone makes a **Soeng / Pung / Gong** (also a gong from their own tiles), a pop-up shows the set big in the middle with a coloured badge and "N CPU Easy: Pung!" / "You: Pung!", and the new set glows gold. These pop-ups stay for 3 seconds.
+- [ ] When anyone makes a **Soeng / Pung / Gong** (also a gong from their own tiles), a coloured bubble ("Pung!") pops up next to that player's name tag and the set's tiles show big in the middle, glowing in the claim's colour (Soeng green, Pung blue, Gong purple), for 3 seconds. Flowers keep their own pop-up.
 - [ ] When anyone draws a flower (not during the deal), a big pop-up shows it in the middle ("N CPU Easy drew a flower" / "You drew a flower"), and the new flower glows gold where it lands.
-- [ ] Left / right players' tiles lie **sideways in columns**; their name tags are one small line.
+- [ ] Left / right players' tiles lie **sideways in columns**; their name tags are one small line. The right player's discards and sets read from the bottom up (oldest at the bottom).
 - [ ] The wall picture around "tiles left" shrinks as tiles are drawn.
 - [ ] **Undo** after a discard. When it's a CPU's turn, you can undo for it.
 - [ ] Open **?** (Help): both tables readable.

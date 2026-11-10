@@ -94,6 +94,8 @@ interface Pop {
   types: TileType[];
   /** A concealed gong shows two of its tiles face down. */
   concealed?: boolean;
+  /** Claims: where the bubble goes (next to the player's name tag), in screen pixels. */
+  bubble?: { x: number; y: number; anchor: 'left' | 'right' };
 }
 const SIDES: Side[] = ['bottom', 'right', 'top', 'left'];
 
@@ -182,7 +184,21 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
   // Claim options on the offered tile (anything except your own turn moves).
   const claimOptions = !!a && (a.win || a.pong || a.gong || a.chow.length > 0) && !!round?.offered && round.offered.by !== mySeat;
   // Buttons, flashing and the big claim tile stop once the next player has drawn.
-  const claimable = claimOptions && !round?.offeredDrawn;
+  // After the next player draws, others can still claim for a while (10 s, set by the
+  // server, or until that player discards): keep the buttons until then.
+  const [claimUntil, setClaimUntil] = useState<number | null>(null);
+  const [, setClaimTick] = useState(0);
+  const claimMsLeft = round?.claimMsLeft ?? null;
+  useEffect(() => {
+    if (claimMsLeft === null) {
+      setClaimUntil(null);
+      return;
+    }
+    setClaimUntil(Date.now() + claimMsLeft);
+    const timer = setTimeout(() => setClaimTick((x) => x + 1), claimMsLeft + 50);
+    return () => clearTimeout(timer);
+  }, [claimMsLeft, round?.offered?.tile.id]);
+  const claimable = claimOptions && (!round?.offeredDrawn || (claimUntil !== null && Date.now() < claimUntil));
   const ownGongs = a ? a.concealedGongs.length + a.addedGongs.length : 0;
 
   /** Your hand row, and where a dragged tile would land in it (updated while dragging). */
@@ -593,6 +609,19 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [flowerSig, roundKey, !!dealAnim]);
 
+  /** Where a claim bubble goes: just beside that player's name tag (left of it for the right player). */
+  const bubbleBeside = (seat: number): Pop['bubble'] => {
+    const side = sideOf(seat);
+    const tag =
+      side === 'bottom'
+        ? document.querySelector('.topbar-left .nametag') ?? document.querySelector('.me-bottom .nametag')
+        : document.querySelector(`.opp-${side} .nametag`);
+    const r = tag?.getBoundingClientRect();
+    if (!r) return undefined;
+    const y = r.top + r.height / 2;
+    return side === 'right' ? { x: r.left - 8, y, anchor: 'right' } : { x: r.right + 8, y, anchor: 'left' };
+  };
+
   // ---------- claims: Soeng / Pung / Gong are just as obvious ----------
   // When a new set appears in front of a player (claimed from a discard, or a
   // gong from their own tiles), show it big in the middle and make it glow.
@@ -611,7 +640,7 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
         // A brand-new set, or a pong that became a gong (robbing a gong turns
         // a gong back into a pong: that is not a claim, so it is skipped).
         if (sv.melds.length <= (before.counts[sv.seat] ?? 0) && m.kind !== 'gong') return;
-        pops.push({ key: `${roundKey}-m-${sig}`, kind: m.kind, seat: sv.seat, types: m.tiles.map((t) => t.type), concealed: m.concealed });
+        pops.push({ key: `${roundKey}-m-${sig}`, kind: m.kind, seat: sv.seat, types: m.tiles.map((t) => t.type), concealed: m.concealed, bubble: bubbleBeside(sv.seat) });
         ids.push(...m.tiles.map((t) => t.id));
       });
     });
@@ -706,9 +735,33 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
       </header>
 
       <main className="board">
-        {flowerPops.length > 0 && (
+        {flowerPops.some((fp) => fp.kind !== 'flower') &&
+          flowerPops
+            .filter((fp) => fp.kind !== 'flower')
+            .map((fp) => (
+              // A claim: a bubble next to the player who claimed, and the set's tiles big in the
+              // middle, glowing in the claim's colour (Soeng green, Pung blue, Gong purple).
+              <div key={fp.key} aria-live="polite">
+                {fp.bubble && (
+                  <div
+                    className="claim-bubble-at"
+                    style={fp.bubble.anchor === 'left' ? { left: fp.bubble.x, top: fp.bubble.y } : { right: window.innerWidth - fp.bubble.x, top: fp.bubble.y }}
+                  >
+                    <span className={`claim-bubble act-${fp.kind}${fp.bubble.anchor === 'right' ? ' from-right' : ''}`}>{labels[fp.kind as 'chow' | 'pong' | 'gong']}!</span>
+                  </div>
+                )}
+                <div className="claim-tiles-at">
+                  <div className={`claim-tiles claim-${fp.kind}`}>
+                    {fp.types.map((type, i) => (
+                      <TileView key={i} type={type} back={!!fp.concealed && (i === 0 || i === 3)} width="clamp(40px, 6.5vw, 76px)" className="claim-glow" />
+                    ))}
+                  </div>
+                </div>
+              </div>
+            ))}
+        {flowerPops.some((fp) => fp.kind === 'flower') && (
           <div className="flower-pops" aria-live="polite">
-            {flowerPops.map((fp) => (
+            {flowerPops.filter((fp) => fp.kind === 'flower').map((fp) => (
               <div key={fp.key} className={`flower-pop pop-${fp.kind}`}>
                 <div className="flower-pop-tiles">
                   {fp.kind !== 'flower' && <span className={`act pop-badge act-${fp.kind}`}>{labels[fp.kind]}</span>}
