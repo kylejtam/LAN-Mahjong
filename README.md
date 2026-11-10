@@ -30,6 +30,7 @@ and the join screen.
 Raise the `version` in `package.json` (for example 1.1.0 → 1.2.0) and merge it into
 `main`. GitHub (`.github/workflows/release.yml`) then runs the checks, builds
 `LAN-Mahjong-Setup.exe` and publishes it as release `v1.2.0` with its SHA-256 fingerprint.
+To add your own words to a release, put them in `docs/release-notes/v1.2.0.md`; they appear above the automatic list of changes.
 The installer is no longer stored in the code itself.
 
 ## For developers: running from the code
