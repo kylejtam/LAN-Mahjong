@@ -163,3 +163,4 @@ Write down which devices worked: ☐ iPhone ☐ iPad ☐ Samsung tablet ☐ lapt
 - [ ] Win summary: winner's name green, thrower's name red.
 - [ ] (1.17.1) Every discard, yours and other players', slides in from the player who threw it.
 - [ ] (1.17.2) The big last discard in the middle disappears as soon as the next player draws, or someone claims it.
+- [ ] (1.17.3, iPad) The whose-turn glow on name tags is never cut off, and doesn't run into the gold table-edge glow.

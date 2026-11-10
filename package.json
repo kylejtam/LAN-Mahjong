@@ -1,6 +1,6 @@
 {
   "name": "lan-mahjong",
-  "version": "1.17.2",
+  "version": "1.17.3",
   "private": true,
   "description": "Hong Kong style mahjong for up to 4 players on a local network",
   "workspaces": [

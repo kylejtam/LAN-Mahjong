@@ -150,11 +150,15 @@ input { font: inherit; }
   background: rgba(0, 0, 0, 0.35); border-radius: 999px; white-space: nowrap; max-width: 100%;
   border: 2px solid transparent;
 }
+/* Whose turn: the name tag pulses gold. The glow stays inside the tag, so it is never cut off by the
+   edge of the player's area and never runs into the gold table-edge glow. */
 .nametag-turn { border-color: #ffd447; animation: turn-pulse 0.8s ease-in-out infinite alternate; }
 @keyframes turn-pulse {
-  from { box-shadow: 0 0 0 1px #ffd447, 0 0 6px 1px rgba(255, 212, 71, 0.5); }
-  to { box-shadow: 0 0 0 2px #ffd447, 0 0 16px 5px rgba(255, 212, 71, 0.75); }
+  from { box-shadow: inset 0 0 4px 1px rgba(255, 212, 71, 0.35); background-color: rgba(0, 0, 0, 0.35); }
+  to { box-shadow: inset 0 0 12px 3px rgba(255, 212, 71, 0.75); background-color: rgba(120, 95, 20, 0.55); }
 }
+/* Name tags sit above the table-edge glow. */
+.nametag { position: relative; z-index: 2; }
 /* The table edge in front of whoever is playing glows gold. */
 .board { position: relative; }
 .turn-edge { position: absolute; pointer-events: none; z-index: 1; }
@@ -162,7 +166,7 @@ input { font: inherit; }
 .turn-edge-bottom { left: 0; right: 0; bottom: 0; height: 12px; background: linear-gradient(0deg, rgba(255, 212, 71, 0.9), rgba(255, 212, 71, 0)); }
 .turn-edge-left { top: 0; bottom: 0; left: 0; width: 12px; background: linear-gradient(90deg, rgba(255, 212, 71, 0.9), rgba(255, 212, 71, 0)); }
 .turn-edge-right { top: 0; bottom: 0; right: 0; width: 12px; background: linear-gradient(270deg, rgba(255, 212, 71, 0.9), rgba(255, 212, 71, 0)); }
-@media (prefers-reduced-motion: reduce) { .nametag-turn { animation: none; box-shadow: 0 0 0 2px #ffd447; } }
+@media (prefers-reduced-motion: reduce) { .nametag-turn { animation: none; box-shadow: inset 0 0 8px 2px rgba(255, 212, 71, 0.6); } }
 .nametag-name { overflow: hidden; text-overflow: ellipsis; font-weight: 600; }
 .wind-badge { font-family: 'Noto Serif TC', 'Songti TC', serif; font-weight: 700; }
 .cpu-badge { font-size: 0.75em; background: #445; border-radius: 4px; padding: 0 0.3em; }
