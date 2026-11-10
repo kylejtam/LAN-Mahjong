@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { NORMAL_TYPES, seededRng, sortHand } from '@lan-mahjong/shared';
-import { Command, HostCommand, Room, cpuTick, createRoom, disconnect, handleCommand, handleHostCommand, joinRoom } from '../src/game/room.js';
+import { Command, HostCommand, Room, cpuTick, createRoom, disconnect, handleCommand, handleHostCommand, joinRoom, settleWall } from '../src/game/room.js';
 import { hostViewOf, viewFor } from '../src/game/view.js';
 import { discard, draw } from '../src/game/round.js';
 import { idOf, setupRound } from './helpers.js';
@@ -705,6 +705,48 @@ describe('swapping players', () => {
 });
 
 describe('CPU players', () => {
+  /** Four Hard CPUs; the dealer has just thrown dR, which completes seat 3's hand. */
+  const cpuTable = (minFan: number, emptyWall: boolean): Room => {
+    let r = emptyRoom();
+    for (let seat = 0; seat < 4; seat++) r = host(r, { type: 'hostSetSeat', seat, cpu: 'hard' });
+    let round = setupRound({
+      hands: [
+        'm1 m2 m3 m4 m5 m6 m7 m8 m9 p1 p2 p3 s1 dR',
+        'p4 p5 p6 p7 p8 p9 s2 s3 s4 s5 s6 s8 wE',
+        'p1 p4 p7 s1 s4 s9 m1 m4 m7 wE wS wW wN',
+        'm2 m3 m4 p5 p6 p7 s3 s4 s5 s7 s7 s7 dR', // concealed hand: 1 fan (2 on the last discard)
+      ],
+      settings: { minFan },
+    });
+    if (emptyWall) {
+      const core = structuredClone(round.core);
+      for (const st of core.wall.stacks) for (const t of st.tiles) core.discards.push({ tile: t, by: 1 });
+      for (const st of core.wall.stacks) st.tiles = [];
+      core.discardCount = 60;
+      round = { ...round, core };
+    }
+    round = discard(round, 0, idOf(round, 0, 'dR'), r.lastChangeAt);
+    return { ...r, phase: 'playing', match: { ...r.match, round } };
+  };
+
+  it('a CPU that can win on a discard wins before the next CPU draws (whatever the seat order)', () => {
+    const r = cpuTable(1, false);
+    const after = cpuTick(r, r.lastChangeAt + 5000, rng);
+    expect(after.match.round!.core.result).toMatchObject({ type: 'win', winner: 3 });
+  });
+
+  it('wall empty: CPUs that do not want the last tile pass, and the hand ends as a tie', () => {
+    // Minimum fan 3: seat 3's hand is only 2 fan even on the last discard, so it cannot win.
+    let r = cpuTable(3, true);
+    let t = r.lastChangeAt;
+    for (let i = 0; i < 10 && r.match.round!.core.phase !== 'ended'; i++) {
+      t += 5000;
+      const s = settleWall(r, t);
+      r = s !== r ? s : cpuTick(r, t, rng);
+    }
+    expect(r.match.round!.core.result).toEqual({ type: 'draw' });
+  });
+
   it('an all-CPU table plays the whole 16-round game by itself, and chips always add up', () => {
     let r = emptyRoom();
     for (let seat = 0; seat < 4; seat++) r = host(r, { type: 'hostSetSeat', seat, cpu: 'easy' });
@@ -724,8 +766,8 @@ describe('CPU players', () => {
   it('the host page sets how many seconds CPUs take per move', () => {
     let r = emptyRoom();
     for (let seat = 0; seat < 4; seat++) r = host(r, { type: 'hostSetSeat', seat, cpu: 'easy' });
-    expect(hostViewOf(r).cpuSeconds).toBe(1);
-    expect(cpuTick(r, r.lastChangeAt + 900, rng)).toBe(r); // default 1 s: still waiting
+    expect(hostViewOf(r).cpuSeconds).toBe(5);
+    expect(cpuTick(r, r.lastChangeAt + 4900, rng)).toBe(r); // default 5 s: still waiting
     r = host(r, { type: 'hostSetCpuSeconds', seconds: 2.5 });
     expect(hostViewOf(r).cpuSeconds).toBe(2.5);
     expect(cpuTick(r, r.lastChangeAt + 2400, rng)).toBe(r);

@@ -752,3 +752,63 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; }
    bottom (oldest) upwards, the way they laid them down. */
 .discards-right { flex-direction: column-reverse; }
 .opp-right .melds-sideways, .opp-right .melds-sideways .meld, .opp-right .opp-hand.melds-sideways { flex-direction: column-reverse; }
+
+/* Wall empty: Pass (say no to the last tile). Plain, with no colour, so it isn't pressed by mistake. */
+.act.act-pass { background: transparent; color: #fff; box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.55); font-weight: 700; }
+.actions-claim .act.act-pass { animation: none; }
+
+/* A win: a "Wu!" bubble next to the winner's name tag (like a claim bubble), for 10 s. */
+.win-bubble {
+  display: inline-block; padding: 0.3em 0.95em; border-radius: 999px; background: #c8342f; color: #fff; font-weight: 800;
+  font-size: clamp(16px, 2.6vw, 28px); white-space: nowrap; box-shadow: 0 0 0 3px #f5c542, 0 4px 12px rgba(0, 0, 0, 0.45);
+  transform-origin: left center; animation: win-pop 10s ease-out forwards;
+}
+.win-bubble.from-right { transform-origin: right center; }
+.win-bubble.zh { font-family: "Noto Serif TC", "Songti TC", "PMingLiU", serif; }
+/* ...and the winner's whole hand in the middle, the winning tile glowing gold. */
+.win-show-at { position: fixed; left: 50%; top: 45%; transform: translate(-50%, -50%); z-index: 45; pointer-events: none; max-width: 96vw; }
+.win-show {
+  display: grid; justify-items: center; gap: 0.45em; padding: 0.7em 1em 0.9em; border-radius: 12px;
+  background: rgba(8, 20, 14, 0.95); box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5); animation: win-pop 10s ease-out forwards;
+}
+.win-show-name { color: #fff; font-weight: 700; font-size: clamp(13px, 1.8vw, 18px); }
+.win-show-row { display: flex; flex-wrap: nowrap; justify-content: center; align-items: flex-end; gap: 0.6em; }
+.win-show-group { display: flex; gap: 2px; }
+.win-show-meld { padding: 2px; border-radius: 5px; background: rgba(255, 255, 255, 0.08); }
+.win-show-tile { margin-left: 0.4em; }
+.win-glow { border-radius: 5px; animation: win-glow 0.7s ease-in-out infinite alternate; }
+@keyframes win-glow {
+  from { box-shadow: 0 0 0 3px #f5c542, 0 0 10px 3px #f5c542; }
+  to { box-shadow: 0 0 0 4px #f5c542, 0 0 26px 9px #f5c542; }
+}
+@keyframes win-pop {
+  0% { opacity: 0; transform: scale(0.6); }
+  3% { opacity: 1; transform: scale(1.06); }
+  6% { transform: scale(1); }
+  95% { opacity: 1; transform: scale(1); }
+  100% { opacity: 0; transform: scale(0.97); }
+}
+
+/* A tie (the wall ran out): a red Chinese seal stamps down for 5 s. */
+.tie-stamp-at { position: fixed; left: 50%; top: 45%; transform: translate(-50%, -50%); z-index: 45; pointer-events: none; }
+.tie-stamp {
+  width: clamp(110px, 16vw, 170px); height: clamp(110px, 16vw, 170px); display: grid; place-items: center;
+  border: 0.28em solid #b8322c; border-radius: 0.5em; background: #f4efe1; color: #b8322c;
+  box-shadow: inset 0 0 0 0.18em rgba(184, 50, 44, 0.5); font-size: clamp(14px, 2vw, 22px);
+  animation: tie-stamp 5s ease-out forwards;
+}
+.tie-stamp span { line-height: 1; text-shadow: 0 0 0.04em #b8322c; }
+.tie-stamp span.en { font-size: 2.6em; font-weight: 800; }
+.tie-stamp span.zh { font-size: 4em; font-weight: 900; font-family: "Noto Serif TC", "Songti TC", "PMingLiU", serif; }
+@keyframes tie-stamp {
+  0% { opacity: 0; transform: rotate(-8deg) scale(1.8); }
+  5% { opacity: 1; transform: rotate(-8deg) scale(0.94); }
+  8% { transform: rotate(-8deg) scale(1); }
+  93% { opacity: 1; transform: rotate(-8deg) scale(1); }
+  100% { opacity: 0; transform: rotate(-8deg) scale(1); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .win-bubble, .win-show, .tie-stamp { animation: none; }
+  .tie-stamp { transform: rotate(-8deg); }
+  .win-glow { animation: none; box-shadow: 0 0 0 4px #f5c542; }
+}

@@ -10,7 +10,9 @@ import {
   draw,
   drawReplacement,
   faceUpSuit,
+  pass,
   selfDrawWin,
+  settleEmptyWall,
   startRound,
   undo,
 } from '../src/game/round.js';
@@ -420,18 +422,79 @@ describe('liability 包 for one-suit hands', () => {
 });
 
 describe('the wall running out', () => {
-  it('is a draw when the next player tries to draw from an empty wall', () => {
+  it('is a tie once nobody can take the last tile (everyone who could has passed)', () => {
     let r = startRound({ dealer: 0, roundWind: 0, settings: { ...DEFAULT_SETTINGS, flowersOn: false }, rng: seededRng(3) });
     let t = 0;
     while (r.core.phase !== 'ended') {
       const seat = r.core.turn;
-      if (r.core.phase === 'mustDiscard') r = discard(r, seat, r.core.hands[seat]!.at(-1)!.id, (t += 10));
-      else if (r.core.phase === 'mustDraw') r = draw(r, seat, (t += 10));
-      else r = drawReplacement(r, seat, (t += 10));
+      t += 10;
+      const settled = settleEmptyWall(r, t);
+      if (settled) r = settled;
+      else if (tilesLeft(r.core.wall) === 0 && r.core.phase !== 'mustDiscard') {
+        // Someone could still take the last tile: they say no.
+        const passer = [0, 1, 2, 3].find((s) => availableActions(r, s, t).pass);
+        expect(passer).toBeDefined();
+        expect(availableActions(r, seat, t).draw).toBe(false); // nobody can end it early by drawing
+        r = pass(r, passer!, t);
+      } else if (r.core.phase === 'mustDiscard') r = discard(r, seat, r.core.hands[seat]!.at(-1)!.id, t);
+      else if (r.core.phase === 'mustDraw') r = draw(r, seat, t);
+      else r = drawReplacement(r, seat, t);
     }
     expect(r.core.result).toEqual({ type: 'draw' });
     expect(tilesLeft(r.core.wall)).toBe(0);
   });
+
+  /** A table where the wall is empty and the dealer is about to throw dR (seat 3 can win on it). */
+  const emptyWall = (discardCount = 60): RoundState => {
+    const hands: Setup['hands'] = [
+      'm1 m2 m3 m4 m5 m6 m7 m8 m9 p1 p2 p3 s1 dR',
+      'p4 p5 p6 p7 p8 p9 s2 s3 s4 s5 s6 s7 wE',
+      'p1 p4 p7 s1 s4 s7 m1 m4 m7 wE wS dR dR',
+      'm2 m3 m4 p5 p6 p7 s3 s4 s5 s7 s8 s9 dR',
+    ];
+    const r = setupRound({ hands, settings: { minFan: 0 } });
+    // Empty the wall (its tiles go to old discards, so the tile set stays whole).
+    const core = structuredClone(r.core);
+    for (const st of core.wall.stacks) for (const t of st.tiles) core.discards.push({ tile: t, by: 1 });
+    for (const st of core.wall.stacks) st.tiles = [];
+    core.discardCount = discardCount;
+    return { ...r, core };
+  };
+
+  it('waits for a player who can win on the last discard, however long they take', () => {
+    const r = discard(emptyWall(), 0, idOf(emptyWall(), 0, 'dR'), 0);
+    expect(availableActions(r, 3, 0)).toMatchObject({ win: true, pass: true });
+    expect(availableActions(r, 2, 0)).toMatchObject({ pong: true, pass: true });
+    expect(settleEmptyWall(r, 60_000)).toBeNull(); // a minute later: still waiting for seat 3
+    expect(availableActions(r, 2, 60_000).pong).toBe(false); // the pong chance ran out after 10 s
+    expect(() => draw(r, 1, 60_000)).toThrow(/Waiting/);
+    const won = claim(r, 3, { kind: 'win' }, 60_000);
+    const res = won.core.result!;
+    if (res.type !== 'win') throw new Error('expected a win');
+    expect(res.items.map((i) => i.zh)).toContain('河底撈魚');
+    expect(res.items.map((i) => i.zh)).not.toContain('海底撈月');
+  });
+
+  it('chow / pong / gong on the last tile can wait 10 s; Pass ends the wait sooner', () => {
+    let r = discard(emptyWall(), 0, idOf(emptyWall(), 0, 'dR'), 0);
+    r = pass(r, 3, 100); // seat 3 doesn't want to win
+    expect(availableActions(r, 3, 100).win).toBe(false); // and can't change their mind
+    expect(settleEmptyWall(r, 5_000)).toBeNull(); // seat 2 can still pong
+    expect(settleEmptyWall(r, 10_001)?.core.result).toEqual({ type: 'draw' }); // 10 s gone: a tie
+    expect(settleEmptyWall(pass(r, 2, 200), 300)?.core.result).toEqual({ type: 'draw' }); // or as soon as seat 2 passes
+  });
+
+  it('after a pong on the last tile, the new discard is waited on in the same way', () => {
+    let r = discard(emptyWall(), 0, idOf(emptyWall(), 0, 'dR'), 0);
+    r = pass(r, 3, 100);
+    r = claim(r, 2, { kind: 'pong' }, 200);
+    expect(settleEmptyWall(r, 300)).toBeNull(); // seat 2 must throw a tile first
+    r = discard(r, 2, idOf(r, 2, 'wS'), 400);
+    expect(r.window?.passed ?? []).toEqual([]); // a new tile: everyone may decide again
+    expect(settleEmptyWall(r, 500)).toEqual(settleEmptyWall(r, 500)); // nobody can use wS: a tie
+    expect(settleEmptyWall(r, 500)?.core.result).toEqual({ type: 'draw' });
+  });
+
 });
 
 describe('undo', () => {

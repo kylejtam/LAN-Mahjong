@@ -194,6 +194,13 @@ disagrees with those, the newest dated entry here wins.
 | 2026-11-10 | **1.15.0: minimum fan is 0-3** on the host page (a drop-down). Older saves with a higher minimum fan keep it until it is changed. | Kyle |
 | 2026-11-10 | **1.15.0: CPU names.** The host page has a Name box for each CPU seat. CPU names always end in " (CPU)" (typed "(CPU)" is not doubled); with no name a CPU is called by its level, e.g. "Hard (CPU)" (was "CPU Hard"; old saves are renamed on start). A typed name stays when the level changes. CPU names may repeat. | Kyle |
 | 2026-11-10 | **1.15.0: the "CPU levels" section is removed from the host page.** | Kyle |
+| 2026-11-10 | **1.16.0: the end of the wall.** After the last tile is thrown, nobody can draw. Anyone who can win on it is waited for until they win or press **Pass** (no time limit). Anyone who can chow / pong / gong is waited for up to 10 s (or until they pass). After a claim, the new discard is waited on the same way. Only when nobody can take the tile does the hand end as a tie (draw). CPUs that don't want the tile pass straight away. A player who passed can't change their mind on that tile. | Kyle |
+| 2026-11-10 | **1.16.0: Pass button** (wall empty only), plain with no colour so it isn't pressed by mistake. Chinese label 過. | Kyle |
+| 2026-11-10 | **1.16.0: Tie stamp.** A tie at the end of the wall shows a red seal stamp saying "Tie" (Chinese: 和) for 5 s, then the summary. | Kyle |
+| 2026-11-10 | **1.16.0: Wu moment.** A win shows a red "Wu!" / 胡! bubble beside the winner's name tag (like a claim bubble), the winner's whole hand in the middle (hidden tiles, face-up sets, then the winning tile glowing gold), and the confetti + fanfare, all at once, for 10 s; then the summary opens. The celebration plays only once (not again with the summary). Reopening the page while a hand is over goes straight to the summary. | Kyle |
+| 2026-11-10 | **1.16.0: 河底撈魚.** Winning on the discard after the last tile is "Win on the last discard" 河底撈魚 (1 fan). Self-drawing the last tile stays 海底撈月 (1 fan). | Kyle |
+| 2026-11-10 | **1.16.0: CPU claims beat the next player's draw.** CPUs used to act strictly in seat order, so a CPU that could win or pong could lose its chance when the next player (an earlier seat) drew first. Now every CPU decides at once: wins first, then other claims, then passes, then everything else. | Kyle |
+| 2026-11-10 | **1.16.0: CPU time per move defaults to 5 seconds** (was 1). Existing games keep their setting. | Kyle |
 
 ## Open questions for Kyle
 

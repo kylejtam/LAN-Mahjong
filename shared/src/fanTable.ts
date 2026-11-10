@@ -26,6 +26,7 @@ export const FAN_TABLE: readonly FanTableRow[] = [
   { id: 'roundWind', fan: 1, en: 'Round wind pong', zh: '圈風' },
   { id: 'mixedTerminals', fan: 1, en: 'Terminals and honours', zh: '混么九' },
   { id: 'lastTile', fan: 1, en: 'Win on the last tile', zh: '海底撈月' },
+  { id: 'lastDiscard', fan: 1, en: 'Win on the last discard', zh: '河底撈魚' },
   { id: 'robbingGong', fan: 1, en: 'Robbing a gong', zh: '搶槓' },
   { id: 'gongReplacement', fan: 2, en: 'Win on a gong replacement', zh: '槓上開花' },
   { id: 'allPongs', fan: 3, en: 'All pongs', zh: '對對胡' },
