@@ -85,6 +85,10 @@ interface HandGap {
 
 /** How long the middle pop-ups (flowers, Soeng / Pung / Gong) stay on screen. Matches the CSS animation. */
 const POP_MS = 3000;
+/** A win: the Wu bubble and the winning hand show this long before the summary (matches the CSS). */
+const WIN_MOMENT_MS = 10000;
+/** A tie: the red seal shows this long before the summary (matches the CSS). */
+const TIE_MOMENT_MS = 5000;
 
 /** A pop-up in the middle of the table: a flower draw or a claim (Soeng / Pung / Gong). */
 interface Pop {
@@ -336,6 +340,31 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [winNow, roundKey]);
 
+  // ---------- the end of a hand: Wu moment / Tie stamp, then the summary ----------
+  // A win: a "Wu!" bubble by the winner's name and their hand in the middle (the
+  // confetti above plays at the same moment), for 10 s. A tie (the wall ran out):
+  // the red Tie / 和 seal for 5 s. Then the summary opens. Only when it happens
+  // live: reopening the page while a hand is over goes straight to the summary.
+  const res = round?.phase === 'ended' ? round.result : null;
+  const endSig = res
+    ? `${roundKey}|${res.type}|${res.type === 'win' ? `${res.winner}:${res.winningTileId ?? ''}` : round!.wallCount}`
+    : null;
+  const [moment, setMoment] = useState<{ sig: string; kind: 'win' | 'tie'; bubble?: Pop['bubble'] } | null>(null);
+  const seenEnd = useRef<string | null>(endSig);
+  const momentTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    const before = seenEnd.current;
+    seenEnd.current = endSig;
+    if (!endSig || endSig === before || !res) return;
+    const kind = res.type === 'win' ? 'win' : round!.wallCount === 0 ? 'tie' : null;
+    if (!kind) return;
+    setMoment({ sig: endSig, kind, bubble: res.type === 'win' ? bubbleBeside(res.winner) : undefined });
+    if (momentTimer.current) clearTimeout(momentTimer.current);
+    momentTimer.current = setTimeout(() => setMoment((m) => (m?.sig === endSig ? null : m)), kind === 'win' ? WIN_MOMENT_MS : TIE_MOMENT_MS);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [endSig]);
+  const showMoment = !!moment && moment.sig === endSig;
+
   // ---------- action buttons ----------
   const onWin = (): void => (a?.selfDrawWin ? command({ type: 'selfDrawWin' }) : doClaim({ kind: 'win' }));
   const onPong = (): void => doClaim({ kind: 'pong' });
@@ -373,7 +402,9 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
     if (a?.draw) hint = tr('hintDraw');
     else if (a?.drawReplacement) hint = tr('hintReplace');
     else if (a?.discard) hint = tr('hintDiscard');
+    else if (a?.pass) hint = tr('hintLastTile');
     else if (claimable) hint = tr('hintClaim');
+    else if (round.wallCount === 0 && (round.phase === 'mustDraw' || round.phase === 'mustReplace')) hint = tr('hintWaitLastTile');
     else if (waitingOnEmptySeat) hint = tr('hintWaitingSeat');
     else if (mySeat === null) hint = tr('hintWatching', { name: turnName });
     else hint = tr('hintTurn', { name: turnName });
@@ -896,6 +927,8 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
           {showButtons && claimable && a.pong && <button className="act act-pong" onClick={onPong}>{labels.pong}</button>}
           {showButtons && ((claimable && a.gong) || ownGongs > 0) && <button className="act act-gong" onClick={onGong}>{labels.gong}</button>}
           {a && (a.selfDrawWin || (a.win && (claimable || round?.phase === 'ended'))) && <button className="act act-win" onClick={onWin}>{winLabel}</button>}
+          {/* Wall empty: say no to the last tile. Plain (no colour) so it isn't pressed by mistake. */}
+          {a?.pass && round?.phase !== 'ended' && <button className="act act-pass" onClick={() => command({ type: 'pass' })}>{tr('pass')}</button>}
         </div>
         <div className="me-bottom">
           {mySeat === null && nameTag(bottom)}
@@ -927,7 +960,27 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
       {view.you.watchAll && mySeat === null && round && (
         <AllHands view={view} tr={tr} newFlowerIds={newFlowerIds} hideFlowers={!!dealAnim} onClose={() => command({ type: 'setWatchAll', visible: false })} />
       )}
-      {(round?.phase === 'ended' || view.phase === 'finished') && (
+      {showMoment && moment.kind === 'tie' && (
+        <div className="tie-stamp-at" aria-live="polite">
+          <div className="tie-stamp">
+            <span className={lang === 'zh' ? 'zh' : 'en'}>{tr('tie')}</span>
+          </div>
+        </div>
+      )}
+      {showMoment && moment.kind === 'win' && res?.type === 'win' && (
+        <div aria-live="polite">
+          {moment.bubble && (
+            <div
+              className="claim-bubble-at"
+              style={moment.bubble.anchor === 'left' ? { left: moment.bubble.x, top: moment.bubble.y } : { right: window.innerWidth - moment.bubble.x, top: moment.bubble.y }}
+            >
+              <span className={`win-bubble${moment.bubble.anchor === 'right' ? ' from-right' : ''}${lang === 'zh' ? ' zh' : ''}`}>{labels.win}!</span>
+            </div>
+          )}
+          <WinningHand seat={view.seats[res.winner]!} winningTileId={res.winningTileId} name={res.winner === mySeat ? tr('you') : personName(view.seats[res.winner]?.name, lang)} />
+        </div>
+      )}
+      {(round?.phase === 'ended' || view.phase === 'finished') && !showMoment && (
         showReady === roundKey && mySeat !== null && view.phase !== 'finished' ? (
           <ReadyPanel view={view} tr={tr} lang={lang} command={command} onBack={() => setShowReady(null)} />
         ) : (
@@ -1463,3 +1516,29 @@ function ReadyPanel({
     </div>
   );
 }
+
+/** The winner's whole hand in the middle of the table: hidden tiles, then face-up sets, then the winning tile glowing. */
+function WinningHand({ seat, winningTileId, name }: { seat: SeatView; winningTileId?: number; name: string }): ReactElement {
+  const hand = seat.hand ?? [];
+  const winTile = hand.find((t) => t.id === winningTileId);
+  const rest = sortHand(hand.filter((t) => t.id !== winningTileId));
+  // Up to 18 tiles (four gongs) must fit on one line.
+  const w = 'min(48px, 4.2vw)';
+  return (
+    <div className="win-show-at">
+      <div className="win-show">
+        <div className="win-show-name">{name}</div>
+        <div className="win-show-row">
+          <div className="win-show-group">{rest.map((t) => <TileView key={t.id} type={t.type} width={w} />)}</div>
+          {seat.melds.map((m, i) => (
+            <div key={i} className="win-show-group win-show-meld">
+              {m.tiles.map((t, j) => <TileView key={t.id} type={t.type} back={m.concealed && (j === 0 || j === 3)} width={w} />)}
+            </div>
+          ))}
+          {winTile && <div className="win-show-group win-show-tile"><TileView type={winTile.type} width={w} className="win-glow" /></div>}
+        </div>
+      </div>
+    </div>
+  );
+}
+

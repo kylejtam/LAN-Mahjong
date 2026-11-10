@@ -144,6 +144,10 @@ export interface ClaimWindow {
   base: RoundCore;
   baseHistory: number;
   status: WindowStatus;
+  /** When the tile was offered (used when the wall is empty). Missing in old saves. */
+  openedAt?: number;
+  /** Wall empty: players who chose not to take this tile (the Pass button). */
+  passed?: number[];
 }
 
 export interface HistoryEntry {
@@ -298,13 +302,14 @@ export function draw(prev: RoundState, seat: number, now: number): RoundState {
   requireTurn(prev.core, seat, 'mustDraw');
   const state = startEdit(prev);
   const { core } = state;
-  if (state.window?.status.type === 'open') state.window.status = { type: 'drawn', at: now };
-
   if (tilesLeft(core.wall) === 0) {
+    // Nothing left to draw: the hand is a tie, but only once nobody can take the last tile.
+    if (lastTileWaiting(prev, now)) fail('Waiting for the other players to decide on the last tile.');
     core.phase = 'ended';
     core.result = { type: 'draw' };
     return finish(state);
   }
+  if (state.window?.status.type === 'open') state.window.status = { type: 'drawn', at: now };
   const tile = drawFront(core.wall);
   takeDrawnTile(core, seat, tile, 'wall');
   return finish(state);
@@ -316,6 +321,7 @@ export function drawReplacement(prev: RoundState, seat: number, now: number): Ro
   const state = startEdit(prev);
   const { core } = state;
   const w = state.window;
+  if (tilesLeft(core.wall) === 0 && lastTileWaiting(prev, now)) fail('Waiting for the other players to decide on the last tile.');
   if (w && w.source === 'addedGong' && w.by === seat && w.status.type === 'open') {
     w.status = { type: 'drawn', at: now };
   }
@@ -369,6 +375,7 @@ export function discard(prev: RoundState, seat: number, tileId: number, now: num
     base: clone(core),
     baseHistory: state.history.length,
     status: { type: 'open' },
+    openedAt: now,
   };
   return finish(state);
 }
@@ -414,6 +421,7 @@ export function addedGong(prev: RoundState, seat: number, type: NormalType, now:
     base: clone(core),
     baseHistory: state.history.length,
     status: { type: 'open' },
+    openedAt: now,
   };
   return finish(state);
 }
@@ -426,6 +434,12 @@ export function claimProblem(state: RoundState, seat: number, claim: Claim, now:
   if (!w) return 'There is no tile to claim.';
   if (seat === w.by) return 'You cannot claim your own tile.';
   if (w.source === 'addedGong' && claim.kind !== 'win') return 'You can only 胡 on a gong tile.';
+
+  if (w.passed?.includes(seat)) return 'You passed on that tile.';
+  // Wall empty: chow / pong / gong only within 10 s of the tile being thrown (a win can wait).
+  if (tilesLeft(w.base.wall) === 0 && claim.kind !== 'win' && w.status.type === 'open' && now - (w.openedAt ?? 0) > CLAIM_AFTER_DRAW_MS) {
+    return 'Too late to claim that tile.';
+  }
 
   // Timing.
   const s = w.status;
@@ -509,7 +523,7 @@ export function claim(prev: RoundState, seat: number, c: Claim, now: number): Ro
       winningTile: tile.type,
       selfDraw: false,
       robbingGong: w.source === 'addedGong',
-      lastTile: tilesLeft(core.wall) === 0,
+      lastDiscard: w.source === 'discard' && tilesLeft(core.wall) === 0,
       earthly,
     });
     return finish(state);
@@ -569,6 +583,7 @@ function endWithWin(
     robbingGong?: boolean;
     gongReplacement?: boolean;
     lastTile?: boolean;
+    lastDiscard?: boolean;
     heavenly?: boolean;
     earthly?: boolean;
   },
@@ -676,6 +691,8 @@ export interface AvailableActions {
   pong: boolean;
   gong: boolean;
   win: boolean;
+  /** Wall empty: say no to the last tile (so the game doesn't wait for you). */
+  pass: boolean;
   undo: boolean;
 }
 
@@ -705,9 +722,15 @@ export function availableActions(state: RoundState, seat: number, now: number): 
     }
   }
 
+  const pong = can({ kind: 'pong' });
+  const gong = can({ kind: 'gong' });
+  const win = can({ kind: 'win' });
+  const wallEmpty = tilesLeft(core.wall) === 0;
+  // With the wall empty, the game moves on by itself once nobody can take the last tile.
+  const waiting = wallEmpty && lastTileWaiting(state, now);
   return {
-    draw: myTurn && core.phase === 'mustDraw',
-    drawReplacement: myTurn && core.phase === 'mustReplace',
+    draw: myTurn && core.phase === 'mustDraw' && !waiting,
+    drawReplacement: myTurn && core.phase === 'mustReplace' && !waiting,
     discard: mustDiscard,
     selfDrawWin: mustDiscard && core.lastDraw !== null && canWinSelfDraw(hand, melds),
     concealedGongs: mustDiscard
@@ -717,9 +740,75 @@ export function availableActions(state: RoundState, seat: number, now: number): 
       ? melds.filter((m) => m.kind === 'pong' && hand.some((t) => t.type === m.tiles[0]!.type)).map((m) => m.tiles[0]!.type as NormalType)
       : [],
     chow,
-    pong: can({ kind: 'pong' }),
-    gong: can({ kind: 'gong' }),
-    win: can({ kind: 'win' }),
+    pong,
+    gong,
+    win,
+    pass: wallEmpty && !!w && w.status.type === 'open' && (win || pong || gong || chow.length > 0),
     undo: undoProblem(state, seat, false) === null,
   };
 }
+
+// ---------- the end of the wall ----------
+
+/** Can this seat still take the offered tile in any way? */
+function canStillClaim(state: RoundState, seat: number, now: number, kinds: ('win' | 'other')[]): boolean {
+  const w = state.window!;
+  if (kinds.includes('win') && claimProblem(state, seat, { kind: 'win' }, now) === null) return true;
+  if (!kinds.includes('other')) return false;
+  if (claimProblem(state, seat, { kind: 'pong' }, now) === null) return true;
+  if (claimProblem(state, seat, { kind: 'gong' }, now) === null) return true;
+  if (w.source === 'discard' && isSuited(w.tile.type)) {
+    const hand = w.base.hands[seat]!;
+    for (const a of hand) for (const b of hand) {
+      if (a.id < b.id && claimProblem(state, seat, { kind: 'chow', tileIds: [a.id, b.id] }, now) === null) return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * Wall empty: is the game still waiting for someone to decide on the last tile?
+ * Anyone who can win is waited for until they win or pass. Anyone who can make
+ * a chow, pong or gong is waited for up to 10 seconds (or until they pass).
+ */
+export function lastTileWaiting(state: RoundState, now: number): boolean {
+  const w = state.window;
+  if (!w || w.status.type !== 'open' || tilesLeft(state.core.wall) !== 0) return false;
+  for (let seat = 0; seat < SEATS; seat++) {
+    if (seat === w.by || w.passed?.includes(seat)) continue;
+    if (canStillClaim(state, seat, now, ['win', 'other'])) return true;
+  }
+  return false;
+}
+
+/** When the 10 seconds for chow / pong / gong on the last tile run out (null = no such deadline). */
+export function lastTileDeadline(state: RoundState): number | null {
+  const w = state.window;
+  if (!w || w.status.type !== 'open' || tilesLeft(state.core.wall) !== 0) return null;
+  return (w.openedAt ?? 0) + CLAIM_AFTER_DRAW_MS;
+}
+
+/** Wall empty: a player says no to the last tile. */
+export function pass(prev: RoundState, seat: number, now: number): RoundState {
+  requireSeat(seat);
+  if (!availableActions(prev, seat, now).pass) fail('There is nothing to pass on.');
+  const state = startEdit(prev);
+  const w = state.window!;
+  w.passed = [...(w.passed ?? []), seat];
+  return finish(state);
+}
+
+/**
+ * Wall empty and nobody can take the last tile any more: the hand is a tie.
+ * Returns the finished round, or null if it isn't time yet.
+ */
+export function settleEmptyWall(state: RoundState, now: number): RoundState | null {
+  const { core } = state;
+  if (core.phase !== 'mustDraw' && core.phase !== 'mustReplace') return null;
+  if (tilesLeft(core.wall) !== 0 || lastTileWaiting(state, now)) return null;
+  const next = startEdit(state);
+  next.core.phase = 'ended';
+  next.core.result = { type: 'draw' };
+  return finish(next);
+}
+

@@ -34,14 +34,16 @@ import {
   discard,
   draw,
   drawReplacement,
+  pass,
   selfDrawWin,
+  settleEmptyWall,
   undo,
 } from './round.js';
 import { cpuMove } from './cpu.js';
 
 export type CpuDifficulty = 'easy' | 'medium' | 'hard';
 /** How long CPUs wait before each move (seconds), set on the host page. Same for every level. */
-export const DEFAULT_CPU_SECONDS = 1;
+export const DEFAULT_CPU_SECONDS = 5;
 export const MIN_CPU_SECONDS = 0.2;
 export const MAX_CPU_SECONDS = 30;
 export type TableColour = 'green' | 'black' | 'white' | 'red' | 'blue';
@@ -147,6 +149,8 @@ export type Command =
   | { type: 'concealedGong'; tileType: NormalType }
   | { type: 'addedGong'; tileType: NormalType }
   | { type: 'selfDrawWin' }
+  /** Wall empty: say no to the last tile. */
+  | { type: 'pass' }
   | { type: 'reorderHand'; tileIds: number[] }
   | { type: 'undo' }
   | { type: 'confirmRound' }
@@ -516,6 +520,7 @@ export function handleCommand(prev: Room, key: string, cmd: Command, now: number
     case 'claim':
     case 'concealedGong':
     case 'addedGong':
+    case 'pass':
     case 'selfDrawWin': {
       const round = requireRound(room);
       const s = requireSeated(room, key);
@@ -816,9 +821,28 @@ function applyRoundMove(round: RoundState, seat: number, cmd: Command, now: numb
       return addedGong(round, seat, cmd.tileType, now);
     case 'selfDrawWin':
       return selfDrawWin(round, seat, now);
+    case 'pass':
+      return pass(round, seat, now);
     default:
       return fail('Unknown move.');
   }
+}
+
+// ---------- the end of the wall ----------
+
+/**
+ * Wall empty and nobody can take the last tile any more: end the hand as a tie.
+ * The server calls this regularly. Returns the same room if nothing happened.
+ */
+export function settleWall(prev: Room, now: number): Room {
+  const round = prev.match.round;
+  if (prev.phase !== 'playing' || !round || round.core.phase === 'ended') return prev;
+  const done = settleEmptyWall(round, now);
+  if (!done) return prev;
+  const room = cloneRoom(prev);
+  setRound(room, done);
+  room.lastChangeAt = now;
+  return room;
 }
 
 // ---------- CPU players ----------
@@ -867,16 +891,24 @@ export function cpuTick(prev: Room, now: number, rng: Rng): Room {
       }
       return prev;
     }
+    // Every CPU decides; a win goes first, then other claims (a claim beats the next
+    // player's draw, whatever the seat order), then passes, then everything else.
+    const choices: { k: string; move: Command; rank: number }[] = [];
     for (const { k, seat } of cpuSeats) {
       // The CPU keeps its plan for this hand (the key names the seat and the hand).
       const memoryKey = `${prev.id}|${prev.match.handsPlayed}|${round.core.dice.join('')}|${seat}`;
-      const move = cpuMove(round, seat, availableActions(round, seat, now), prev.people[k]!.cpu!, rng, now, memoryKey);
-      if (move) {
-        try {
-          return act(k, move);
-        } catch {
-          // A CPU move that is no longer allowed is simply skipped.
-        }
+      const a = availableActions(round, seat, now);
+      const move = cpuMove(round, seat, a, prev.people[k]!.cpu!, rng, now, memoryKey);
+      if (move?.type === 'claim') choices.push({ k, move, rank: move.claim.kind === 'win' ? 0 : 1 });
+      else if (a.pass) choices.push({ k, move: { type: 'pass' }, rank: 2 }); // wall empty: doesn't want the tile
+      else if (move) choices.push({ k, move, rank: 3 });
+    }
+    choices.sort((x, y) => x.rank - y.rank);
+    for (const c of choices) {
+      try {
+        return act(c.k, c.move);
+      } catch {
+        // A CPU move that is no longer allowed is simply skipped.
       }
     }
   }

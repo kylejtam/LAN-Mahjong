@@ -18,8 +18,8 @@ import { randomUUID, getRandomValues } from 'node:crypto';
 import QRCode from 'qrcode';
 import { WebSocketServer, WebSocket } from 'ws';
 import { Rng } from '@lan-mahjong/shared';
-import { CLAIM_AFTER_DRAW_MS, GRACE_MS, GameError, WIN_OVERRIDE_MS } from './game/round.js';
-import { Room, cpuTick, createRoom, disconnect, handleCommand, handleHostCommand, joinRoom, nameKey } from './game/room.js';
+import { CLAIM_AFTER_DRAW_MS, GRACE_MS, GameError, WIN_OVERRIDE_MS, lastTileDeadline } from './game/round.js';
+import { Room, cpuTick, settleWall, createRoom, disconnect, handleCommand, handleHostCommand, joinRoom, nameKey } from './game/room.js';
 import { matchLabel } from './game/match.js';
 import { hostViewOf, viewFor } from './game/view.js';
 import { ClientMessage, GameListEntry, HostMessage, ServerHostMessage, ServerMessage } from './protocol.js';
@@ -464,6 +464,11 @@ export async function startServer(opts: ServerOptions): Promise<RunningServer> {
   const tick = (): void => {
     const t = now();
     for (const room of [...rooms.values()]) {
+      const settled = settleWall(room, t);
+      if (settled !== room) {
+        setRoom(settled);
+        continue;
+      }
       const updated = cpuTick(room, t, rng);
       if (updated !== room) {
         setRoom(updated);
@@ -476,6 +481,9 @@ export async function startServer(opts: ServerOptions): Promise<RunningServer> {
         const deadlines = [w.status.at + GRACE_MS, w.status.at + WIN_OVERRIDE_MS, w.status.at + CLAIM_AFTER_DRAW_MS];
         if (deadlines.some((d) => d > sent && d <= t)) broadcast(room.id);
       }
+      // Wall empty: when the 10 s for chow / pong / gong on the last tile run out, buttons must go.
+      const last = room.match.round ? lastTileDeadline(room.match.round) : null;
+      if (last !== null && last > (lastSent.get(room.id) ?? 0) && last <= t) broadcast(room.id);
     }
   };
   const interval = setInterval(tick, opts.tickMs ?? 250);

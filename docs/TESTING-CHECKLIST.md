@@ -59,6 +59,7 @@ Write down which devices worked: ☐ iPhone ☐ iPad ☐ Samsung tablet ☐ lapt
 - [ ] Play a few hands at fan 3 with each level: Hard usually goes for one suit or pongs and wins bigger hands; Medium claims less often; Easy never calls chow / pong / gong.
 - [ ] **Remove player** takes a person out of their seat (they become a spectator).
 - [ ] Chips: change a number in a seat card, press **Set**, then **tap again** to confirm.
+- [ ] A new game's **CPU time per move** starts at **5** seconds.
 - [ ] Change **CPU time per move** (e.g. 0.5 and 3) and watch the CPUs speed up / slow down.
 - [ ] Change the table colour; every device changes too.
 - [ ] Settings → **Liability 包** (on by default for new games; can be turned off). With it on: once someone shows 3 face-up sets of one suit, the first player to discard a tile of that suit which they use is liable; if they win with a one-suit hand, the summary says "包: … pays for everyone" and only that player pays.
@@ -138,3 +139,15 @@ Write down which devices worked: ☐ iPhone ☐ iPad ☐ Samsung tablet ☐ lapt
 - **Nothing happens / the window closes at once:** take a photo of the window if you can and send it to me.
 - **"Windows protected your PC" when installing:** click **More info**, then **Run anyway**.
 - **The host page doesn't open:** open your browser and go to `http://localhost:3000/host`.
+
+## End of the wall, ties and wins (1.16.0)
+- [ ] Play until the wall shows 0. After the last tile is thrown, nobody can draw.
+- [ ] If you can win on the last tile: the game waits (no time limit). You see **Wu** and a plain **Pass** button (no colour). Pass: you can't win on that tile any more.
+- [ ] If you can only chow / pong / gong on it: the buttons stay for 10 s, then go. Pass makes them go straight away.
+- [ ] If someone pongs the last tile and throws another, everyone may decide again on that tile.
+- [ ] When nobody can take the tile: a red seal stamp "Tie" (Chinese 和) shows for 5 s, then the summary ("Draw – the wall is empty").
+- [ ] A win on the last discard shows "Win on the last discard 河底撈魚" (1 fan) on the summary.
+- [ ] Any win: a red "Wu!" bubble by the winner's name, the winner's hand in the middle with the winning tile glowing gold, and your confetti, all at once. The summary opens after 10 s and the confetti does **not** play again.
+- [ ] Reload the page while a summary is showing: it goes straight to the summary (no bubble, no confetti).
+- [ ] A CPU that can win on a discard wins it, even when the next player is a CPU that would otherwise draw first.
+

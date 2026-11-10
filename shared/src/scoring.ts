@@ -23,8 +23,10 @@ export interface WinContext {
   seatWind: number;
   roundWind: number;
   flowersOn: boolean;
-  /** Won on the very last tile of the wall 海底撈月. */
+  /** Won on the very last tile of the wall 海底撈月 (self-drawn). */
   lastTile?: boolean;
+  /** Won on the discard after the last tile of the wall 河底撈魚. */
+  lastDiscard?: boolean;
   /** Won by robbing a gong 搶槓. */
   robbingGong?: boolean;
   /** Won on the replacement tile after a gong 槓上開花. */
@@ -193,6 +195,7 @@ function scoreSplit(ctx: WinContext, sets: SetInfo[], pair: number, noClaimedMel
 
   // Special timing
   if (ctx.lastTile) items.push(item('lastTile', 1, 'Win on the last tile', '海底撈月'));
+  if (ctx.lastDiscard) items.push(item('lastDiscard', 1, 'Win on the last discard', '河底撈魚'));
   if (ctx.robbingGong) items.push(item('robbingGong', 1, 'Robbing a gong', '搶槓'));
   if (ctx.gongReplacement) items.push(item('gongReplacement', 2, 'Win on a gong replacement', '槓上開花'));
 
