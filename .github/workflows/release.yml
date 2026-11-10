@@ -68,5 +68,9 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           v="${{ steps.version.outputs.number }}"
+          # Hand-written notes for this version (docs/release-notes/vX.Y.Z.md) go first, if there are any;
+          # the automatic list of changes follows.
+          extra=()
+          if [ -f "docs/release-notes/v$v.md" ]; then extra=(--notes-file "docs/release-notes/v$v.md"); fi
           gh release create "v$v" LAN-Mahjong-Setup.exe LAN-Mahjong-Setup.exe.sha256 \
-            --target "$GITHUB_SHA" --title "LAN Mahjong $v" --generate-notes
+            --target "$GITHUB_SHA" --title "LAN Mahjong $v" --generate-notes "${extra[@]}"
