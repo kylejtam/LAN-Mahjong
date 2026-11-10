@@ -210,6 +210,7 @@ disagrees with those, the newest dated entry here wins.
 | 2026-11-10 | **1.17.0: game tiles (host page).** Each game is a tile (name, wind/game, playing or waiting, tiles left, players and chips), newest first. Tap to open its seats, current game, history and settings; several can be open. A newly created game opens by itself and glows gold briefly. Open tiles are remembered on the host computer. | Kyle |
 | 2026-11-10 | **1.17.0: win summary names.** The winner's name is green and the name of the player who threw the winning tile is red (heading and hand rows). | Kyle |
 | 2026-11-10 | **1.17.1 (bug fix): the discard slide-in animation was missing.** A new discard was marked to slide in, but the screen redrew again at once and the mark was dropped before the animation could play. Now a new discard keeps its slide-in for the length of the animation (0.4 s), so extra redraws can't cut it off. | Kyle |
+| 2026-11-10 | **1.17.2: the big last discard in the middle disappears** as soon as the next player draws or someone claims it. It shows only while that tile is still on offer. (If you can claim it, the "Take" tile shows instead, as before.) | Kyle |
 
 ## Open questions for Kyle
 
