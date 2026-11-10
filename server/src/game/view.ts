@@ -14,7 +14,7 @@
 import { GameSettings, Meld, SEATS, Tile, tilesLeft } from '@lan-mahjong/shared';
 import { matchLabel } from './match.js';
 import { AvailableActions, CLAIM_AFTER_DRAW_MS, DiscardEntry, Phase, RoundResult, availableActions, currentPlayer } from './round.js';
-import { CpuDifficulty, DEFAULT_CPU_SECONDS, HandRecord, PendingSwap, Room, RoomPhase, TableColour, pendingChange, roundCanClose, seatOf, undoableForSeat } from './room.js';
+import { CpuDifficulty, DEFAULT_CPU_SECONDS, HandRecord, HistoryEdit, PendingSwap, Room, RoomPhase, TableColour, pendingChange, roundCanClose, seatOf, undoableForSeat } from './room.js';
 import { sortHand } from '@lan-mahjong/shared';
 
 export interface SeatView {
@@ -205,6 +205,7 @@ export function viewFor(room: Room, viewerKey: string, now: number): RoomView {
 export interface HostGameView {
   id: string;
   name: string;
+  createdAt: number;
   label: { en: string; zh: string };
   phase: RoomPhase;
   settings: GameSettings;
@@ -219,12 +220,14 @@ export interface HostGameView {
   /** Short summary of the round, with no hidden tiles. */
   round: null | { phase: Phase; turn: number; wallCount: number; result: RoundResult | null };
   /** Finished hands, oldest first, with chip changes by name. */
-  history: (Omit<HandRecord, 'changes' | 'balancesBefore' | 'seatChanges' | 'winnerSeat' | 'discarderSeat'> & {
+  history: (Omit<HandRecord, 'changes' | 'balancesBefore' | 'seatChanges' | 'winnerSeat' | 'discarderSeat' | 'seatKeys'> & {
     changes: { name: string; change: number }[];
     seatChanges: number[];
     winnerSeat: number | null;
     discarderSeat: number | null;
   })[];
+  /** Chip changes the host edited in the history, newest first. */
+  historyEdits: HistoryEdit[];
 }
 
 function seatByName(h: HandRecord, name: string | null): number | null {
@@ -239,6 +242,7 @@ export function hostViewOf(room: Room): HostGameView {
   return {
     id: room.id,
     name: room.name,
+    createdAt: room.createdAt,
     label: { en: matchLabel(room.match, 'en'), zh: matchLabel(room.match, 'zh') },
     phase: room.phase,
     settings: room.match.settings,
@@ -276,6 +280,8 @@ export function hostViewOf(room: Room): HostGameView {
       // Older saved hands did not record seats: find them from the names.
       winnerSeat: h.winnerSeat !== undefined ? h.winnerSeat : h.result.type === 'win' ? seatByName(h, h.result.winner) : null,
       discarderSeat: h.discarderSeat !== undefined ? h.discarderSeat : h.result.type === 'win' ? seatByName(h, h.result.discarder) : null,
+      originalSeatChanges: h.originalSeatChanges,
     })),
+    historyEdits: [...(room.historyEdits ?? [])].reverse(),
   };
 }

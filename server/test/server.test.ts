@@ -356,6 +356,8 @@ describe('game server over the network', () => {
     const s = await boot();
     const host = await hostPage(s.port);
     const gameId = await host.createGame('Bots', 100);
+    // Fast CPUs, so the test doesn't wait 5 s (the default) for every move.
+    host.send({ type: 'hostCommand', gameId, command: { type: 'hostSetCpuSeconds', seconds: 0.5 } });
     for (let seat = 0; seat < 4; seat++) {
       host.send({ type: 'hostCommand', gameId, command: { type: 'hostSetSeat', seat, cpu: 'easy' } });
     }

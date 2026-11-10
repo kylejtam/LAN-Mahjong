@@ -80,9 +80,18 @@ export function ResultPanel({ view, lang, command, canClaimWin, onWin, winLabel,
         ) : (
           <>
             <h3>
-              {result.discarder === null
-                ? tr('winsSelfDraw', { name: personName(view.seats[result.winner]?.name, lang) })
-                : tr('winsOnDiscard', { name: personName(view.seats[result.winner]?.name, lang), from: personName(view.seats[result.discarder]?.name, lang) })}
+              {/* The winner's name in green, the player who threw the winning tile in red. */}
+              {(result.discarder === null ? tr('winsSelfDraw', { name: '\u0001name\u0001' }) : tr('winsOnDiscard', { name: '\u0001name\u0001', from: '\u0001from\u0001' }))
+                .split('\u0001')
+                .map((part, i) =>
+                  part === 'name' ? (
+                    <span key={i} className="name-winner">{personName(view.seats[result.winner]?.name, lang)}</span>
+                  ) : part === 'from' && result.discarder !== null ? (
+                    <span key={i} className="name-discarder">{personName(view.seats[result.discarder]?.name, lang)}</span>
+                  ) : (
+                    part
+                  ),
+                )}
               {result.isChicken ? tr('chickenWin') : ''}
             </h3>
             <h4 className="result-subhead">{tr('winningConditions')}</h4>
@@ -114,7 +123,7 @@ export function ResultPanel({ view, lang, command, canClaimWin, onWin, winLabel,
             return (
               <div key={s.seat} className={`result-row${isWinner ? ' result-winner' : ''}`}>
                 <span className="result-name">
-                  {personName(s.name, lang)}
+                  <span className={isWinner ? 'name-winner' : result.type === 'win' && result.discarder === s.seat ? 'name-discarder' : undefined}>{personName(s.name, lang)}</span>
                   {/* Who is ready for the next round. */}
                   {s.name && !s.cpu && <span className={`ready-dot${s.confirmed ? ' on' : ''}`}>{s.confirmed ? tr('ready') : '…'}</span>}
                 </span>

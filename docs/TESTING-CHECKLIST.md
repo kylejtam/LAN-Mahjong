@@ -151,3 +151,14 @@ Write down which devices worked: ☐ iPhone ☐ iPad ☐ Samsung tablet ☐ lapt
 - [ ] Reload the page while a summary is showing: it goes straight to the summary (no bubble, no confetti).
 - [ ] A CPU that can win on a discard wins it, even when the next player is a CPU that would otherwise draw first.
 
+## 1.17.0
+- [ ] With two or three possible Soengs, tap Soeng: the usable tiles glow green, the rest fade, no pop-up. Tap 三 (or 七) in 三四六七 + 五: done at once. Tap 四: it turns gold and only 三 and 六 stay lit; tap 六: Soeng 4-5-6. Tap the table: starts again. Tap Soeng again: stops choosing.
+- [ ] Whose turn: that player's name tag pulses gold and the table edge in front of them glows gold (above your hand on your turn).
+- [ ] After a win or a tie, "Tap anywhere to continue" shows; tapping opens the summary straight away (only on your screen).
+- [ ] CPUs show "(CPU)" once, with no extra CPU badge.
+- [ ] Draw: just touching the glowing tile draws it.
+- [ ] Discard: push a tile up; when it is fully out of the dark hand area it glows red; let go to throw it. Let go before that: it goes back. Sideways still rearranges.
+- [ ] Host page: each game is a tile; tap to open/close; a new game opens by itself. Open tiles stay open after reloading the host page.
+- [ ] Host page history: tap a number, type a new one, Save. Only that player's chips change, by the difference. Orange outline, "was …", Edited tag, edit list line. Roll back to a later game keeps the edit.
+- [ ] Win summary: winner's name green, thrower's name red.
+
