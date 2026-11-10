@@ -716,3 +716,34 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; }
 /* Same label size under Take, the last discard and Draw, so their tiles sit at the same height. */
 .hub-slot .draw-label, .hub-slot .last-discard-label { font-size: 0.8em; line-height: 1.25; height: 1.25em; }
 .hub-slot > .last-discard, .hub-slot > .claim-pile, .hub-slot > .draw-pile { gap: 0.15em; padding: 0.3em 0.4em; }
+
+/* Claims (Soeng / Pung / Gong): a bubble next to the player who claimed, and the set's tiles
+   big in the middle glowing in the claim's colour. Lasts 3 s, like the flower pop-up. */
+.claim-bubble-at { position: fixed; z-index: 45; pointer-events: none; transform: translateY(-50%); }
+.claim-bubble {
+  display: inline-block; padding: 0.3em 0.95em; border-radius: 999px; color: #fff; font-weight: 800;
+  font-size: clamp(14px, 2.2vw, 24px); white-space: nowrap; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.45);
+  transform-origin: left center; animation: claim-pop 3s ease-out forwards;
+}
+.claim-bubble.from-right { transform-origin: right center; }
+.claim-tiles-at { position: fixed; left: 50%; top: 45%; transform: translate(-50%, -50%); z-index: 45; pointer-events: none; }
+.claim-tiles { display: flex; gap: 0.35em; animation: claim-pop 3s ease-out forwards; }
+.claim-chow { --lc: #2f8f5b; } .claim-pong { --lc: #2f6fbf; } .claim-gong { --lc: #8a4fc0; }
+.claim-glow { border-radius: 6px; animation: claim-glow 0.6s ease-in-out 5 alternate; }
+@keyframes claim-glow {
+  from { box-shadow: 0 0 0 3px var(--lc), 0 0 10px 2px var(--lc); }
+  to { box-shadow: 0 0 0 4px var(--lc), 0 0 26px 8px var(--lc); }
+}
+@keyframes claim-pop {
+  0% { opacity: 0; transform: scale(0.5); }
+  8% { opacity: 1; transform: scale(1.08); }
+  15% { transform: scale(1); }
+  85% { opacity: 1; transform: scale(1); }
+  100% { opacity: 0; transform: scale(0.95); }
+}
+@media (prefers-reduced-motion: reduce) { .claim-bubble, .claim-tiles { animation: none; } .claim-glow { animation: none; box-shadow: 0 0 0 4px var(--lc); } }
+
+/* The right player sits facing the other way: their discards and face-up sets read from the
+   bottom (oldest) upwards, the way they laid them down. */
+.discards-right { flex-direction: column-reverse; }
+.opp-right .melds-sideways, .opp-right .melds-sideways .meld, .opp-right .opp-hand.melds-sideways { flex-direction: column-reverse; }

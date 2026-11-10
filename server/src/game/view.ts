@@ -13,7 +13,7 @@
  */
 import { GameSettings, Meld, SEATS, Tile, tilesLeft } from '@lan-mahjong/shared';
 import { matchLabel } from './match.js';
-import { AvailableActions, DiscardEntry, Phase, RoundResult, availableActions, currentPlayer } from './round.js';
+import { AvailableActions, CLAIM_AFTER_DRAW_MS, DiscardEntry, Phase, RoundResult, availableActions, currentPlayer } from './round.js';
 import { CpuDifficulty, DEFAULT_CPU_SECONDS, HandRecord, PendingSwap, Room, RoomPhase, TableColour, pendingChange, roundCanClose, seatOf, undoableForSeat } from './room.js';
 import { sortHand } from '@lan-mahjong/shared';
 
@@ -62,6 +62,8 @@ export interface RoomView {
     /** The tile that can currently be claimed, if any. */
     offered: { tile: Tile; by: number } | null;
     offeredDrawn: boolean;
+    /** After the next player drew: how long others can still claim (ms, when this was sent). */
+    claimMsLeft: number | null;
     /** Flowers each seat has set aside (face up, so public). Used by the deal animation. */
     flowersDealt: number[];
     result: RoundResult | null;
@@ -174,6 +176,8 @@ export function viewFor(room: Room, viewerKey: string, now: number): RoomView {
           offered: round.window ? { tile: round.window.tile, by: round.window.by } : null,
           /** The next player has drawn: claim buttons are hidden (a quick tap on the tile still works for 3 s). */
           offeredDrawn: round.window?.status.type === 'drawn',
+          claimMsLeft:
+            round.window?.status.type === 'drawn' ? Math.max(0, CLAIM_AFTER_DRAW_MS - (now - round.window.status.at)) : null,
           flowersDealt: round.core.flowers.map((f) => f.length),
           result: round.core.result,
         }
