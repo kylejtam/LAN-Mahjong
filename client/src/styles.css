@@ -635,7 +635,7 @@ input { font: inherit; }
   85% { opacity: 1; transform: scale(1); }
   100% { opacity: 0; transform: scale(0.92); }
 }
-.flower-new { animation: flower-glow 0.6s ease-in-out 8 alternate; border-radius: 4px; position: relative; z-index: 1; }
+.flower-new::before { animation: flower-glow 0.6s ease-in-out 8 alternate; }
 @keyframes flower-glow {
   from { box-shadow: 0 0 0 2px #f5c542, 0 0 4px 2px rgba(245, 197, 66, 0.4); }
   to { box-shadow: 0 0 0 3px #f5c542, 0 0 16px 6px rgba(245, 197, 66, 0.9); }
@@ -689,7 +689,8 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; }
 }
 
 /* Win summary: the tile that completed the hand. */
-.winning-tile { position: relative; z-index: 1; border-radius: 4px; box-shadow: 0 0 0 3px #ffd447, 0 0 14px 4px rgba(255, 212, 71, 0.8); transform: translateY(-3px); }
+.winning-tile { top: -3px; }
+.winning-tile::before { box-shadow: 0 0 0 3px #ffd447, 0 0 14px 4px rgba(255, 212, 71, 0.8); }
 
 /* The dice roll before the deal: three dice bounce around the screen, then land in the middle. */
 .dice-roll { position: fixed; inset: 0; z-index: 42; pointer-events: none; }
@@ -750,7 +751,7 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; }
 .claim-tiles-at { position: fixed; left: 50%; top: 45%; transform: translate(-50%, -50%); z-index: 45; pointer-events: none; }
 .claim-tiles { display: flex; gap: 0.35em; animation: claim-pop 3s ease-out forwards; }
 .claim-chow { --lc: #2f8f5b; } .claim-pong { --lc: #2f6fbf; } .claim-gong { --lc: #8a4fc0; }
-.claim-glow { border-radius: 6px; animation: claim-glow 0.6s ease-in-out 5 alternate; }
+.claim-glow::before { animation: claim-glow 0.6s ease-in-out 5 alternate; }
 @keyframes claim-glow {
   from { box-shadow: 0 0 0 3px var(--lc), 0 0 10px 2px var(--lc); }
   to { box-shadow: 0 0 0 4px var(--lc), 0 0 26px 8px var(--lc); }
@@ -762,7 +763,7 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; }
   85% { opacity: 1; transform: scale(1); }
   100% { opacity: 0; transform: scale(0.95); }
 }
-@media (prefers-reduced-motion: reduce) { .claim-bubble, .claim-tiles { animation: none; } .claim-glow { animation: none; box-shadow: 0 0 0 4px var(--lc); } }
+@media (prefers-reduced-motion: reduce) { .claim-bubble, .claim-tiles { animation: none; } .claim-glow::before { animation: none; box-shadow: 0 0 0 4px var(--lc); } }
 
 /* The right player sits facing the other way: their discards and face-up sets read from the
    bottom (oldest) upwards, the way they laid them down. */
@@ -792,7 +793,7 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; }
 .win-show-group { display: flex; gap: 2px; }
 .win-show-meld { padding: 2px; border-radius: 5px; background: rgba(255, 255, 255, 0.08); }
 .win-show-tile { margin-left: 0.4em; }
-.win-glow { border-radius: 5px; animation: win-glow 0.7s ease-in-out infinite alternate; }
+.win-glow::before { animation: win-glow 0.7s ease-in-out infinite alternate; }
 @keyframes win-glow {
   from { box-shadow: 0 0 0 3px #f5c542, 0 0 10px 3px #f5c542; }
   to { box-shadow: 0 0 0 4px #f5c542, 0 0 26px 9px #f5c542; }
@@ -826,7 +827,7 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; }
 @media (prefers-reduced-motion: reduce) {
   .win-bubble, .win-show, .tie-stamp { animation: none; }
   .tie-stamp { transform: rotate(-8deg); }
-  .win-glow { animation: none; box-shadow: 0 0 0 4px #f5c542; }
+  .win-glow::before { animation: none; box-shadow: 0 0 0 4px #f5c542; }
 }
 
 /* Win summary: the winner's name green, the player who threw the winning tile red. */
@@ -845,8 +846,9 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; }
 .drag-ghost.discard-ready { filter: drop-shadow(0 0 6px #e8463f) drop-shadow(0 0 14px rgba(232, 70, 63, 0.85)) drop-shadow(0 6px 8px rgba(0, 0, 0, 0.5)); }
 
 /* Choosing which Soeng: the tiles you could use lift up and glow green; the rest fade. */
-.hand-tile.chow-pick { transform: translateY(-14%); border-radius: 5px; box-shadow: 0 0 0 2px #2f8f5b, 0 0 12px 3px rgba(47, 143, 91, 0.85); cursor: pointer; transition: transform 0.15s; }
-.hand-tile.chow-first { box-shadow: 0 0 0 3px #f5c542, 0 0 12px 3px rgba(245, 197, 66, 0.8); }
+.hand-tile.chow-pick { position: relative; top: -0.35em; cursor: pointer; }
+.hand-tile.chow-pick::before { box-shadow: 0 0 0 2px #2f8f5b, 0 0 12px 3px rgba(47, 143, 91, 0.85); }
+.hand-tile.chow-first::before { box-shadow: 0 0 0 3px #f5c542, 0 0 12px 3px rgba(245, 197, 66, 0.8); }
 .hand-tile.chow-faded { opacity: 0.4; }
 
 /* Host page: each game is a tile; tap it to open its seats, history and settings. */
@@ -882,3 +884,11 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; }
 .history-editor input { width: 5em; background: var(--input-bg); color: var(--fg); border: 1px solid #f0a73c; border-radius: 6px; padding: 0.2em 0.4em; font: inherit; text-align: right; }
 .history-editor .btn { font-size: 0.8em; padding: 0.2em 0.5em; }
 .edit-log { margin: 0.4rem 0 0; padding-left: 1.1rem; color: var(--muted); font-size: 0.85rem; }
+
+/* Tile glows are drawn on a layer underneath the tiles, so a glow never covers a neighbouring
+   tile. Each row of tiles is its own layer group (isolation), and the glowing tile itself must
+   not start a new group (no transform or z-index on it). */
+.claim-glow::before, .flower-new::before, .winning-tile::before, .win-glow::before, .hand-tile.chow-pick::before {
+  content: ''; position: absolute; inset: 0; border-radius: 5px; z-index: -1; pointer-events: none;
+}
+.claim-tiles, .melds, .result-tiles, .win-show-row, .hand, .all-hands-overlay { isolation: isolate; }
