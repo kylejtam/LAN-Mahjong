@@ -5,7 +5,7 @@
  */
 import { mkdirSync, readFileSync, renameSync, writeFileSync, existsSync } from 'node:fs';
 import { dirname } from 'node:path';
-import type { Room } from './game/room.js';
+import { cpuDisplayName, type Room } from './game/room.js';
 
 interface SaveFile {
   version: 1;
@@ -19,7 +19,11 @@ export function loadRooms(file: string): Room[] {
     if (data.version !== 1 || !Array.isArray(data.rooms)) return [];
     // Nobody is connected straight after a restart (CPUs always are).
     for (const room of data.rooms) {
-      for (const p of Object.values(room.people)) p.connected = !!p.cpu;
+      for (const p of Object.values(room.people)) {
+        p.connected = !!p.cpu;
+        // Older saves named CPUs "CPU Easy" etc.; they are now "Easy (CPU)".
+        if (p.cpu && !p.name.endsWith('(CPU)')) p.name = cpuDisplayName(p);
+      }
     }
     return data.rooms.filter((r) => !r.ended);
   } catch (err) {

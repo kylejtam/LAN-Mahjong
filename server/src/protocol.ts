@@ -42,6 +42,6 @@ export type HostMessage =
 
 /** Server → host page. */
 export type ServerHostMessage =
-  | { type: 'hostState'; games: HostGameView[]; urls: string[]; cpuLevels: Record<'easy' | 'medium' | 'hard', string[]> }
+  | { type: 'hostState'; games: HostGameView[]; urls: string[] }
   | { type: 'hostCreated'; gameId: string }
   | { type: 'error'; message: string };

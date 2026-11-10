@@ -273,18 +273,39 @@ describe('host controls (laptop host page only)', () => {
     expect(() => host(startedTable(), { type: 'hostUpdateSettings', settings: { minFan: 2 } })).toThrow(/between rounds/);
   });
 
-  it('CPUs are named by level (names may repeat) and each keeps its own chips', () => {
+  it('CPUs are named by level with (CPU) (names may repeat) and each keeps its own chips', () => {
     let r = emptyRoom();
     r = host(r, { type: 'hostSetSeat', seat: 0, cpu: 'easy' });
     r = host(r, { type: 'hostSetSeat', seat: 1, cpu: 'easy' });
     r = host(r, { type: 'hostSetSeat', seat: 2, cpu: 'hard' });
     const names = hostViewOf(r).seats.map((s) => s.name);
-    expect(names).toEqual(['CPU Easy', 'CPU Easy', 'CPU Hard', null]);
+    expect(names).toEqual(['Easy (CPU)', 'Easy (CPU)', 'Hard (CPU)', null]);
     const key1 = hostViewOf(r).seats[1]!.key!;
-    r = host(r, { type: 'hostSetBalance', name: 'CPU Easy', key: key1, balance: 123 });
+    r = host(r, { type: 'hostSetBalance', name: 'Easy (CPU)', key: key1, balance: 123 });
     expect(hostViewOf(r).seats.map((s) => s.balance)).toEqual([1000, 123, 1000, null]);
     r = host(r, { type: 'hostSetSeat', seat: 1, cpu: 'medium' }); // same seat, new level, same chips
-    expect(hostViewOf(r).seats[1]).toMatchObject({ name: 'CPU Medium', balance: 123 });
+    expect(hostViewOf(r).seats[1]).toMatchObject({ name: 'Medium (CPU)', balance: 123 });
+  });
+
+  it('the host can name each CPU; (CPU) is always added and the name stays when the level changes', () => {
+    let r = emptyRoom();
+    r = host(r, { type: 'hostSetSeat', seat: 0, cpu: 'easy' });
+    r = host(r, { type: 'hostNameCpu', seat: 0, name: 'Auntie May' });
+    expect(hostViewOf(r).seats[0]).toMatchObject({ name: 'Auntie May (CPU)', cpuName: 'Auntie May' });
+    r = host(r, { type: 'hostNameCpu', seat: 0, name: '  Uncle Wing (cpu) ' }); // typed "(CPU)" is not doubled
+    expect(hostViewOf(r).seats[0]!.name).toBe('Uncle Wing (CPU)');
+    r = host(r, { type: 'hostSetSeat', seat: 0, cpu: 'hard' });
+    expect(hostViewOf(r).seats[0]!.name).toBe('Uncle Wing (CPU)');
+    r = host(r, { type: 'hostNameCpu', seat: 0, name: '' }); // empty: back to the level
+    expect(hostViewOf(r).seats[0]).toMatchObject({ name: 'Hard (CPU)', cpuName: null });
+    expect(() => host(r, { type: 'hostNameCpu', seat: 1, name: 'Nobody' })).toThrow(/no CPU/);
+    expect(() => host(r, { type: 'hostNameCpu', seat: 0, name: 'x'.repeat(30) })).toThrow(/at most/);
+  });
+
+  it('minimum fan can only be 0 to 3', () => {
+    const r = fullTable();
+    expect(host(r, { type: 'hostUpdateSettings', settings: { minFan: 0 } }).match.settings.minFan).toBe(0);
+    expect(() => host(r, { type: 'hostUpdateSettings', settings: { minFan: 4 } })).toThrow(/0 to 3/);
   });
 
   it('the host page can type in any person\'s chip count (players cannot)', () => {

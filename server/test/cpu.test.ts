@@ -85,24 +85,39 @@ describe('claims', () => {
     r = discard(r, 0, idOf(r, 0, 'dG'), 0);
     expect(move(r, 2, 'easy')).toBeNull();
   });
-  it('medium and hard claim Pung when it brings them closer to winning', () => {
-    for (const level of ['medium', 'hard'] as const) {
+  it('hard always pongs a dragon it has a pair of', () => {
+    let r = setupRound({ hands });
+    r = discard(r, 0, idOf(r, 0, 'dG'), 0);
+    expect(move(r, 2, 'hard')).toEqual({ type: 'claim', claim: { kind: 'pong' } });
+  });
+  it('medium makes the same claim only some of the time (it misses about 2 in 3)', () => {
+    let claims = 0;
+    const tries = 60;
+    for (let n = 0; n < tries; n++) {
       let r = setupRound({ hands });
       r = discard(r, 0, idOf(r, 0, 'dG'), 0);
-      expect(move(r, 2, level)).toEqual({ type: 'claim', claim: { kind: 'pong' } });
+      // A different deal (dice) each time, same tiles.
+      r = { ...r, core: { ...r.core, dice: [1 + (n % 6), 1 + (Math.floor(n / 6) % 6), 1 + (Math.floor(n / 36) % 6)] } };
+      const m = move(r, 2, 'medium');
+      if (m?.type === 'claim') claims++;
+      else expect(m).toBeNull(); // missed: it just waits for its turn
+      // Asking again gives the same answer (no second chance while the window is open).
+      expect(move(r, 2, 'medium')).toEqual(m);
     }
+    expect(claims).toBeGreaterThan(tries * 0.15);
+    expect(claims).toBeLessThan(tries * 0.55);
   });
-  it('the next player can claim Soeng', () => {
-    // Dealer discards p6; seat 1 has p4 p5 and nothing else connected.
+  it('the next player can claim Soeng when it fits a one-suit plan', () => {
+    // Dealer discards p6; seat 1 collects circles (p) and honours and has p4 p5.
     const h: Setup['hands'] = [
       'm1 m2 m3 m4 m5 m6 m7 m8 m9 p1 p2 p3 s1 p6',
-      'p4 p5 s2 s3 s4 m5 m6 m7 dW dW wN wS s9',
+      'p4 p5 p1 p1 p8 p9 s2 m5 dW dW wN wS s9',
       'p7 p8 s5 s6 m1 m2 wE wE dR dR dG s8 m9',
       'm2 m5 m8 p1 p9 s1 s7 wE wS wW wN dR dG',
     ];
     let r = setupRound({ hands: h });
     r = discard(r, 0, idOf(r, 0, 'p6'), 0);
-    expect(move(r, 1, 'medium')).toMatchObject({ type: 'claim', claim: { kind: 'chow' } });
+    expect(move(r, 1, 'hard')).toMatchObject({ type: 'claim', claim: { kind: 'chow' } });
   });
 });
 
