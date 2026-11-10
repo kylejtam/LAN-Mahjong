@@ -428,6 +428,7 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
     pond.querySelectorAll('.discards').forEach((el) => ro.observe(el));
     return () => ro.disconnect();
   }, [!!round]);
+  const discardSize = useRef<{ key: string; screen: string; discards: number; d: number }>({ key: '', screen: '', discards: 0, d: 0 });
   const discardCount = (side: Side): number => round?.discards.filter((d) => d.by === seatAt(side)).length ?? 0;
   const discardW = useMemo(() => {
     const maxW = Math.min(screen.w * 0.028, screen.h * 0.055);
@@ -445,6 +446,14 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
     };
     let d = Math.floor(maxW);
     while (d > 8 && !SIDES.every((side) => fits(discardCount(side), zones[side].w - 1, zones[side].h - 1, d, side === 'left' || side === 'right'))) d -= 0.5;
+    // Safety net: within a hand the discards only get smaller. They may grow again only when the
+    // screen changes size, a new hand starts, or discards are taken back (a claim or undo). This
+    // stops any back-and-forth between the tile size and the layout (tiles flickering).
+    const prev = discardSize.current;
+    const total = round?.discards.length ?? 0;
+    const sameSituation = prev.key === roundKey && prev.screen === `${screen.w}x${screen.h}` && total >= prev.discards;
+    if (sameSituation && d > prev.d) d = prev.d;
+    discardSize.current = { key: roundKey, screen: `${screen.w}x${screen.h}`, discards: total, d };
     return d;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [zones, round?.discards.length, screen.w, screen.h, bottomSeat]);

@@ -700,7 +700,10 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; }
    - the middle column always makes room for it (side discards shrink instead of being overlapped);
    - Take / last discard / Draw each fill their whole slot with the tile centred, so a longer
      label (a player's name, "Replacement") can never shift the tile. */
-.pond { grid-template-columns: minmax(0, 1fr) minmax(max-content, 1.5fr) minmax(0, 1fr); }
+/* The middle column is at least as wide as the middle row (two slots + the wall + gaps). Its
+   minimum must NOT depend on the discards: they are sized to fit the columns, so a column that
+   grew with them would feed back into their size and make them flicker. */
+.pond { grid-template-columns: minmax(0, 1fr) minmax(calc(2 * (var(--draw-w) + 2.6em) + 6.2em + 2.6em), 1.5fr) minmax(0, 1fr); }
 .hub-slot { justify-content: center; }
 .hub-slot > .last-discard, .hub-slot > .claim-pile, .hub-slot > .draw-pile { width: 100%; box-sizing: border-box; margin: 0; }
 .hub-slot .draw-label, .hub-slot .last-discard-label { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
