@@ -161,4 +161,4 @@ Write down which devices worked: ☐ iPhone ☐ iPad ☐ Samsung tablet ☐ lapt
 - [ ] Host page: each game is a tile; tap to open/close; a new game opens by itself. Open tiles stay open after reloading the host page.
 - [ ] Host page history: tap a number, type a new one, Save. Only that player's chips change, by the difference. Orange outline, "was …", Edited tag, edit list line. Roll back to a later game keeps the edit.
 - [ ] Win summary: winner's name green, thrower's name red.
-
+- [ ] (1.17.1) Every discard, yours and other players', slides in from the player who threw it.

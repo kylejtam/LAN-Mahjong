@@ -495,11 +495,24 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
   );
 
   // Discards slide in from the player who threw them (only tiles that are new on this screen).
-  const seenDiscards = useRef<{ key: string; ids: Set<number> }>({ key: '', ids: new Set() });
+  // A new tile keeps its slide-in for the length of the animation, so a quick second redraw
+  // (which often follows straight away) can't cut the animation off.
+  const SLIDE_MS = 400;
+  const seenDiscards = useRef<{ key: string; ids: Set<number>; until: Map<number, number> }>({ key: '', ids: new Set(), until: new Map() });
   useEffect(() => {
-    const ids = new Set((round?.discards ?? []).map((d) => d.tile.id));
-    if (seenDiscards.current.key !== roundKey) seenDiscards.current = { key: roundKey, ids };
-    else ids.forEach((id) => seenDiscards.current.ids.add(id));
+    const ids = (round?.discards ?? []).map((d) => d.tile.id);
+    const seen = seenDiscards.current;
+    if (seen.key !== roundKey) {
+      seenDiscards.current = { key: roundKey, ids: new Set(ids), until: new Map() };
+      return;
+    }
+    const now = Date.now();
+    for (const id of ids) {
+      if (seen.ids.has(id)) continue;
+      seen.ids.add(id);
+      seen.until.set(id, now + SLIDE_MS);
+    }
+    for (const [id, t] of seen.until) if (t < now) seen.until.delete(id);
   });
 
   // Discard size: as big as possible while every player's discards still fit in their area.
@@ -556,7 +569,8 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
   const renderDiscards = (side: Side): ReactElement => {
     const seat = seatAt(side);
     const tiles = round?.discards.filter((d) => d.by === seat) ?? [];
-    const isNew = (id: number): boolean => seenDiscards.current.key === roundKey && !seenDiscards.current.ids.has(id);
+    const isNew = (id: number): boolean =>
+      seenDiscards.current.key === roundKey && (!seenDiscards.current.ids.has(id) || (seenDiscards.current.until.get(id) ?? 0) > Date.now());
     return (
       <div className={`discards discards-${side}`}>
         {tiles.map((d) => {
