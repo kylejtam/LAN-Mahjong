@@ -180,6 +180,7 @@ disagrees with those, the newest dated entry here wins.
 | 2026-11-08 | **Dealer stays when the dealer wins** (standard HK). Repeated hands (dealer stays after a win or a draw) do NOT count toward the 16 rounds. | Kyle |
 | 2026-11-08 | **Draw:** the round is a draw when the wall is completely empty. No tiles are kept back. | Kyle |
 | 2026-11-08 | **Chicken win can be visible.** The win summary may show that it was a chicken win and that the winner paid 96. Replaces "no sign that it is not a real win" in the notes. | Kyle |
+| 2026-11-10 | **CPU levels plan (agreed, NOT built yet):** 300-game tests at min fan 3 showed new Hard and new Medium both win ~36-37% (today's Hard ~20%) and avoid chicken hands (avg ~5 fan), but new Hard was no stronger than new Medium (40 vs 38 deals). Agreed: keep new Hard as planned (one-suit / all-pongs / concealed plan, early switching, always pong value tiles, never chicken), and make new Medium weaker (switch to one suit later, sometimes miss a good claim) so Easy < Medium < Hard. Build only when Kyle says so. | Kyle |
 
 ## Open questions for Kyle
 
