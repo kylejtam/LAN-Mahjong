@@ -181,6 +181,8 @@ export type Command =
   | { type: 'reorderHand'; tileIds: number[] }
   | { type: 'undo' }
   | { type: 'confirmRound' }
+  /** Changed your mind: not ready after all (between hands). */
+  | { type: 'unready' }
   | { type: 'setWatchedSeat'; seat: number; visible: boolean }
   | { type: 'setWatchAll'; visible: boolean }
   | { type: 'setPrefs'; prefs: Record<string, unknown> }
@@ -627,6 +629,13 @@ export function handleCommand(prev: Room, key: string, cmd: Command, now: number
         // Give players time to press undo again before the CPUs move.
         room.cpuPauseUntil = now + UNDO_PAUSE_MS;
       }
+      break;
+    }
+    case 'unready': {
+      // Take back Ready: before the first hand (Start) or after a hand (the summary's Ready).
+      if (room.phase === 'betweenRounds') room.startPressed = room.startPressed.filter((k) => k !== key);
+      else if (room.phase === 'playing' && room.match.round?.core.phase === 'ended') room.confirmed = room.confirmed.filter((k) => k !== key);
+      else fail('Too late: the hand has started.');
       break;
     }
     case 'confirmRound': {

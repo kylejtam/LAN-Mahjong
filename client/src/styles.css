@@ -979,3 +979,11 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; }
 .lost-tag { background: #e5484d; color: #fff; border-radius: 999px; padding: 0.05em 0.6em; font-size: 0.85em; font-weight: 800; }
 .back-toast { position: fixed; left: 50%; top: 18%; transform: translateX(-50%); z-index: 36; background: var(--panel, #1c1f26); border: 2px solid #f5c542; border-radius: 999px; padding: 0.4em 1.1em; font-weight: 700; animation: back-toast 2.5s ease-out forwards; pointer-events: none; }
 @keyframes back-toast { 0%, 70% { opacity: 1; } 100% { opacity: 0; } }
+
+/* At the table between hands: only the pile, the name tags and the buttons show. */
+.at-table .pond, .at-table .melds, .at-table .opp-hand, .at-table .hand, .at-table .wall-box, .at-table .turn-edge, .at-table .last-discard, .at-table .hub { visibility: hidden; }
+.at-table .board { touch-action: none; }
+.ready-btn { background: #3fb56f; color: #08210f; border: none; font-weight: 800; border-radius: 999px; padding: 0.6em 1.4em; font-size: 1.05em; box-shadow: 0 3px 0 rgba(0, 0, 0, 0.35); }
+.unready-btn { background: none; border: 2px solid #59616d; color: var(--fg); border-radius: 999px; padding: 0.55em 1.3em; font-size: 1.05em; }
+.back-to-summary { margin: 0 auto; }
+.ready-tag { background: #3fb56f; color: #08210f; border-radius: 999px; padding: 0 0.5em; font-size: 0.8em; font-weight: 800; margin-left: 0.3em; }

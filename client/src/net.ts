@@ -8,6 +8,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ClientMessage, GameListEntry, ServerMessage } from '../../server/src/protocol';
 import type { RoomView } from '../../server/src/game/view';
+import { emitPile } from './pileBus';
 
 const SESSION_KEY = 'lan-mahjong-session';
 /** Commands that change the game: each must be answered by the server quickly. */
@@ -96,6 +97,9 @@ export function useConnection(): Connection {
         if (msg.type === 'state' || msg.type === 'error') moveSentAt.current = null; // the move was answered
         switch (msg.type) {
           case 'pong':
+            break;
+          case 'pile':
+            emitPile(msg);
             break;
           case 'games':
             setGames(msg.games);

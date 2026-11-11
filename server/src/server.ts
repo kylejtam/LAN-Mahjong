@@ -26,6 +26,7 @@ import { ClientMessage, GameListEntry, HostMessage, ServerHostMessage, ServerMes
 import { loadRooms, saveRooms } from './storage.js';
 import { lanAddresses } from './addresses.js';
 import { APP_VERSION } from './update.js';
+import { Pile, cpuHand, newPile, pileFrame, shovesDone, startShoves, stepPile } from './pile.js';
 
 export interface ServerOptions {
   port: number;
@@ -193,6 +194,8 @@ export async function startServer(opts: ServerOptions): Promise<RunningServer> {
     for (const ws of hostSockets) send(ws, msg);
   };
 
+  /** The shared pile of tiles between hands, for each room that has one. */
+  const piles = new Map<string, { id: number; pile: Pile; sentDone?: boolean }>();
   /** How many times each room's state has been sent (devices check they have the latest). */
   const revs = new Map<string, number>();
 
@@ -237,6 +240,20 @@ export async function startServer(opts: ServerOptions): Promise<RunningServer> {
       case 'listGames':
         send(ws, { type: 'games', games: gameList() });
         return;
+      case 'shove': {
+        // Shuffling: only seated players, and only while the tiles are loose on the table.
+        const room = c.roomId ? rooms.get(c.roomId) : undefined;
+        const p = room ? piles.get(room.id) : undefined;
+        if (!room || !p || !c.key || !room.seats.includes(c.key) || p.pile.shovesAt !== null) return;
+        const x = Number(msg.x);
+        const y = Number(msg.y);
+        if (!Number.isFinite(x) || !Number.isFinite(y)) return;
+        const h = p.pile.hands.get(c.key);
+        const on = !!msg.on;
+        if (!h || !h.on) p.pile.hands.set(c.key, { x, y, px: x, py: y, on, at: now() });
+        else Object.assign(h, { x, y, on, at: now() });
+        return;
+      }
       case 'ping': {
         // A device checking in. If it missed an update, send it the latest state now.
         const room = c.roomId ? rooms.get(c.roomId) : undefined;
@@ -265,6 +282,8 @@ export async function startServer(opts: ServerOptions): Promise<RunningServer> {
         c.key = person.key;
         send(ws, { type: 'joined', gameId: joined.id, name: person.name });
         setRoom(joined);
+        const p = piles.get(joined.id);
+        if (p) send(ws, { type: 'pile', id: p.id, perWall: p.pile.perWall, tiles: pileFrame(p.pile), done: shovesDone(p.pile, now()) });
         return;
       }
       case 'command': {
@@ -533,11 +552,51 @@ export async function startServer(opts: ServerOptions): Promise<RunningServer> {
   };
   const interval = setInterval(tick, opts.tickMs ?? 250);
 
+  // ---------- the shared pile between hands (shuffling) ----------
+  let pileIds = 0;
+  const pileTimer = setInterval(() => {
+    const t = now();
+    for (const room of rooms.values()) {
+      const round = room.match.round;
+      const loose = room.phase === 'betweenRounds' || (room.phase === 'playing' && !!round && round.core.phase === 'ended');
+      const rolling = room.phase === 'rolling';
+      let p = piles.get(room.id);
+      if (!loose && !rolling) {
+        if (p) piles.delete(room.id); // the hand is on: the wall has been built
+        continue;
+      }
+      const watchers = [...clients.values()].filter((c) => c.roomId === room.id);
+      if (watchers.length === 0) continue;
+      if (!p) {
+        const perWall = room.match.settings.flowersOn ? 18 : 17;
+        p = { id: ++pileIds, pile: newPile(perWall * 8, perWall) };
+        piles.set(room.id, p);
+      }
+      const pile = p.pile;
+      if (rolling && pile.shovesAt === null) startShoves(pile, t);
+      if (!rolling) {
+        // Computer players shuffle too while they wait for the people at the table.
+        room.seats.forEach((k, i) => {
+          if (k && room.people[k]?.cpu) cpuHand(pile, `cpu${i}`, i, t);
+        });
+      }
+      const done = shovesDone(pile, t);
+      if (!done) for (let i = 0; i < 4; i++) stepPile(pile, 1 / 60, t - 50 + i * 16);
+      if (pile.moving || (done && !p.sentDone)) {
+        pile.moving = false;
+        if (done) p.sentDone = true;
+        const msg: ServerMessage = { type: 'pile', id: p.id, perWall: pile.perWall, tiles: pileFrame(pile), done };
+        for (const [ws, c] of clients) if (c.roomId === room.id) send(ws, msg);
+      }
+    }
+  }, 66);
+
   await new Promise<void>((resolve, reject) => {
     // Report problems such as "port already in use" instead of waiting forever.
     const onError = (err: Error): void => {
       clearInterval(interval);
       clearInterval(pingTimer);
+      clearInterval(pileTimer);
       reject(err);
     };
     http.once('error', onError);
@@ -555,6 +614,7 @@ export async function startServer(opts: ServerOptions): Promise<RunningServer> {
     close: async () => {
       clearInterval(interval);
       clearInterval(pingTimer);
+      clearInterval(pileTimer);
       if (saveTimer) clearTimeout(saveTimer);
       saveNow();
       for (const ws of [...clients.keys(), ...hostSockets]) ws.terminate();

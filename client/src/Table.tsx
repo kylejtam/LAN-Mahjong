@@ -25,7 +25,8 @@ import { DragSource, Drop, useDrag } from './drag';
 import { HelpPanel } from './HelpPanel';
 import { ChipIcon } from './ChipIcon';
 import { DICE_MS, DiceRoll, DieFace } from './DiceRoll';
-import { countIntro, countMs, finishIntro, introStackPoint, prepareMix, setIntroStacks, startIntro, stopIntro } from './TableIntro';
+import { buildFromPile, countIntro, countMs, finishIntro, hidePile, introKeyIs, introStackPoint, pileShowing, pileUnits, setIntroStacks, showPile, startIntro, stopIntro } from './TableIntro';
+import { latestPile, onPile } from './pileBus';
 import { APP_VERSION } from './version';
 import { CELEBRATION_STYLES, celebrate } from './celebrate';
 import { ResultPanel } from './ResultPanel';
@@ -498,6 +499,13 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
   };
 
   // ---------- hints ----------
+  // At the table between hands.
+  const notReady = view.seats.filter((sv) => sv.name && !sv.cpu && !(view.phase === 'betweenRounds' ? sv.startPressed : sv.confirmed)).map((sv) => personName(sv.name, lang));
+  const tableHint =
+    view.phase === 'rolling' ? ''
+    : mySeat === null ? (view.seats.some((sv) => !sv.name) && view.phase === 'betweenRounds' ? tr('hintSitHere') : tr('hintSeatsFull'))
+    : (view.phase === 'betweenRounds' ? me?.startPressed : me?.confirmed) ? (notReady.length ? tr('waitingFor', { names: notReady.join(lang === 'zh' ? '、' : ', ') }) : '')
+    : tr('hintShuffle');
   const turnName = round ? personName(view.seats[round.turn]?.name, lang) : '';
   const waitingOnEmptySeat = !!round && round.phase !== 'ended' && !turnName;
   let hint = '';
@@ -652,12 +660,16 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
           {round.dice.map((d, i) => <span key={i} className="die">{d}</span>)}
         </span>
       )}
-      {mySeat === null && !sv.name && round && (
+      {/* Ready for the next hand (CPUs always are). */}
+      {atTable && view.phase !== 'rolling' && sv.name && (sv.cpu || (view.phase === 'betweenRounds' ? sv.startPressed : sv.confirmed)) && (
+        <span className="ready-tag">{tr('ready')}</span>
+      )}
+      {mySeat === null && !sv.name && (round || (atTable && view.phase === 'betweenRounds')) && (
         <button className="btn sit-here" onClick={(e) => { e.stopPropagation(); command({ type: 'takeSeat', seat: sv.seat }); }}>
           {tr('sitHere')}
         </button>
       )}
-      {mySeat === null && sv.name && (
+      {mySeat === null && sv.name && !atTable && (
         <button
           className={`btn show-hide${sv.watched ? ' on' : ''}`}
           onClick={(e) => { e.stopPropagation(); command({ type: 'setWatchedSeat', seat: sv.seat, visible: !sv.watched }); }}
@@ -693,17 +705,87 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
   // One key per hand (the same while the dice are being rolled and while it is dealt).
   const introKey = `${view.id}|${view.match.handsPlayed}|${view.match.roundWind}|${view.match.dealer}`;
   const [introBuilt, setIntroBuilt] = useState<string | null>(null);
-  useEffect(() => {
-    // Work out the next mixing ahead of time, a little at a time, while the table is quiet.
-    if (view.phase === 'betweenRounds') {
-      stopIntro();
-      prepareMix(8 * perWall, perWall);
-    }
-    if (view.phase === 'rolling') startIntro(introKey, perWall, sideOf, () => setIntroBuilt(introKey));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [view.phase, introKey]);
-  useEffect(() => () => stopIntro(), []);
   const wallStanding = introBuilt === introKey;
+  // At the table between hands: the shared pile is on show (and you can shuffle it).
+  const roundOver = view.phase === 'playing' && round?.phase === 'ended';
+  const atTable = view.phase === 'betweenRounds' || (view.phase === 'rolling' && !wallStanding) || (roundOver && showReady === roundKey);
+  const tableRef = useRef({ atTable, phase: view.phase, introKey });
+  tableRef.current = { atTable, phase: view.phase, introKey };
+  const build = (): void => {
+    const k = tableRef.current.introKey;
+    buildFromPile(k, perWall, sideOf, () => setIntroBuilt(k));
+  };
+  // The pile arrives from the server about 15 times a second.
+  useEffect(
+    () =>
+      onPile((m) => {
+        const { atTable: shown, phase } = tableRef.current;
+        if (phase === 'rolling' && m.done) return build();
+        if (shown) showPile(m.id, m.perWall, m.tiles);
+        else hidePile();
+      }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [],
+  );
+  useEffect(() => {
+    if (view.phase === 'betweenRounds') stopIntro();
+    if (atTable) {
+      const m = latestPile();
+      if (m && !m.done) showPile(m.id, m.perWall, m.tiles);
+    } else if (view.phase !== 'rolling') hidePile();
+    if (view.phase === 'rolling') {
+      const m = latestPile();
+      if (m?.done && pileShowing()) build();
+      // No pile on screen (the page was just opened): mix and build the wall by itself.
+      const t = setTimeout(() => {
+        if (!pileShowing() && !introKeyIs(introKey)) startIntro(introKey, perWall, sideOf, () => setIntroBuilt(introKey));
+      }, 1500);
+      return () => clearTimeout(t);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [view.phase, introKey, atTable]);
+  useEffect(() => () => { stopIntro(); hidePile(); }, []);
+  // Shuffling: where your mouse is (or your finger, while it's down) pushes the tiles.
+  const canShuffle = atTable && mySeat !== null && view.phase !== 'rolling';
+  useEffect(() => {
+    if (!canShuffle) return;
+    let last = 0;
+    let down = false;
+    let lastOn = false;
+    const sendAt = (e: PointerEvent, on: boolean): void => {
+      const t = performance.now();
+      if (on === lastOn && t - last < 45) return;
+      last = t;
+      lastOn = on;
+      const u = pileUnits(e.clientX, e.clientY, perWall);
+      send({ type: 'shove', x: u.x, y: u.y, on });
+    };
+    const overTable = (e: PointerEvent): boolean => !(e.target as Element | null)?.closest?.('button, .panel, .topbar, .me, .overlay');
+    const move = (e: PointerEvent): void => sendAt(e, overTable(e) && (e.pointerType === 'mouse' || down));
+    const press = (e: PointerEvent): void => {
+      down = true;
+      sendAt(e, overTable(e));
+    };
+    const lift = (e: PointerEvent): void => {
+      down = false;
+      if (e.pointerType !== 'mouse') sendAt(e, false);
+    };
+    const leave = (): void => send({ type: 'shove', x: 0, y: 0, on: false });
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerdown', press);
+    window.addEventListener('pointerup', lift);
+    window.addEventListener('pointercancel', lift);
+    document.addEventListener('pointerleave', leave);
+    return () => {
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerdown', press);
+      window.removeEventListener('pointerup', lift);
+      window.removeEventListener('pointercancel', lift);
+      document.removeEventListener('pointerleave', leave);
+      leave();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [canShuffle]);
   const dealAnim = useDealAnimation(round, roundKey, perWall, sideOf, introKey);
 
   // ---------- the last discard, shown big in the middle ----------
@@ -917,7 +999,7 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
   const canUndo = !!a?.undo || (!!lastWin && mySeat !== null);
 
   return (
-    <div className={`table-screen felt-${view.tableColour}`}>
+    <div className={`table-screen felt-${view.tableColour}${atTable ? ' at-table' : ''}`}>
       <header className="topbar">
         <div className="topbar-left">
           {me && nameTag(me, true)}
@@ -932,9 +1014,7 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
               {round && (
                 <button className="btn" onClick={() => command({ type: 'setWatchAll', visible: true })}>{tr('allHands')}</button>
               )}
-              {view.phase === 'betweenRounds' && justWatching && (
-                <button className="btn" onClick={() => setJustWatching(false)}>{tr('takeSeat')}</button>
-              )}
+
             </>
           )}
         </div>
@@ -1141,6 +1221,14 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
           </div>
         </div>
         <div className={`actions${claimable && !myHold ? ' actions-claim' : ''}`}>
+          {/* At the table between hands: Ready (green), then a plain Unready if you change your mind. */}
+          {atTable && view.phase !== 'rolling' && me && (
+            (view.phase === 'betweenRounds' ? me.startPressed : me.confirmed) ? (
+              <button className="btn unready-btn" onClick={() => command({ type: 'unready' })}>{tr('unready')}</button>
+            ) : (
+              <button className="btn ready-btn" onClick={() => command(view.phase === 'betweenRounds' ? { type: 'pressStart' } : { type: 'confirmRound' })}>{tr('ready')}</button>
+            )
+          )}
           {/* Holding a tile: Cancel (no colour) to its left, and Confirm in the claim's colour. */}
           {showButtons && myHold && <button className="act act-pass" onClick={cancelHold}>{tr('cancel')}</button>}
           {showButtons && myHold?.kind ? (
@@ -1158,7 +1246,10 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
         </div>
         <div className="me-bottom">
           {mySeat === null && nameTag(bottom)}
-          <span className="hint">{dealAnim ? '' : hint}</span>
+          <span className="hint">{dealAnim ? '' : atTable ? tableHint : hint}</span>
+          {atTable && roundOver && (
+            <button className="btn back-to-summary" onClick={() => setShowReady(null)}>{tr('backToSummary')}</button>
+          )}
         </div>
       </footer>
 
@@ -1175,18 +1266,7 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
         </div>
       )}
 
-      {view.phase === 'betweenRounds' && !(mySeat === null && justWatching) && (
-        <SeatPicker
-          view={view}
-          tr={tr}
-          lang={lang}
-          command={command}
-          onSpectate={() => {
-            if (mySeat !== null) command({ type: 'leaveSeat' });
-            setJustWatching(true);
-          }}
-        />
-      )}
+
       {view.you.watchAll && mySeat === null && round && (
         <AllHands view={view} tr={tr} newFlowerIds={newFlowerIds} hideFlowers={!!dealAnim} onClose={() => command({ type: 'setWatchAll', visible: false })} />
       )}
@@ -1212,9 +1292,7 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
         </div>
       )}
       {(round?.phase === 'ended' || view.phase === 'finished') && !showMoment && (
-        showReady === roundKey && mySeat !== null && view.phase !== 'finished' ? (
-          <ReadyPanel view={view} tr={tr} lang={lang} command={command} onBack={() => setShowReady(null)} />
-        ) : (
+        showReady === roundKey && mySeat !== null && view.phase !== 'finished' ? null : (
           <ResultPanel
             view={view}
             lang={lang}
