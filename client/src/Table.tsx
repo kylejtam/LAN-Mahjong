@@ -25,6 +25,7 @@ import { DragSource, Drop, useDrag } from './drag';
 import { HelpPanel } from './HelpPanel';
 import { ChipIcon } from './ChipIcon';
 import { DICE_MS, DiceRoll } from './DiceRoll';
+import { countIntro, countMs, finishIntro, introStackPoint, prepareMix, setIntroStacks, startIntro, stopIntro } from './TableIntro';
 import { APP_VERSION } from './version';
 import { CELEBRATION_STYLES, celebrate } from './celebrate';
 import { ResultPanel } from './ResultPanel';
@@ -644,7 +645,22 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
 
   // ---------- deal animation (about 5 seconds at the start of each hand) ----------
   const perWall = view.settings.flowersOn ? 18 : 17;
-  const dealAnim = useDealAnimation(round, roundKey, perWall, sideOf);
+  // ---------- the start of each hand: mixing, building the wall (see TableIntro) ----------
+  // One key per hand (the same while the dice are being rolled and while it is dealt).
+  const introKey = `${view.id}|${view.match.handsPlayed}|${view.match.roundWind}|${view.match.dealer}`;
+  const [introBuilt, setIntroBuilt] = useState<string | null>(null);
+  useEffect(() => {
+    // Work out the next mixing ahead of time, a little at a time, while the table is quiet.
+    if (view.phase === 'betweenRounds') {
+      stopIntro();
+      prepareMix(8 * perWall, perWall);
+    }
+    if (view.phase === 'rolling') startIntro(introKey, perWall, sideOf, () => setIntroBuilt(introKey));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [view.phase, introKey]);
+  useEffect(() => () => stopIntro(), []);
+  const wallStanding = introBuilt === introKey;
+  const dealAnim = useDealAnimation(round, roundKey, perWall, sideOf, introKey);
 
   // ---------- the last discard, shown big in the middle ----------
   // Set when a tile is discarded; cleared when it is claimed (it leaves the
@@ -935,7 +951,10 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
                       !dealAnim && lastDiscardTile
                     )}
                   </span>
-                  <WallBox round={round} sideOf={sideOf} perWall={perWall} label={tr('tilesLeft')} override={dealAnim?.wall} />
+                  {/* While the big wall is drawn over the table (dealing), the small box waits for it to shrink in. */}
+                  <span style={dealAnim ? { visibility: 'hidden' } : undefined}>
+                    <WallBox round={round} sideOf={sideOf} perWall={perWall} label={tr('tilesLeft')} override={dealAnim?.wall} />
+                  </span>
                   <span className="hub-slot hub-right">
                     {(a?.draw || a?.drawReplacement) && (
                       // Big glowing tile: pressing it draws straight away (no need to drag or let go).
@@ -954,7 +973,9 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
                   </span>
                 </span>
               ) : view.phase === 'rolling' ? (
-                iAmDealer ? <div className="hub-sub">{tr('swipeDiceHere')}</div> : <div className="hub-sub">{tr('waitingRoll', { name: personName(view.seats[view.match.dealer]?.name, lang) })}</div>
+                !wallStanding || iAmDealer ? null : (
+                  <div className="hub-sub">{tr('waitingRoll', { name: personName(view.seats[view.match.dealer]?.name, lang) })}</div>
+                )
               ) : null}
             </div>
             {renderDiscards('right')}
@@ -1035,12 +1056,16 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
         </div>
       </footer>
 
-      {view.phase === 'rolling' && iAmDealer && (
-        <div className="dice-tray" onPointerDown={start({ kind: 'dice' })}>
+      {/* The dealer rolls once the wall is built: swipe the dice, or press the button. */}
+      {view.phase === 'rolling' && iAmDealer && wallStanding && (
+        <div className="dice-tray in-wall" onPointerDown={start({ kind: 'dice' })}>
           <span className="die">⚀</span>
           <span className="die">⚂</span>
           <span className="die">⚄</span>
-          <div className="dice-hint">{tr('swipeDice')}</div>
+          <div className="dice-hint">{tr('swipeDiceOut')}</div>
+          <button className="roll-btn" onPointerDown={(e) => e.stopPropagation()} onClick={() => command({ type: 'rollDice' })}>
+            {tr('rollDice')}
+          </button>
         </div>
       )}
 
@@ -1460,6 +1485,7 @@ function useDealAnimation(
   roundKey: string,
   perWall: number,
   sideOf: (seat: number) => Side,
+  introKey: string,
 ): DealAnim | null {
   const done = useRef<string>('');
   const [plan, setPlan] = useState<null | {
@@ -1509,8 +1535,10 @@ function useDealAnimation(
       left: centre(document.querySelector('.opp-left .nametag')),
       right: centre(document.querySelector('.opp-right .nametag')),
     };
-    // The dice roll first; the deal starts when they land.
-    setPlan({ key: roundKey, start: performance.now() + DICE_MS, steps, order, total, from: centre(document.querySelector('.hub')), to });
+    // The dice roll first; then the wall is counted and broken (TableIntro); then the deal.
+    const diceTotal = round.dice.reduce((x, y) => x + y, 0);
+    countIntro(introKey, perWall, sideOf, dealer, diceTotal, DICE_MS);
+    setPlan({ key: roundKey, start: performance.now() + DICE_MS + countMs(diceTotal), steps, order, total, from: centre(document.querySelector('.hub')), to });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [roundKey, !!round]);
 
@@ -1520,6 +1548,7 @@ function useDealAnimation(
     const loop = (): void => {
       if (performance.now() - plan.start >= DEAL_MS) {
         setPlan(null);
+        finishIntro(introKey); // the rest of the wall shrinks into the small box
         return;
       }
       setTick((t) => t + 1);
@@ -1550,11 +1579,15 @@ function useDealAnimation(
   const N = plan.order.length;
   const clamp = (x: number): number => Math.max(0, Math.min(2, x));
   const stacks = plan.order.map((st, i) => ({ ...st, count: Math.max(0, 2 - clamp(f - 2 * i) - clamp(b - 2 * (N - 1 - i))) }));
-  // Each step of the deal sends its tiles gliding to that player (once per step).
+  setIntroStacks(introKey, stacks); // the big wall over the table loses the same tiles
+  // Each step of the deal sends its tiles gliding to that player (once per step), from the wall.
   if (lastFlown.current !== `${plan.key}-${index}`) {
     lastFlown.current = `${plan.key}-${index}`;
     const step = plan.steps[index]!;
-    flyBacks(plan.from, plan.to[sideOf(step.seat)], step.n, Math.max(150, stepMs * 0.9));
+    const taken = step.from === 'front' ? Math.floor((f - step.n) / 2) : N - 1 - Math.floor((b - step.n) / 2);
+    const st = plan.order[Math.max(0, Math.min(N - 1, taken))]!;
+    const from = introStackPoint(introKey, st.seat, st.position) ?? plan.from;
+    flyBacks(from, plan.to[sideOf(step.seat)], step.n, Math.max(150, stepMs * 0.9));
   }
   return { wall: { stacks, count: plan.total - f - b }, dealt };
 }

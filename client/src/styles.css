@@ -892,3 +892,20 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; }
   content: ''; position: absolute; inset: 0; border-radius: 5px; z-index: -1; pointer-events: none;
 }
 .claim-tiles, .melds, .result-tiles, .win-show-row, .hand, .all-hands-overlay { isolation: isolate; }
+
+/* The start of each hand (TableIntro): the big wall drawn over the table. */
+.intro-layer { position: fixed; inset: 0; pointer-events: none; z-index: 14; }
+.intro-tile {
+  position: absolute; left: 0; top: 0; border-radius: 3px; background: var(--tile-back);
+  border: 1px solid rgba(0, 0, 0, 0.25); box-shadow: 0 2px 0 rgba(0, 0, 0, 0.3); will-change: transform;
+}
+.intro-tile.intro-top { z-index: 1; }
+.intro-break { position: absolute; z-index: 2; background: #f5c542; border-radius: 2px; box-shadow: 0 0 8px #f5c542; }
+.roll-btn {
+  margin-top: 0.2em; background: #f5c542; color: #2b2205; border: none; border-radius: 999px; font: inherit; font-size: 0.7em;
+  font-weight: 800; padding: 0.35em 1.1em; cursor: pointer; animation: roll-pulse 0.8s ease-in-out infinite alternate;
+}
+@keyframes roll-pulse { from { transform: scale(1); } to { transform: scale(1.08); } }
+@media (prefers-reduced-motion: reduce) { .roll-btn { animation: none; } }
+/* The dice sit in the middle of the wall (inside the square), clear of the tiles. */
+.dice-tray.in-wall { bottom: auto; top: 46%; transform: translate(-50%, -50%); z-index: 16; font-size: 1.2em; }

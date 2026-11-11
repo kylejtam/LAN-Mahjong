@@ -84,6 +84,8 @@ const en = {
   swipeDiceHere: 'Swipe the dice here',
   swipeDice: 'Swipe the dice to the middle',
   waitingRoll: 'Waiting for {name} to roll',
+  rollDice: 'Roll the dice',
+  swipeDiceOut: 'Tap the button, or swipe the dice',
   // seats
   tapSeat: 'Tap an empty seat to sit down, or Spectate to just watch.',
   startRule: 'A round starts when all 4 seats are filled and everyone presses Start. The host can fill seats with CPUs.',
@@ -212,6 +214,8 @@ const zh: Strings = {
   swipeDiceHere: '將骰仔掃過嚟',
   swipeDice: '將骰仔掃去枱中間',
   waitingRoll: '等緊 {name} 擲骰',
+  rollDice: '擲骰',
+  swipeDiceOut: '撳掣，或者掃一下骰仔',
   tapSeat: '撳空位入座，或者撳「旁觀」淨係睇。',
   startRule: '四個位坐滿、個個撳咗「開始」就開局。主機可以用電腦補位。',
   start: '開始',
