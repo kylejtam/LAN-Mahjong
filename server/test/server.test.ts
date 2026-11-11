@@ -6,7 +6,7 @@ import { get as httpGet } from 'node:http';
 import type { IncomingHttpHeaders } from 'node:http';
 import { gunzipSync } from 'node:zlib';
 import { WebSocket } from 'ws';
-import { seededRng } from '@lan-mahjong/shared';
+import { INTRO_BUILD_MS, introAfterRollMs, seededRng } from '@lan-mahjong/shared';
 import { RunningServer, startServer } from '../src/server.js';
 import type { ClientMessage, HostMessage, ServerHostMessage, ServerMessage } from '../src/protocol.js';
 import type { RoomView } from '../src/game/view.js';
@@ -362,11 +362,19 @@ describe('game server over the network', () => {
       host.send({ type: 'hostCommand', gameId, command: { type: 'hostSetSeat', seat, cpu: 'easy' } });
     }
     // A spectator watches the all-CPU table get going: dice rolled and tiles discarded.
+    // The CPUs wait for the start-of-hand animation (the wall built before the dice,
+    // the tiles dealt before the first discard), so this takes about 17 seconds.
     const watcher = await device(s.port);
     watcher.send({ type: 'joinGame', gameId, name: 'Kyle' });
-    const v = await watcher.state((x) => (x.round?.discards.length ?? 0) >= 1, 15000);
+    const t0 = Date.now();
+    const rolled = await watcher.state((x) => !!x.round, 15000);
+    expect(Date.now() - t0).toBeGreaterThanOrEqual(INTRO_BUILD_MS - 1000);
+    const total = rolled.round!.dice[0] + rolled.round!.dice[1] + rolled.round!.dice[2];
+    const t1 = Date.now();
+    const v = await watcher.state((x) => (x.round?.discards.length ?? 0) >= 1, 25000);
+    expect(Date.now() - t1).toBeGreaterThanOrEqual(introAfterRollMs(total) - 1000);
     expect(v.you.seat).toBeNull();
     host.close();
     watcher.close();
-  }, 25000);
+  }, 45000);
 });

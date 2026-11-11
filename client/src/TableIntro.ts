@@ -18,6 +18,8 @@
  * else is happening (between hands), so it never makes the screen stutter.
  */
 
+import { WALL_SHRINK_MS, wallCountMs } from '@lan-mahjong/shared';
+
 export type Side = 'bottom' | 'right' | 'top' | 'left';
 const SEATS = 4;
 /** Seconds of mixing before the tiles start gliding into the wall. */
@@ -30,7 +32,7 @@ interface SimTile { x: number; y: number; a: number; vx: number; vy: number; va:
 type SimFrame = { x: number; y: number; a: number }[];
 
 function* shoveSimulation(n: number, perWall: number): Generator<void, SimFrame[]> {
-  const tw = 1 / (perWall + 1.4);
+  const tw = 1 / (perWall + 2);
   const th = tw * 1.32;
   const hw = tw / 2 + 0.002;
   const hh = th / 2 + 0.002; // a hair of space so tiles never touch
@@ -107,12 +109,13 @@ function* shoveSimulation(n: number, perWall: number): Generator<void, SimFrame[
         if (sh.from === 'top') { const e = field.t + reach * 0.36; if (q.y - ext < e) { push = e + ext - q.y; q.y += push; q.vy += push * 6; } }
         if (sh.from === 'bottom') { const e = field.b - reach * 0.36; if (q.y + ext > e) { push = q.y + ext - e; q.y -= push; q.vy -= push * 6; } }
         // A tile pushed off-centre turns, like a real tile nudged near one end.
-        if (push) q.va += (off / halfBand) * push * 1.4 * (sh.from === 'left' || sh.from === 'bottom' ? 1 : -1);
+        if (push) q.va += (off / halfBand) * (push / rad) * 0.05 * (sh.from === 'left' || sh.from === 'bottom' ? 1 : -1);
       }
     }
     for (const q of P) {
       q.x += q.vx * dt;
       q.y += q.vy * dt;
+      q.va = Math.max(-0.03, Math.min(0.03, q.va)); // a gentle turn, never a spin
       q.a += q.va;
       q.vx *= 0.86;
       q.vy *= 0.86;
@@ -146,7 +149,8 @@ function* shoveSimulation(n: number, perWall: number): Generator<void, SimFrame[
           A.y -= m.y * push;
           B.x += m.x * push;
           B.y += m.y * push;
-          const turn = (((B.x - A.x) * m.y - (B.y - A.y) * m.x) / (rad * rad)) * 0.01;
+          // A bump off-centre turns both tiles a tiny bit (the same at any screen size).
+          const turn = (((B.x - A.x) * m.y - (B.y - A.y) * m.x) / rad) * (push / rad) * 0.08;
           A.va -= turn;
           B.va += turn;
         }
@@ -182,8 +186,8 @@ export function prepareMix(n: number, perWall: number): void {
   if (preparing) return;
   preparing = true;
   const tick = (): void => {
-    runSome(6);
-    if (prepared && !prepared.frames) setTimeout(tick, 30);
+    runSome(10);
+    if (prepared && !prepared.frames) setTimeout(tick, 20);
     else preparing = false;
   };
   setTimeout(tick, 30);
@@ -211,7 +215,7 @@ function geometry(perWall: number): Geometry {
   const S = Math.min(bh * 0.8, bw * 0.62);
   const cx = hub ? hub.left + hub.width / 2 : innerWidth / 2;
   const cy = hub ? hub.top + hub.height / 2 : innerHeight / 2;
-  const tw = S / (perWall + 1.4);
+  const tw = S / (perWall + 2);
   const th = tw * 1.32;
   return { cx, cy, S, tw, th, lift: th * 0.16 };
 }
@@ -219,7 +223,9 @@ function geometry(perWall: number): Geometry {
 /** Centre of stack `position` (0 = the right-hand end, as that player sees it) on a side of the table. */
 function stackCentre(side: Side, position: number, perWall: number, g: Geometry): { x: number; y: number; r: number } {
   const half = g.S / 2;
-  const off = -half + (g.S / perWall) * (position + 0.5);
+  // Each wall stops short of the corners, so the ends of two walls never overlap.
+  const span = g.S - g.th * 1.3;
+  const off = -span / 2 + (span / perWall) * (position + 0.5);
   if (side === 'bottom') return { x: g.cx - off, y: g.cy + half, r: 0 }; // your right is the screen's right
   if (side === 'right') return { x: g.cx + half, y: g.cy + off, r: 90 }; // their right is the screen's top
   if (side === 'top') return { x: g.cx + off, y: g.cy - half, r: 0 }; // their right is the screen's left
@@ -242,6 +248,7 @@ let current: {
 } | null = null;
 
 function clear(): void {
+  document.body.classList.remove('intro-arriving');
   if (!current) return;
   current.timers.forEach(clearTimeout);
   current.box.remove();
@@ -313,13 +320,14 @@ export function startIntro(key: string, perWall: number, sideOf: (seat: number) 
   });
   const frameDt = MIX_S / (sim.length - 1);
   let lastEnd = 0;
+  const anims: Animation[] = [];
   c.tiles.forEach((t, ti) => {
     const si = simOf[ti]!;
     const pull = MIX_S - 0.3 + t.position * 0.02 + t.layer * 0.04; // all four walls at once, end to end
     const end = pull + PULL_S;
     lastEnd = Math.max(lastEnd, end);
     const frames: Keyframe[] = [];
-    const N = Math.ceil(end / 0.04);
+    const N = Math.ceil(end / 0.06);
     for (let f = 0; f <= N; f++) {
       const time = (f / N) * end;
       const k = Math.min(sim.length - 1, time / frameDt);
@@ -335,20 +343,23 @@ export function startIntro(key: string, perWall: number, sideOf: (seat: number) 
       const target = t.r + 180 * Math.round((ma - t.r) / 180);
       frames.push({ offset: f / N, transform: T(mx + (t.x - mx) * u, my + (t.y - my) * u, ma + (target - ma) * u) });
     }
-    t.el.animate(frames, { duration: end * 1000, easing: 'linear', fill: 'forwards' });
+    anims.push(t.el.animate(frames, { duration: end * 1000, easing: 'linear', fill: 'forwards' }));
   });
-  c.timers.push(
-    setTimeout(() => {
+  // The wall is standing once every tile has really arrived (an iPad can start the
+  // animations late, so this waits for them rather than for a clock).
+  Promise.all(anims.map((a) => a.finished)).then(
+    () => {
       if (current !== c) return;
       showBuilt(c);
       onBuilt();
-    }, lastEnd * 1000 + 100),
+    },
+    () => undefined, // stopped part-way (a new hand, or the page changed)
   );
 }
 
 /** How long the counting wipe takes for this dice total (ms). */
 export function countMs(total: number): number {
-  return reducedMotion() ? 300 : total * 120 + 250 + total * 35 + 700;
+  return reducedMotion() ? 300 : wallCountMs(total);
 }
 
 /**
@@ -430,15 +441,30 @@ export function finishIntro(key: string): void {
   const g = c.g;
   const sx = target.width / g.S;
   const sy = target.height / g.S;
+  const scale = Math.min(sx, sy);
   const tx = target.left + target.width / 2;
   const ty = target.top + target.height / 2;
+  // The small box stays hidden until the tiles get there, then takes their place.
+  document.body.classList.add('intro-arriving');
+  const SHRINK = WALL_SHRINK_MS - 100;
   for (const t of c.tiles) {
     if (t.el.style.visibility === 'hidden') continue;
     const nx = tx + (t.x + g.tw / 2 - g.cx) * sx - g.tw / 2;
     const ny = ty + (t.y + g.th / 2 - g.cy) * sy - g.th / 2;
-    t.el.animate([{ transform: T(t.x, t.y, t.r), opacity: 1 }, { transform: T(nx, ny, t.r, 0.3), opacity: 0 }], { duration: 800, easing: 'ease-in-out', fill: 'forwards' });
+    t.el.getAnimations().forEach((a) => a.cancel());
+    t.el.animate(
+      [
+        { transform: T(t.x, t.y, t.r), opacity: 1, easing: 'ease-in-out' },
+        { transform: T(nx, ny, t.r, scale), opacity: 1, offset: 0.88 },
+        { transform: T(nx, ny, t.r, scale), opacity: 0 },
+      ],
+      { duration: SHRINK, fill: 'forwards' },
+    );
   }
-  c.timers.push(setTimeout(() => current === c && clear(), 850));
+  c.timers.push(
+    setTimeout(() => document.body.classList.remove('intro-arriving'), SHRINK * 0.88),
+    setTimeout(() => current === c && clear(), SHRINK + 50),
+  );
 }
 
 /** Remove the wall drawing (a hand was stopped, the page changes, ...). */

@@ -173,3 +173,11 @@ Write down which devices worked: ☐ iPhone ☐ iPad ☐ Samsung tablet ☐ lapt
 - [ ] Tiles fly from the wall to each player in the right order; your tiles appear four at a time; the wall shrinks into the small tiles-left box and play starts.
 - [ ] CPU dealer: rolls by itself after the wall is built. Reopening the page during the deal: the wall just appears (no mixing).
 
+## 1.18.1: start-of-hand fixes (check on iPad)
+- [ ] Mixing: tiles turn only a little as they are shoved, never spin.
+- [ ] You see the wall being built; the Roll the dice button (or "Waiting for … to roll") only appears after it is finished.
+- [ ] The four walls' ends don't overlap at the corners.
+- [ ] CPU dealer: doesn't roll until the wall is built, and doesn't discard until all tiles are dealt and the wall has shrunk.
+- [ ] The dice in the Roll the dice box are real dice pictures, not squares.
+- [ ] The wall shrinks into the small tiles-left box without fading early; the box appears as it arrives.
+

@@ -14,7 +14,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties, ReactElement } from 'react';
 import type { Meld, NormalType, Tile, TileType } from '@lan-mahjong/shared';
-import { sortHand } from '@lan-mahjong/shared';
+import { DEAL_ANIM_MS, sortHand } from '@lan-mahjong/shared';
 import type { ClientMessage } from '../../server/src/protocol';
 import type { RoomView, SeatView } from '../../server/src/game/view';
 import type { Claim } from '../../server/src/game/round';
@@ -24,7 +24,7 @@ import type { StringKey } from './i18n';
 import { DragSource, Drop, useDrag } from './drag';
 import { HelpPanel } from './HelpPanel';
 import { ChipIcon } from './ChipIcon';
-import { DICE_MS, DiceRoll } from './DiceRoll';
+import { DICE_MS, DiceRoll, DieFace } from './DiceRoll';
 import { countIntro, countMs, finishIntro, introStackPoint, prepareMix, setIntroStacks, startIntro, stopIntro } from './TableIntro';
 import { APP_VERSION } from './version';
 import { CELEBRATION_STYLES, celebrate } from './celebrate';
@@ -1059,9 +1059,9 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
       {/* The dealer rolls once the wall is built: swipe the dice, or press the button. */}
       {view.phase === 'rolling' && iAmDealer && wallStanding && (
         <div className="dice-tray in-wall" onPointerDown={start({ kind: 'dice' })}>
-          <span className="die">⚀</span>
-          <span className="die">⚂</span>
-          <span className="die">⚄</span>
+          <span className="tray-dice">
+            {[1, 3, 5].map((v) => <span key={v} className="tray-die"><DieFace value={v} /></span>)}
+          </span>
           <div className="dice-hint">{tr('swipeDiceOut')}</div>
           <button className="roll-btn" onPointerDown={(e) => e.stopPropagation()} onClick={() => command({ type: 'rollDice' })}>
             {tr('rollDice')}
@@ -1192,7 +1192,7 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
           {drag.src.kind === 'hand' ? (
             <TileView type={drag.src.type} width="var(--hand-w)" />
           ) : drag.src.kind === 'dice' ? (
-            <span className="die">⚃</span>
+            <span className="tray-die"><DieFace value={4} /></span>
           ) : (
             <TileView back width="var(--hand-w)" />
           )}
@@ -1472,7 +1472,7 @@ export function flyBacks(from: { x: number; y: number }, to: { x: number; y: num
   setTimeout(done, ms + 500); // safety net
 }
 
-const DEAL_MS = 5000;
+const DEAL_MS = DEAL_ANIM_MS;
 
 /**
  * At the start of each hand, replay the deal in about 5 seconds: tiles slide from

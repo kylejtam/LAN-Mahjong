@@ -12,7 +12,8 @@ import { useEffect, useRef } from 'react';
 import type { ReactElement } from 'react';
 
 /** How long the whole roll lasts, landing included. */
-export const DICE_MS = 2600;
+import { DICE_ROLL_MS } from '@lan-mahjong/shared';
+export const DICE_MS = DICE_ROLL_MS;
 const BOUNCE_MS = 1650; // bouncing around
 const SETTLE_MS = 450; // gliding into place
 
