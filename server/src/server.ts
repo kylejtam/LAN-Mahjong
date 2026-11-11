@@ -471,10 +471,15 @@ export async function startServer(opts: ServerOptions): Promise<RunningServer> {
   // row (about 10 s) died quietly and is dropped, so the person shows as disconnected
   // (and the game pauses) and can rejoin with their name.
   const missed = new WeakMap<WebSocket, number>();
+  /** When each player's device last sent anything (it checks in every 3 s). */
+  const heardAt = new WeakMap<WebSocket, number>();
   const pingTimer = setInterval(() => {
     for (const ws of [...clients.keys(), ...hostSockets]) {
       const m = (missed.get(ws) ?? 0) + 1;
-      if (m > 2) {
+      // A device at a table that has said nothing for 10 s has gone, even if the
+      // connection still looks open (a frozen page can't check in).
+      const quiet = clients.get(ws)?.roomId && Date.now() - (heardAt.get(ws) ?? Date.now()) > 10_000;
+      if (m > 2 || quiet) {
         ws.terminate();
         continue;
       }
@@ -488,8 +493,12 @@ export async function startServer(opts: ServerOptions): Promise<RunningServer> {
   }, opts.pingMs ?? 5000);
   const watch = (ws: WebSocket): void => {
     missed.set(ws, 0);
+    heardAt.set(ws, Date.now());
     ws.on('pong', () => missed.set(ws, 0));
-    ws.on('message', () => missed.set(ws, 0));
+    ws.on('message', () => {
+      missed.set(ws, 0);
+      heardAt.set(ws, Date.now());
+    });
   };
   /** Someone rejoined with a name that is still connected: is that old connection really there? */
   const checkOldConnection = (roomId: string, key: string): void => {

@@ -183,16 +183,16 @@ export function ResultPanel({ view, lang, command, canClaimWin, onWin, winLabel,
       </div>
       {showWall && (
         // The tiles left in the wall, in the order they would have been drawn.
-        <div className="overlay wall-left-overlay" onClick={() => setShowWall(false)}>
-          <div className="panel wall-left" role="dialog" aria-label={tr('remainingTiles')} onClick={(e) => e.stopPropagation()}>
-            <div className="wall-left-head">
+        <div className="overlay remaining-overlay" onClick={() => setShowWall(false)}>
+          <div className="panel remaining-panel" role="dialog" aria-label={tr('remainingTiles')} onClick={(e) => e.stopPropagation()}>
+            <div className="remaining-head">
               <h3>{tr('remainingTiles')}</h3>
-              <span className="wall-left-count">{wallCount}</span>
+              <span className="remaining-count">{wallCount}</span>
               <button className="panel-close" aria-label={tr('close')} onClick={() => setShowWall(false)}>×</button>
             </div>
-            <div className="wall-left-tiles">
+            <div className="remaining-tiles">
               {wall.map((st, i) => (
-                <span key={i} className="wall-left-stack">
+                <span key={i} className="remaining-stack">
                   {st.map((tile) => <TileView key={tile.id} type={tile.type} width="var(--result-w)" />)}
                 </span>
               ))}

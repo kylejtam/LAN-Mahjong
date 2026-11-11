@@ -181,3 +181,24 @@ Write down which devices worked: ☐ iPhone ☐ iPad ☐ Samsung tablet ☐ lapt
 - [ ] The dice in the Roll the dice box are real dice pictures, not squares.
 - [ ] The wall shrinks into the small tiles-left box without fading early; the box appears as it arrives.
 
+## 1.19.0
+- [ ] Opening flowers pop up in front of each player after the deal: green ring = scores for them, red = doesn't. They fade after about 2.5 s.
+- [ ] Flowers sit first (on each player's left) in front of every player, including the right-hand player.
+- [ ] A flower drawn during the hand glows green if it scores for that player, red if not.
+- [ ] After the deal the leftover wall shrinks exactly onto the small tiles-left box, then fades into it with no jump.
+- [ ] The dice stay inside the wall while they bounce.
+- [ ] Joining: no pop-up; you watch the pile until you press Sit here on an empty seat. A full table: you can only watch.
+- [ ] Moving your mouse / dragging your finger pushes the tiles; other players' and CPUs' pushing shows on every screen.
+- [ ] Ready (green) then Unready (plain). When all four are ready: 6 shoves from random directions, then the wall builds.
+- [ ] After a hand: Continue in the summary brings you back to the table, with Return to Game Summary in the middle and the next game's name at the top.
+- [ ] After the very last hand: Continue goes straight to the final scores (including that hand).
+- [ ] The dealer's 14th tile is sorted into the hand at the start (not apart on the right).
+- [ ] Remaining tiles in the game summary: title, count on the right, tiles in drawing order (not after a draw).
+- [ ] Fullscreen button works on laptop/iPad/Android and isn't shown on iPhone.
+- [ ] Your tiles stay the same size when you draw, discard and claim.
+- [ ] Claims: first tap holds (tiles glow, next player can't draw, bubble for everyone), Confirm claims, Cancel lets it go. Holding after the next player drew puts their tile back.
+- [ ] Settings → Call all possible claims: any claimable tile is held automatically (colour-cycling bubble for others), with Cancel on the left.
+- [ ] Undo takes back your own last move only (until someone else moves); anyone can undo a CPU's move.
+- [ ] Turn off a player's Wi-Fi mid-hand: they see a huge Reconnecting…; everyone else sees the game paused with a red card within about 10 s; it carries on when they're back.
+- [ ] Tutorial: from the game list; every step's glow points at the right control; Leave tutorial works at any time; ends with Tutorial complete → back to the game list.
+

@@ -141,7 +141,6 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
   /** After the last hand: this player has left the summary and sees the final scores. */
   const [showFinal, setShowFinal] = useState<string | null>(null);
   /** Spectators can close the seat picker and just watch. */
-  const [justWatching, setJustWatching] = useState(false);
   const [chooser, setChooser] = useState<Chooser>(null);
   /**
    * Choosing which Soeng (when there is more than one): the tiles you could use glow
@@ -737,7 +736,8 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
     [],
   );
   useEffect(() => {
-    if (view.phase === 'betweenRounds') stopIntro();
+    // Back at the table between hands: the old wall goes, and the pile shows instead.
+    if (view.phase === 'betweenRounds' || (atTable && view.phase !== 'rolling')) stopIntro();
     if (atTable) {
       const m = latestPile();
       if (m && !m.done) showPile(m.id, m.perWall, m.tiles);
@@ -1272,7 +1272,7 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
           {mySeat === null && nameTag(bottom)}
           <span className="hint">{dealAnim ? '' : atTable ? tableHint : hint}</span>
           {atTable && roundOver && (
-            <button className="btn back-to-summary" onClick={() => setShowReady(null)}>{tr('backToSummary')}</button>
+            <button className="btn back-to-summary" onClick={() => setShowReady(null)}>{tr('returnToSummary')}</button>
           )}
         </div>
       </footer>
@@ -1451,64 +1451,6 @@ function AllHands({ view, tr, newFlowerIds, hideFlowers, onClose }: { view: Room
   );
 }
 
-/** Between rounds: choose a seat and press Start, or tap Spectate in the middle to just watch. */
-function SeatPicker({
-  view,
-  tr,
-  lang,
-  command,
-  onSpectate,
-}: {
-  view: RoomView;
-  tr: Tr;
-  lang: Prefs['lang'];
-  command: (c: Extract<ClientMessage, { type: 'command' }>['command']) => void;
-  onSpectate: () => void;
-}): ReactElement {
-  const mySeat = view.you.seat;
-  const me = mySeat !== null ? view.seats[mySeat] : null;
-  const filled = view.seats.filter((s) => s.name).length;
-  return (
-    <div className="overlay">
-      <div className="panel seat-picker">
-        <h3>{view.name} · {view.label[lang]}</h3>
-        <div className="seat-square">
-          {view.seats.map((s) => {
-            const mine = s.seat === mySeat;
-            const canTake = !mine && (!s.name || !!s.cpu);
-            return (
-              <button
-                key={s.seat}
-                className={`seat seat-${s.seat}${mine ? ' seat-mine' : ''}${s.name && !s.cpu ? ' seat-taken' : ''}`}
-                disabled={!canTake}
-                onClick={() => command({ type: 'takeSeat', seat: s.seat })}
-              >
-                <span className="seat-wind">{WIND_NAMES[lang][s.wind]}</span>
-                <span className="seat-name">{s.name ? personName(s.name, lang) : tr('empty')}</span>
-                {s.startPressed && <span className="seat-ready">{tr('ready')}</span>}
-              </button>
-            );
-          })}
-          <button className="seat seat-spectate" onClick={onSpectate}>
-            <span className="seat-name">{tr('spectate')}</span>
-            <span className="seat-wind">{tr('justWatch')}</span>
-          </button>
-        </div>
-        {me ? (
-          <div className="row">
-            <button className="btn primary big" disabled={me.startPressed} onClick={() => command({ type: 'pressStart' })}>
-              {me.startPressed ? tr('waitingOthers') : tr('start')}
-            </button>
-            <button className="btn" onClick={() => command({ type: 'leaveSeat' })}>{tr('leaveSeat')}</button>
-          </div>
-        ) : (
-          <p className="muted">{tr('tapSeat')}</p>
-        )}
-        {filled < 4 && <p className="muted">{tr('startRule')}</p>}
-      </div>
-    </div>
-  );
-}
 
 type Tr = (key: StringKey, vars?: Record<string, string | number>) => string;
 type Cmd = (c: Extract<ClientMessage, { type: 'command' }>['command']) => void;
@@ -1730,7 +1672,7 @@ function useDealAnimation(
   const lastFlown = useRef('');
 
   useEffect(() => {
-    if (!round || round.discards.length > 0 || done.current === roundKey || round.wall.length === 0) return;
+    if (!round || round.phase === 'ended' || round.discards.length > 0 || done.current === roundKey || round.wall.length === 0) return;
     done.current = roundKey;
     // Rebuild the wall's full draw order from the stacks that are left.
     const N = 4 * perWall;
@@ -1840,52 +1782,6 @@ function glide(el: HTMLElement, dx: number, dy: number): void {
   }, 400);
 }
 
-/**
- * After the win summary: press Ready for the next round, or Leave seat to watch.
- * The same square of seats as the seat picker shows who is ready.
- */
-function ReadyPanel({
-  view,
-  tr,
-  lang,
-  command,
-  onBack,
-}: {
-  view: RoomView;
-  tr: Tr;
-  lang: Prefs['lang'];
-  command: Cmd;
-  onBack: () => void;
-}): ReactElement {
-  const me = view.you.seat !== null ? view.seats[view.you.seat]! : null;
-  return (
-    <div className="overlay">
-      <div className="panel seat-picker">
-        <h3>{view.name} · {view.label[lang]}</h3>
-        <div className="seat-square">
-          {view.seats.map((s) => (
-            <div key={s.seat} className={`seat seat-${s.seat}${s.seat === view.you.seat ? ' seat-mine' : ''}`}>
-              <span className="seat-wind">{WIND_NAMES[lang][s.wind]}</span>
-              <span className="seat-name">{s.name ? personName(s.name, lang) : tr('empty')}</span>
-              {s.cpu ? <span className="seat-ready">{tr('ready')}</span> : s.name && (s.confirmed ? <span className="seat-ready">{tr('ready')}</span> : <span className="seat-wind">…</span>)}
-            </div>
-          ))}
-        </div>
-        <div className="row">
-          {me && (
-            <button className="btn primary big" disabled={me.confirmed} onClick={() => command({ type: 'confirmRound' })}>
-              {me.confirmed ? `${tr('ready')} ✓` : tr('ready')}
-            </button>
-          )}
-          {me && (
-            <button className="btn" onClick={() => command({ type: 'dropOut', replacement: { none: true } })}>{tr('leaveSeat')}</button>
-          )}
-          <button className="btn" onClick={onBack}>{tr('backToSummary')}</button>
-        </div>
-      </div>
-    </div>
-  );
-}
 
 /** The winner's whole hand in the middle of the table: hidden tiles, then face-up sets, then the winning tile glowing. */
 function WinningHand({ seat, winningTileId, name }: { seat: SeatView; winningTileId?: number; name: string }): ReactElement {
