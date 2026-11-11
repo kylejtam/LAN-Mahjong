@@ -36,6 +36,8 @@ export interface ServerOptions {
   rng?: Rng;
   /** How often CPUs and timers are checked (milliseconds). */
   tickMs?: number;
+  /** How often to check each connection is still there (ms). */
+  pingMs?: number;
   /** Folder with the built screens (client/dist). */
   clientDir?: string;
   /** Which connections may use the host page. Default: only this computer. */
@@ -191,14 +193,19 @@ export async function startServer(opts: ServerOptions): Promise<RunningServer> {
     for (const ws of hostSockets) send(ws, msg);
   };
 
+  /** How many times each room's state has been sent (devices check they have the latest). */
+  const revs = new Map<string, number>();
+
   /** Send every device in a room its own view. */
   const broadcast = (roomId: string): void => {
     const room = rooms.get(roomId);
     if (!room) return;
     const t = now();
     lastSent.set(roomId, t);
+    const rev = (revs.get(roomId) ?? 0) + 1;
+    revs.set(roomId, rev);
     for (const [ws, c] of clients) {
-      if (c.roomId === roomId && c.key && room.people[c.key]) send(ws, { type: 'state', view: viewFor(room, c.key, t) });
+      if (c.roomId === roomId && c.key && room.people[c.key]) send(ws, { type: 'state', view: viewFor(room, c.key, t), rev });
     }
     sendGameListIfChanged();
     sendHostState();
@@ -230,10 +237,29 @@ export async function startServer(opts: ServerOptions): Promise<RunningServer> {
       case 'listGames':
         send(ws, { type: 'games', games: gameList() });
         return;
+      case 'ping': {
+        // A device checking in. If it missed an update, send it the latest state now.
+        const room = c.roomId ? rooms.get(c.roomId) : undefined;
+        const rev = room ? revs.get(room.id) ?? 0 : null;
+        if (room && c.key && room.people[c.key] && typeof msg.rev === 'number' && msg.rev !== rev) {
+          send(ws, { type: 'state', view: viewFor(room, c.key, now()), rev: rev ?? 0 });
+        }
+        send(ws, { type: 'pong', rev });
+        return;
+      }
       case 'joinGame': {
         const room = rooms.get(String(msg.gameId));
         if (!room) throw new GameError('That game no longer exists.');
-        const { room: joined, person } = joinRoom(room, String(msg.name ?? ''), now());
+        let joined: Room;
+        let person: { key: string; name: string };
+        try {
+          ({ room: joined, person } = joinRoom(room, String(msg.name ?? ''), now()));
+        } catch (err) {
+          // "Name in use": maybe that's this same phone, whose old connection died quietly.
+          // Check the old connection now; if it doesn't answer, drop it so the retry works.
+          if (err instanceof GameError && /already in use/.test(err.message)) checkOldConnection(room.id, nameKey(String(msg.name ?? '')));
+          throw err;
+        }
         disconnectClient(c);
         c.roomId = joined.id;
         c.key = person.key;
@@ -402,27 +428,46 @@ export async function startServer(opts: ServerOptions): Promise<RunningServer> {
     ws.on('close', () => hostSockets.delete(ws));
   });
 
-  // Every 15 s check each phone is still there; drop connections that died
-  // silently (so the person shows as disconnected and can rejoin with their name).
-  const alive = new WeakMap<WebSocket, boolean>();
+  // Every 5 s check each phone is still there; a connection that misses two checks in a
+  // row (about 10 s) died quietly and is dropped, so the person shows as disconnected
+  // (and the game pauses) and can rejoin with their name.
+  const missed = new WeakMap<WebSocket, number>();
   const pingTimer = setInterval(() => {
     for (const ws of [...clients.keys(), ...hostSockets]) {
-      if (alive.get(ws) === false) {
+      const m = (missed.get(ws) ?? 0) + 1;
+      if (m > 2) {
         ws.terminate();
         continue;
       }
-      alive.set(ws, false);
+      missed.set(ws, m);
       try {
         ws.ping();
       } catch {
         /* ignore */
       }
     }
-  }, 15000);
+  }, opts.pingMs ?? 5000);
   const watch = (ws: WebSocket): void => {
-    alive.set(ws, true);
-    ws.on('pong', () => alive.set(ws, true));
-    ws.on('message', () => alive.set(ws, true));
+    missed.set(ws, 0);
+    ws.on('pong', () => missed.set(ws, 0));
+    ws.on('message', () => missed.set(ws, 0));
+  };
+  /** Someone rejoined with a name that is still connected: is that old connection really there? */
+  const checkOldConnection = (roomId: string, key: string): void => {
+    for (const [old, oc] of clients) {
+      if (oc.roomId !== roomId || oc.key !== key) continue;
+      const before = missed.get(old) ?? 0;
+      missed.set(old, before + 1);
+      try {
+        old.ping();
+      } catch {
+        old.terminate();
+        continue;
+      }
+      setTimeout(() => {
+        if ((missed.get(old) ?? 0) > 0 && clients.has(old)) old.terminate();
+      }, 2000);
+    }
   };
 
   wss.on('connection', (ws) => {

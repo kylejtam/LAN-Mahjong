@@ -640,12 +640,12 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
   };
 
   const nameTag = (sv: SeatView, hideChips = false): ReactElement => (
-    <div className={`nametag${round && round.turn === sv.seat && round.phase !== 'ended' ? ' nametag-turn' : ''}`}>
+    <div className={`nametag${round && round.turn === sv.seat && round.phase !== 'ended' ? ' nametag-turn' : ''}${view.pausedSeats.includes(sv.seat) ? ' gone' : ''}`}>
       <span className="wind-badge">{WIND_SHORT[lang][sv.wind]}</span>
       <span className="nametag-name">{sv.name ? personName(sv.name, lang) : tr('empty')}</span>
       {/* CPU names already end in "(CPU)"; older names don't. */}
       {sv.cpu && !sv.name?.startsWith('CPU') && !sv.name?.endsWith('(CPU)') && <span className="cpu-badge">{tr('cpu')}</span>}
-      {sv.name && !sv.connected && !sv.cpu && <span className="offline">{tr('offline')}</span>}
+      {sv.name && !sv.connected && !sv.cpu && (view.pausedSeats.includes(sv.seat) ? <span className="lost-tag">{tr('disconnectedTag')}</span> : <span className="offline">{tr('offline')}</span>)}
       {sv.balance !== null && !hideChips && <span className="chips">{sv.balance}</span>}
       {round && sv.isDealer && (
         <span className="dice dice-small" title="dice">
@@ -1029,6 +1029,7 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
             </div>
           );
         })}
+        <PausedCard view={view} lang={lang} />
         {openingFlowers?.key === roundKey &&
           openingFlowers.items.map((o) => (
             <div key={o.seat} className="opening-flowers" style={{ left: o.x, top: o.y }} aria-label={personName(view.seats[o.seat]?.name, lang)}>
@@ -1854,5 +1855,50 @@ function FullscreenButton({ title }: { title: string }): ReactElement | null {
         )}
       </svg>
     </button>
+  );
+}
+
+/**
+ * Someone at the table lost their connection mid-hand: the game is paused, and a card in
+ * the middle says who and how long ago. When they're back, a short "… is back" shows.
+ */
+function PausedCard({ view, lang }: { view: RoomView; lang: Prefs['lang'] }): ReactElement | null {
+  const tr = (k: StringKey, v?: Record<string, string | number>): string => t(lang, k, v);
+  const seat = view.pausedSeats.find((s) => s !== view.you.seat);
+  const sv = seat !== undefined ? view.seats[seat] : undefined;
+  const [, tick] = useState(0);
+  const [back, setBack] = useState<string | null>(null);
+  const was = useRef<string | null>(null);
+  useEffect(() => {
+    if (!sv) return;
+    const i = setInterval(() => tick((n) => n + 1), 1000);
+    return () => clearInterval(i);
+  }, [sv?.seat]);
+  useEffect(() => {
+    const name = sv?.name ? personName(sv.name, lang) : null;
+    if (!name && was.current) {
+      setBack(was.current);
+      const tm = setTimeout(() => setBack(null), 2600);
+      was.current = null;
+      return () => clearTimeout(tm);
+    }
+    was.current = name;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sv?.name]);
+  if (!sv) return back ? <div className="back-toast">{tr('isBack', { name: back })}</div> : null;
+  // How long ago, using the server's clock (devices' clocks may differ).
+  const offset = view.serverNow - Date.now();
+  const secs = sv.offlineSince ? Math.max(0, Math.floor((Date.now() + offset - sv.offlineSince) / 1000)) : 0;
+  const ago = secs < 60 ? tr('secondsAgo', { n: secs }) : tr('minutesAgo', { m: Math.floor(secs / 60), s: secs % 60 });
+  const name = personName(sv.name, lang);
+  const [before, after] = tr('disconnectedTitle', { name: '\u0001' }).split('\u0001');
+  return (
+    <div className="paused-layer" role="status">
+      <div className="paused-card">
+        <div className="title">{before}<b>{name}</b>{after}</div>
+        <div className="sub">{tr('pausedUntil')}</div>
+        <div className="time">{ago}</div>
+      </div>
+    </div>
   );
 }

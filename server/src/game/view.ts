@@ -14,7 +14,7 @@
 import { GameSettings, Meld, SEATS, Tile, tilesLeft } from '@lan-mahjong/shared';
 import { closeRound, matchLabel } from './match.js';
 import { AvailableActions, CLAIM_AFTER_DRAW_MS, DiscardEntry, Phase, RoundResult, availableActions, currentPlayer, lastMover, undoProblem } from './round.js';
-import { CpuDifficulty, DEFAULT_CPU_SECONDS, HandRecord, HistoryEdit, PendingSwap, Room, RoomPhase, TableColour, pendingChange, roundCanClose, seatOf, undoableForSeat } from './room.js';
+import { CpuDifficulty, DEFAULT_CPU_SECONDS, HandRecord, HistoryEdit, PendingSwap, Room, RoomPhase, TableColour, pendingChange, roundCanClose, seatOf, undoableForSeat, pausedBy } from './room.js';
 import { sortHand } from '@lan-mahjong/shared';
 
 export interface SeatView {
@@ -22,6 +22,8 @@ export interface SeatView {
   name: string | null;
   cpu: CpuDifficulty | null;
   connected: boolean;
+  /** When this player's connection dropped (null while connected). */
+  offlineSince: number | null;
   balance: number | null;
   isDealer: boolean;
   /** This seat's wind for the current round: 0 East ... 3 North. */
@@ -75,6 +77,9 @@ export interface RoomView {
   nextLabel: { en: string; zh: string } | null;
   /** Once the hand is over: true if it was the last hand of the whole game. */
   lastHand: boolean;
+  pausedSeats: number[];
+  /** The server's clock when this was sent (to show "disconnected 14 seconds ago"). */
+  serverNow: number;
   /** Your buttons. Null if you are not seated or no round is on. */
   actions: AvailableActions | null;
   /** True when you are a spectator at an all-CPU table and the round is over. */
@@ -120,6 +125,7 @@ export function viewFor(room: Room, viewerKey: string, now: number): RoomView {
       name: p?.name ?? null,
       cpu: p?.cpu ?? null,
       connected: p?.connected ?? false,
+      offlineSince: p && !p.connected ? p.offlineSince ?? null : null,
       // While the win summary shows, include the payout straight away.
       balance: p ? p.balance + pendingChange(room, seat) : null,
       isDealer: seat === dealer,
@@ -193,6 +199,9 @@ export function viewFor(room: Room, viewerKey: string, now: number): RoomView {
         }
       : null,
     ...nextGame(room),
+    /** Seats whose player lost their connection mid-hand: the game waits for them. */
+    pausedSeats: pausedBy(room).map((k) => room.seats.indexOf(k)),
+    serverNow: now,
     actions: round && mySeat !== null ? withRoomUndo(room, availableActions(round, mySeat, now)) : null,
     /** At an all-CPU table, spectators confirm the end of a round. */
     spectatorsConfirm: mySeat === null && !!round && round.core.phase === 'ended' && room.seats.every((k) => !k || !!room.people[k]?.cpu),

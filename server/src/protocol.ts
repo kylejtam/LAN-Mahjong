@@ -22,13 +22,16 @@ export type ClientMessage =
   | { type: 'listGames' }
   | { type: 'joinGame'; gameId: string; name: string }
   | { type: 'command'; command: Command }
+  /** Check-in every few seconds: proves the connection works. rev = the last state this device has. */
+  | { type: 'ping'; rev?: number }
   | { type: 'leaveGame' };
 
 /** Server → device. */
 export type ServerMessage =
   | { type: 'games'; games: GameListEntry[] }
   | { type: 'joined'; gameId: string; name: string }
-  | { type: 'state'; view: RoomView }
+  | { type: 'state'; view: RoomView; rev?: number }
+  | { type: 'pong'; rev: number | null }
   | { type: 'error'; message: string }
   | { type: 'gameEnded'; gameId: string };
 

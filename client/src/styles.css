@@ -958,3 +958,24 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; }
 @media (prefers-reduced-motion: reduce) { .claim-bubble.hold-any { animation-duration: 12s; } }
 .act-confirm { font-size: 0.85em; }
 .act:disabled { opacity: 0.45; }
+
+/* Lost connection: the whole screen dims, with a huge "Reconnecting…". */
+.reconnecting { position: fixed; inset: 0; z-index: 100; background: rgba(0, 0, 0, 0.78); display: grid; place-items: center; text-align: center; padding: 1rem; }
+.reconnecting-big { font-size: clamp(2.2rem, 9vw, 4.6rem); font-weight: 900; color: #fff; }
+.reconnecting-small { color: #c9ced6; font-size: clamp(0.95rem, 2.4vw, 1.2rem); margin-top: 0.4em; }
+.reconnecting .dots span { animation: dots-blink 1.4s infinite; }
+.reconnecting .dots span:nth-child(2) { animation-delay: 0.2s; }
+.reconnecting .dots span:nth-child(3) { animation-delay: 0.4s; }
+@keyframes dots-blink { 0%, 100% { opacity: 0.2; } 30% { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .reconnecting .dots span { animation: none; } }
+/* Someone else lost their connection: the game pauses, with a card saying who. */
+.paused-layer { position: fixed; inset: 0; z-index: 35; background: rgba(0, 0, 0, 0.45); display: grid; place-items: center; padding: 1rem; pointer-events: none; }
+.paused-card { background: var(--panel, #1c1f26); border: 2px solid #e5484d; border-radius: 12px; padding: 1em 1.4em; text-align: center; display: grid; gap: 0.35em; max-width: 26em; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5); }
+.paused-card .title { font-size: 1.4em; font-weight: 900; }
+.paused-card .title b { color: #e5484d; }
+.paused-card .sub { color: var(--muted, #9aa3ad); }
+.paused-card .time { font-weight: 700; font-variant-numeric: tabular-nums; }
+.nametag.gone { background: #3a1416 !important; box-shadow: 0 0 0 2px #e5484d; }
+.lost-tag { background: #e5484d; color: #fff; border-radius: 999px; padding: 0.05em 0.6em; font-size: 0.85em; font-weight: 800; }
+.back-toast { position: fixed; left: 50%; top: 18%; transform: translateX(-50%); z-index: 36; background: var(--panel, #1c1f26); border: 2px solid #f5c542; border-radius: 999px; padding: 0.4em 1.1em; font-weight: 700; animation: back-toast 2.5s ease-out forwards; pointer-events: none; }
+@keyframes back-toast { 0%, 70% { opacity: 1; } 100% { opacity: 0; } }

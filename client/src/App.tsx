@@ -48,7 +48,15 @@ export function App(): ReactElement {
       ) : (
         <Lobby conn={conn} prefs={prefs} setPrefs={setPrefs} />
       )}
-      {conn.view && conn.status !== 'open' && <div className="banner">{t(prefs.lang, 'reconnecting')}</div>}
+      {conn.view && conn.status !== 'open' && (
+        // Lost the connection: dim everything, with a message nobody can miss.
+        <div className="reconnecting" role="alert">
+          <div>
+            <div className="reconnecting-big">{t(prefs.lang, 'reconnectingBig')}<span className="dots"><span>.</span><span>.</span><span>.</span></span></div>
+            <div className="reconnecting-small">{t(prefs.lang, 'reconnectingNote')}</div>
+          </div>
+        </div>
+      )}
       {conn.ended && (
         <div className="overlay" onClick={conn.dismissEnded}>
           <div className="panel">

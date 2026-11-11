@@ -62,6 +62,8 @@ export interface Person {
   /** 1 for the first person to join, 2 for the next, ... */
   joinOrder: number;
   connected: boolean;
+  /** When this person's connection dropped (while disconnected). */
+  offlineSince?: number;
   balance: number;
   cpu: CpuDifficulty | null;
   /** A CPU's name typed on the host page (shown with " (CPU)" after it). Missing = named by its level. */
@@ -313,6 +315,7 @@ export function joinRoom(prev: Room, rawName: string, now: number): { room: Room
     if (existing.cpu) fail('That name is used by a CPU player. Please choose another name.');
     if (existing.connected) fail('That name is already in use in this game. Please choose another name.');
     existing.connected = true;
+    delete existing.offlineSince;
     room.lastChangeAt = now;
     return { room, person: existing };
   }
@@ -335,9 +338,23 @@ export function joinRoom(prev: Room, rawName: string, now: number): { room: Room
 export function disconnect(prev: Room, key: string, now: number): Room {
   const room = cloneRoom(prev);
   const p = room.people[key];
-  if (p) p.connected = false;
+  if (p) {
+    p.connected = false;
+    p.offlineSince = now;
+  }
   room.lastChangeAt = now;
   return room;
+}
+
+/**
+ * Seated players (not CPUs) who have lost their connection while a hand is on: the game
+ * pauses for everyone until they are back (or the host gives their seat to a CPU).
+ */
+export function pausedBy(room: Room): string[] {
+  const round = room.match.round;
+  const handOn = room.phase === 'rolling' || (room.phase === 'playing' && !!round && round.core.phase !== 'ended');
+  if (!handOn) return [];
+  return room.seats.filter((k): k is string => !!k && !room.people[k]!.cpu && !room.people[k]!.connected);
 }
 
 // ---------- helpers ----------
@@ -405,6 +422,12 @@ function maybeBeginRolling(room: Room): void {
     room.phase = 'rolling';
     room.startPressed = [];
   }
+}
+
+/** Moves wait while someone else at the table has lost their connection. */
+function failIfPaused(room: Room, key: string): void {
+  const away = pausedBy(room).filter((k) => k !== key);
+  if (away.length) fail(`The game is paused until ${room.people[away[0]!]!.name} reconnects.`);
 }
 
 /** If the round is over and everyone has confirmed, pay out and get ready for the next one. */
@@ -538,6 +561,7 @@ export function handleCommand(prev: Room, key: string, cmd: Command, now: number
     }
     case 'rollDice': {
       if (room.phase !== 'rolling') fail('It is not time to roll the dice.');
+      failIfPaused(room, key);
       if (seat !== room.match.dealer) fail('Only the dealer rolls the dice.');
       startDealing(room, rng);
       break;
@@ -552,12 +576,14 @@ export function handleCommand(prev: Room, key: string, cmd: Command, now: number
     case 'selfDrawWin': {
       const round = requireRound(room);
       const s = requireSeated(room, key);
+      failIfPaused(room, key);
       setRound(room, autoHolds(room, applyRoundMove(round, s, cmd, now), now));
       break;
     }
     case 'hold': {
       const round = requireRound(room);
       const s = requireSeated(room, key);
+      failIfPaused(room, key);
       const kind = cmd.kind;
       if (kind !== null && !['chow', 'pong', 'gong', 'win'].includes(kind)) fail('Unknown claim.');
       setRound(room, holdClaim(round, s, kind, now));
@@ -685,6 +711,7 @@ export function handleCommand(prev: Room, key: string, cmd: Command, now: number
       // The person keeps their seat (shown as disconnected) so the host can
       // wait for them or fill the seat with a CPU.
       room.people[key]!.connected = false;
+      room.people[key]!.offlineSince = now;
       break;
     }
     default:
@@ -935,7 +962,7 @@ function applyRoundMove(round: RoundState, seat: number, cmd: Command, now: numb
  */
 export function settleWall(prev: Room, now: number): Room {
   const round = prev.match.round;
-  if (prev.phase !== 'playing' || !round || round.core.phase === 'ended') return prev;
+  if (prev.phase !== 'playing' || !round || round.core.phase === 'ended' || pausedBy(prev).length > 0) return prev;
   const done = settleEmptyWall(round, now);
   if (!done) return prev;
   const room = cloneRoom(prev);
@@ -952,6 +979,7 @@ export function settleWall(prev: Room, now: number): Room {
  * The server calls this regularly.
  */
 export function cpuTick(prev: Room, now: number, rng: Rng): Room {
+  if (pausedBy(prev).length > 0) return prev; // someone lost their connection: everyone waits
   if (prev.ended || now - prev.lastChangeAt < cpuDelay(prev) || now < (prev.cpuPauseUntil ?? 0)) return prev;
   const cpuSeats = prev.seats
     .map((k, seat) => ({ k, seat }))
