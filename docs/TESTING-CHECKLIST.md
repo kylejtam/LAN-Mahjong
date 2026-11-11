@@ -165,3 +165,11 @@ Write down which devices worked: ☐ iPhone ☐ iPad ☐ Samsung tablet ☐ lapt
 - [ ] (1.17.2) The big last discard in the middle disappears as soon as the next player draws, or someone claims it.
 - [ ] (1.17.3, iPad) The whose-turn glow on name tags is never cut off, and doesn't run into the gold table-edge glow.
 - [ ] (1.17.4) No tile glow is ever drawn over another tile: claim pop-ups, new flowers, the winning tile (summary and Wu moment), the Soeng choice in your hand.
+
+## 1.18.0: start of each hand
+- [ ] After everyone presses Start: the tiles are shoved around face down (never on top of each other) and glide into a square wall; all four sides build together.
+- [ ] Dealer: a "Roll the dice" button appears in the middle of the wall only once it is built (swiping the dice still works). Others: "Waiting for … to roll".
+- [ ] After the dice: a quick light runs round the walls, then along the stacks, and a gold mark shows the break.
+- [ ] Tiles fly from the wall to each player in the right order; your tiles appear four at a time; the wall shrinks into the small tiles-left box and play starts.
+- [ ] CPU dealer: rolls by itself after the wall is built. Reopening the page during the deal: the wall just appears (no mixing).
+
