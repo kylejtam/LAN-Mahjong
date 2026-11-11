@@ -28,6 +28,7 @@ import { DICE_MS, DiceRoll, DieFace } from './DiceRoll';
 import { buildFromPile, countIntro, countMs, finishIntro, hidePile, introKeyIs, introStackPoint, pileShowing, pileUnits, setIntroStacks, showPile, startIntro, stopIntro } from './TableIntro';
 import { latestPile, onPile } from './pileBus';
 import { TutorialGuide, tutorialDiscardTile } from './Tutorial';
+import { playWindowBreak } from './sounds';
 import { APP_VERSION } from './version';
 import { CELEBRATION_STYLES, celebrate } from './celebrate';
 import { ResultPanel } from './ResultPanel';
@@ -882,6 +883,8 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
   };
   const [newFlowerIds, setNewFlowerIds] = useState<Set<number>>(() => new Set());
   const seenFlowers = useRef<{ key: string; ids: Set<number> }>({ key: '', ids: new Set() });
+  /** The hand in which the window-break sound has already played (once per hand). */
+  const glassPlayedFor = useRef('');
   const flowerSig = view.seats.map((sv) => sv.flowers.map((f) => f.id).join(',')).join('|');
   useEffect(() => {
     const seen = seenFlowers.current;
@@ -895,6 +898,12 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
       .map((x): Pop => ({ key: `${roundKey}-f-${x.tiles.map((t) => t.id).join('-')}`, kind: 'flower', seat: x.seat, types: x.tiles.map((t) => t.type) }));
     const ids = pops.length ? view.seats.flatMap((sv) => sv.flowers.filter((f) => !seen.ids.has(f.id)).map((f) => f.id)) : [];
     showPops(pops, ids);
+    // The first flower this hand that doesn't score for whoever drew it: a window breaks.
+    const dud = pops.some((p) => p.types.some((type) => !flowerScores(type, view.seats[p.seat]!.wind)));
+    if (dud && glassPlayedFor.current !== roundKey) {
+      glassPlayedFor.current = roundKey;
+      playWindowBreak();
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [flowerSig, roundKey, !!dealAnim]);
 

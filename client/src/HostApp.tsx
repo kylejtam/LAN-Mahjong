@@ -22,6 +22,9 @@ function useHostConnection() {
   const [error, setError] = useState<string | null>(null);
   /** The game this page just created (its tile opens by itself). */
   const [created, setCreated] = useState<string | null>(null);
+  /** LAN Mahjong has been closed from this page. */
+  const [closed, setClosed] = useState(false);
+  const closedRef = useRef(false);
   const ws = useRef<WebSocket | null>(null);
   useEffect(() => {
     let stopped = false;
@@ -36,6 +39,9 @@ function useHostConnection() {
           setUrls(msg.urls);
         } else if (msg.type === 'hostCreated') {
           setCreated(msg.gameId);
+        } else if (msg.type === 'shuttingDown') {
+          closedRef.current = true;
+          setClosed(true);
         } else if (msg.type === 'error') {
           setError(msg.message);
           setTimeout(() => setError(null), 4000);
@@ -43,7 +49,7 @@ function useHostConnection() {
       };
       s.onclose = () => {
         setOpen(false);
-        if (!stopped) setTimeout(connect, 1500);
+        if (!stopped && !closedRef.current) setTimeout(connect, 1500);
       };
     };
     connect();
@@ -53,11 +59,18 @@ function useHostConnection() {
     };
   }, []);
   const send = (m: HostMessage): void => ws.current?.send(JSON.stringify(m));
-  return { games, urls, open, error, send, created };
+  return { games, urls, open, error, send, created, closed };
 }
 
 export function HostApp(): ReactElement {
-  const { games, urls, open, error, send, created } = useHostConnection();
+  const { games, urls, open, error, send, created, closed } = useHostConnection();
+  // Closing LAN Mahjong takes two clicks: the first asks "Click again to close".
+  const [confirmClose, setConfirmClose] = useState(false);
+  useEffect(() => {
+    if (!confirmClose) return;
+    const t = setTimeout(() => setConfirmClose(false), 4000);
+    return () => clearTimeout(t);
+  }, [confirmClose]);
   // Which game tiles are open (remembered on this computer).
   const [openIds, setOpenIds] = useState<Set<string>>(() => {
     try {
@@ -87,10 +100,27 @@ export function HostApp(): ReactElement {
   }, [created]);
   const [gameName, setGameName] = useState('');
   const [balance, setBalance] = useState(200);
+  if (closed) {
+    return (
+      <div className="host">
+        <h1 className="host-title">LAN Mahjong · Host</h1>
+        <div className="card">
+          <p><b>LAN Mahjong has closed.</b> Games were saved. You can close this page.</p>
+          <p className="muted">To play again, open LAN Mahjong from the desktop or Start menu.</p>
+        </div>
+      </div>
+    );
+  }
   return (
     <div className="host">
       <h1 className="host-title">
         LAN Mahjong · Host <span className="version-badge">Version {APP_VERSION}</span>
+        <button
+          className={`btn close-host${confirmClose ? ' danger' : ''}`}
+          onClick={() => (confirmClose ? send({ type: 'hostShutdown' }) : setConfirmClose(true))}
+        >
+          {confirmClose ? 'Click again to close' : 'Close host'}
+        </button>
       </h1>
       {!open && <p className="muted">Connecting to the server…</p>}
       <div className="host-top card">

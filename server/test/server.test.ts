@@ -74,7 +74,7 @@ afterEach(async () => {
   dir = null;
 });
 
-async function boot(dataFile: string | null = null, extra: { isHostAddress?: (a: string | undefined) => boolean } = {}): Promise<RunningServer> {
+async function boot(dataFile: string | null = null, extra: { isHostAddress?: (a: string | undefined) => boolean; onShutdown?: () => void } = {}): Promise<RunningServer> {
   server = await startServer({ port: 0, host: '127.0.0.1', dataFile, rng: seededRng(7), tickMs: 20, ...extra });
   return server;
 }
@@ -382,4 +382,16 @@ describe('game server over the network', () => {
     host.close();
     watcher.close();
   }, 45000);
+
+  it('the host page can close LAN Mahjong', async () => {
+    let closed = false;
+    const s = await boot(null, { onShutdown: () => (closed = true) });
+    const host = await hostPage(s.port);
+    host.send({ type: 'hostShutdown' });
+    const msg = await host.waitFor((m) => m.type === 'shuttingDown');
+    expect(msg.type).toBe('shuttingDown');
+    await new Promise((res) => setTimeout(res, 400));
+    expect(closed).toBe(true);
+    host.close();
+  });
 });

@@ -945,11 +945,12 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; }
 .remaining-stack { display: flex; gap: 1px; }
 
 /* Holding a claim: the tiles it would use glow in the claim's colour (behind the tile). */
-.hand-tile.hold-glow .tile::before, .hold-glow::before { content: ''; position: absolute; inset: -4px; border-radius: 7px; z-index: -1; pointer-events: none; }
-.hold-glow.hold-chow .tile::before, .hold-glow.hold-chow::before { background: #2f8f5b; box-shadow: 0 0 10px 3px rgba(47, 143, 91, 0.8); }
-.hold-glow.hold-pong .tile::before, .hold-glow.hold-pong::before { background: #2f6fbf; box-shadow: 0 0 10px 3px rgba(47, 111, 191, 0.8); }
-.hold-glow.hold-gong .tile::before, .hold-glow.hold-gong::before { background: #8a4fc0; box-shadow: 0 0 10px 3px rgba(138, 79, 192, 0.8); }
-.hold-glow.hold-win .tile::before, .hold-glow.hold-win::before { background: #d23b3b; box-shadow: 0 0 10px 3px rgba(210, 59, 59, 0.8); }
+/* Only the tile itself glows (the glow sits on the tile, never around the whole hand). */
+.hand-tile.hold-glow .tile::before { content: ''; position: absolute; inset: -4px; border-radius: 7px; z-index: -1; pointer-events: none; }
+.hold-glow.hold-chow .tile::before { background: #2f8f5b; box-shadow: 0 0 10px 3px rgba(47, 143, 91, 0.8); }
+.hold-glow.hold-pong .tile::before { background: #2f6fbf; box-shadow: 0 0 10px 3px rgba(47, 111, 191, 0.8); }
+.hold-glow.hold-gong .tile::before { background: #8a4fc0; box-shadow: 0 0 10px 3px rgba(138, 79, 192, 0.8); }
+.hold-glow.hold-win .tile::before { background: #d23b3b; box-shadow: 0 0 10px 3px rgba(210, 59, 59, 0.8); }
 /* A held claim's bubble stays (no pop-in-and-out); "not chosen yet" cycles through the colours. */
 .hold-at { z-index: 26; }
 .claim-bubble.hold-bubble { animation: none; }
@@ -1007,3 +1008,7 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; }
 @media (prefers-reduced-motion: reduce) { .tut-target { animation: none; } }
 .leave-tutorial { font-size: 0.85em; padding: 0.25em 0.8em; background: none; border: 1px solid #59616d; border-radius: 999px; }
 .tutorial-done { z-index: 70; }
+
+/* Host page: close LAN Mahjong (two clicks). */
+.close-host { font-size: 0.8rem; padding: 0.3em 0.9em; margin-left: 0.6em; vertical-align: middle; }
+.close-host.danger { background: #a3302d; border-color: #a3302d; color: #fff; }

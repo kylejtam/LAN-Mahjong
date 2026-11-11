@@ -202,3 +202,13 @@ Write down which devices worked: ☐ iPhone ☐ iPad ☐ Samsung tablet ☐ lapt
 - [ ] Turn off a player's Wi-Fi mid-hand: they see a huge Reconnecting…; everyone else sees the game paused with a red card within about 10 s; it carries on when they're back.
 - [ ] Tutorial: from the game list; every step's glow points at the right control; Leave tutorial works at any time; ends with Tutorial complete → back to the game list.
 
+## 1.19.1
+- [ ] Tutorial: no step moves on by itself; each waits for the move or for Next (including after the computer players move).
+- [ ] Tutorial: what to press glows gold; everything else is dimmed except a circle around it, and taps outside the circle do nothing.
+- [ ] Tutorial: the settings × and the help Close are part of the steps; Everyone is ready has a Next; the flowers step has a Next.
+- [ ] Tutorial: on a discard step, only the asked-for tile can be pushed out of the hand.
+- [ ] Claim glow: only the tiles used by the claim glow (Wu: only the tiles that complete it with the claimed tile).
+- [ ] Settings order: name, language, win celebration, Call all possible claims.
+- [ ] The first flower in a hand that doesn't score for whoever drew it plays a window breaking on every device (not for opening flowers, only once per hand).
+- [ ] Host page: Close host → Click again to close → LAN Mahjong stops and the page says it has closed.
+

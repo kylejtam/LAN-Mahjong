@@ -47,10 +47,14 @@ export type ServerMessage =
  */
 export type HostMessage =
   | { type: 'hostCreateGame'; gameName: string; startingBalance: number; settings?: Partial<GameSettings> }
-  | { type: 'hostCommand'; gameId: string; command: HostCommand };
+  | { type: 'hostCommand'; gameId: string; command: HostCommand }
+  /** Close LAN Mahjong on the laptop (games are saved first). */
+  | { type: 'hostShutdown' };
 
 /** Server → host page. */
 export type ServerHostMessage =
   | { type: 'hostState'; games: HostGameView[]; urls: string[] }
   | { type: 'hostCreated'; gameId: string }
+  /** LAN Mahjong is closing (after the host page asked). */
+  | { type: 'shuttingDown' }
   | { type: 'error'; message: string };
