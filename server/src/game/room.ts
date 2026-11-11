@@ -20,7 +20,7 @@
  *   empty seat; during a round the game waits on it until the host adds a CPU.
  *   (To hand over to a spectator, use a swap instead of dropping out.)
  */
-import { DEFAULT_SETTINGS, GameSettings, NormalType, Rng, SEATS, Tile } from '@lan-mahjong/shared';
+import { DEFAULT_SETTINGS, GameSettings, INTRO_BUILD_MS, NormalType, Rng, SEATS, Tile, introAfterRollMs } from '@lan-mahjong/shared';
 import { MatchState, beginRound, closeRound, matchLabel, newMatch } from './match.js';
 import {
   Claim,
@@ -930,12 +930,21 @@ export function cpuTick(prev: Room, now: number, rng: Rng): Room {
     }
     return prev;
   }
+  // Someone is watching the start-of-hand animation: a CPU waits for it.
+  const watched = Object.values(prev.people).some((p) => !p.cpu && p.connected);
   if (prev.phase === 'rolling') {
+    // Don't roll before the tiles have been mixed and the wall is built.
+    if (watched && now - prev.lastChangeAt < INTRO_BUILD_MS) return prev;
     const dealer = cpuSeats.find((c) => c.seat === prev.match.dealer);
     return dealer ? act(dealer.k, { type: 'rollDice' }) : prev;
   }
   if (prev.phase === 'playing' && prev.match.round) {
     const round = prev.match.round;
+    // Nobody has discarded or claimed yet: the tiles may still be flying out of the
+    // wall on screen, so wait for the dice, the counting and the dealing first.
+    const firstTurn = round.core.discards.length === 0 && round.core.melds.every((m) => m.every((x) => x.kind !== 'pong' && x.kind !== 'chow'));
+    const total = round.core.dice[0] + round.core.dice[1] + round.core.dice[2];
+    if (watched && firstTurn && round.core.phase !== 'ended' && now - prev.lastChangeAt < introAfterRollMs(total)) return prev;
     if (round.core.phase === 'ended') {
       // CPUs never hold up the next round. At an all-CPU table with nobody
       // watching, carry on by itself (spectators confirm with their button).
