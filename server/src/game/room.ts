@@ -187,6 +187,8 @@ export type Command =
   | { type: 'reorderHand'; tileIds: number[] }
   | { type: 'undo' }
   | { type: 'confirmRound' }
+  /** Tutorial: the player has read the note and pressed Next. */
+  | { type: 'tutorialNext' }
   /** Changed your mind: not ready after all (between hands). */
   | { type: 'unready' }
   | { type: 'setWatchedSeat'; seat: number; visible: boolean }
@@ -539,6 +541,17 @@ export function handleCommand(prev: Room, key: string, cmd: Command, now: number
   if (round && round.core.phase !== 'ended' && !matches && !ALWAYS_OK.has(cmd.type)) fail('Follow the tutorial: see the note on the table.');
   if (round && cmd.type === 'reorderHand' && !matches && stage && !('you' in stage && stage.id === 'rearrange')) {
     // Rearranging your hand is always fine.
+  }
+  if (cmd.type === 'tutorialNext') {
+    // After the computer players' moves, the tutorial waits for Next.
+    const room = cloneRoom(prev);
+    const tt = room.tutorial!;
+    if (stage && 'cpu' in stage && tt.step >= stage.cpu.length) {
+      tt.stage++;
+      tt.step = 0;
+      tt.nextAt = now;
+    }
+    return room;
   }
   const room = handleCommandInner(prev, key, cmd, now, rng);
   if (room.tutorial) {
@@ -1128,6 +1141,7 @@ function tutorialTick(prev: Room, now: number, rng: Rng): Room {
   const round = prev.match.round;
   const stage = STAGES[t.stage];
   if (prev.phase !== 'playing' || !round || round.core.phase === 'ended' || !stage || !('cpu' in stage) || now < t.nextAt) return prev;
+  if (t.step >= stage.cpu.length) return prev; // done: waiting for the player's Next
   const [seat, step] = stage.cpu[t.step]!;
   const key = prev.seats[seat]!;
   const hand = round.core.hands[seat]!;
@@ -1150,10 +1164,5 @@ function tutorialTick(prev: Room, now: number, rng: Rng): Room {
   const tt = room.tutorial!;
   tt.step++;
   tt.nextAt = now + TUTORIAL_CPU_GAP_MS;
-  if (tt.step >= stage.cpu.length) {
-    tt.stage++;
-    tt.step = 0;
-    tt.nextAt = now + stage.read;
-  }
   return room;
 }

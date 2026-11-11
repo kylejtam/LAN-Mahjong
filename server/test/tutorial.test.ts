@@ -19,7 +19,11 @@ describe('the tutorial', () => {
     const stageId = () => STAGES[r.tutorial!.stage]!.id;
     /** Let the computer players make their scripted moves. */
     const cpus = (): void => {
-      for (let i = 0; i < 40 && 'cpu' in STAGES[r.tutorial!.stage]!; i++) r = cpuTick(r, (clock += 4000), rng);
+      for (let i = 0; i < 40 && 'cpu' in STAGES[r.tutorial!.stage]!; i++) {
+        r = cpuTick(r, (clock += 4000), rng);
+        // Nothing moves on by itself: after the computer players' moves, you press Next.
+        if (viewFor(r, 'kyle', clock).tutorial?.waitingNext) you({ type: 'tutorialNext' });
+      }
     };
 
     you({ type: 'takeSeat', seat: 0 });

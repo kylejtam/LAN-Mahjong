@@ -989,13 +989,21 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; }
 .ready-tag { background: #3fb56f; color: #08210f; border-radius: 999px; padding: 0 0.5em; font-size: 0.8em; font-weight: 800; margin-left: 0.3em; }
 
 /* The tutorial: a small, quiet note in the corner of the table, and a soft glow on the control to use. */
-.tutorial-guide { position: fixed; left: max(12px, var(--safe-l, 0px)); bottom: 24vh; z-index: 60; max-width: min(22em, 46vw); background: rgba(10, 24, 16, 0.86); color: #fff; border-radius: 8px; padding: 0.45em 0.75em; display: grid; gap: 0.1em; font-size: 0.92rem; box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35); }
+.tutorial-guide { position: fixed; left: max(12px, var(--safe-l, 0px)); bottom: 24vh; z-index: 62; max-width: min(22em, 46vw); background: rgba(10, 24, 16, 0.86); color: #fff; border-radius: 8px; padding: 0.45em 0.75em; display: grid; gap: 0.1em; font-size: 0.92rem; box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35); }
 .tutorial-guide .count { color: #aab3bd; font-size: 0.78em; }
 .tutorial-guide .say { font-weight: 600; }
 .tutorial-guide .why { color: #c3cbd3; font-size: 0.86em; }
 .tutorial-guide .tut-next { justify-self: end; margin-top: 0.3em; }
-.tut-target { outline: 2px solid rgba(255, 255, 255, 0.65); outline-offset: 3px; border-radius: 8px; animation: tut-pulse 1.6s ease-in-out infinite alternate; }
-@keyframes tut-pulse { from { outline-color: rgba(255, 255, 255, 0.7); } to { outline-color: rgba(255, 255, 255, 0.1); } }
+/* What to press next: a gold pulsing outline. */
+.tut-target { outline: 3px solid #f5c542; outline-offset: 3px; border-radius: 8px; animation: tut-pulse 1.1s ease-in-out infinite alternate; }
+@keyframes tut-pulse {
+  from { outline-color: rgba(245, 197, 66, 1); box-shadow: 0 0 12px 4px rgba(245, 197, 66, 0.55); }
+  to { outline-color: rgba(245, 197, 66, 0.35); box-shadow: 0 0 2px 0 rgba(245, 197, 66, 0); }
+}
+/* Everything else is dimmed, with a clear circle around each thing to press (taps elsewhere are blocked). */
+.tut-dim { position: fixed; inset: 0; z-index: 58; pointer-events: none; }
+.tut-dim path { fill: rgba(0, 0, 0, 0.55); pointer-events: visiblePainted; }
+.tut-ring { fill: none; stroke: rgba(245, 197, 66, 0.55); stroke-width: 2; pointer-events: none; }
 @media (prefers-reduced-motion: reduce) { .tut-target { animation: none; } }
 .leave-tutorial { font-size: 0.85em; padding: 0.25em 0.8em; background: none; border: 1px solid #59616d; border-radius: 999px; }
 .tutorial-done { z-index: 70; }

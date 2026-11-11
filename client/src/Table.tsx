@@ -12,9 +12,9 @@
  * your right, the opposite player at the top, the previous player on your left.
  */
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import type { CSSProperties, ReactElement } from 'react';
+import type { CSSProperties, ReactElement, PointerEvent as ReactPointerEvent } from 'react';
 import type { Meld, NormalType, Tile, TileType } from '@lan-mahjong/shared';
-import { DEAL_ANIM_MS, sortHand } from '@lan-mahjong/shared';
+import { DEAL_ANIM_MS, NORMAL_TYPES, findWinShape, sortHand } from '@lan-mahjong/shared';
 import type { ClientMessage } from '../../server/src/protocol';
 import type { RoomView, SeatView } from '../../server/src/game/view';
 import type { Claim } from '../../server/src/game/round';
@@ -27,7 +27,7 @@ import { ChipIcon } from './ChipIcon';
 import { DICE_MS, DiceRoll, DieFace } from './DiceRoll';
 import { buildFromPile, countIntro, countMs, finishIntro, hidePile, introKeyIs, introStackPoint, pileShowing, pileUnits, setIntroStacks, showPile, startIntro, stopIntro } from './TableIntro';
 import { latestPile, onPile } from './pileBus';
-import { TutorialGuide } from './Tutorial';
+import { TutorialGuide, tutorialDiscardTile } from './Tutorial';
 import { APP_VERSION } from './version';
 import { CELEBRATION_STYLES, celebrate } from './celebrate';
 import { ResultPanel } from './ResultPanel';
@@ -240,7 +240,7 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
   const onDrop = (src: DragSource, drop: Drop): void => {
     if (src.kind === 'hand') {
       const gap = reorderRef.current;
-      if (a?.discard && (discardReadyAt(drop.y) || drop.zone === 'discard')) {
+      if (a?.discard && (discardReadyAt(drop.y) || drop.zone === 'discard') && tutorialDiscardTile(view) !== null) {
         command({ type: 'discard', tileId: src.tileId });
       } else if (gap?.over) {
         // Reorder (on this device only): drop it into the gap the other tiles made.
@@ -286,7 +286,16 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
     else if (src.kind === 'wallBack' && a?.drawReplacement) command({ type: 'drawReplacement' });
     else if (src.kind === 'offered') onTapOffered();
   };
-  const { drag, start } = useDrag(onDrop, onTap);
+  const { drag, start: startDrag } = useDrag(onDrop, onTap);
+  /** In the tutorial, a tile the step doesn't ask for can't be picked up on a discard step. */
+  const start = (src: DragSource) => {
+    const go = startDrag(src);
+    return (e: ReactPointerEvent): void => {
+      const only = tutorialDiscardTile(view);
+      if (src.kind === 'hand' && typeof only === 'string' && src.type !== only) return;
+      go(e);
+    };
+  };
 
   // ---------- rearranging your hand: tiles slide apart to show where it will land ----------
   // Natural positions (offsetLeft) are not affected by the sliding, so they stay steady.
@@ -490,7 +499,10 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
     } else if (myHold.kind === 'chow') {
       const ids = a?.chow.length === 1 ? a.chow[0]! : chosenChow;
       ids?.forEach((id) => out.add(id));
-    } else serverHand.forEach((t) => out.add(t.id)); // Wu: your whole hand
+    } else {
+      // Wu: only the tiles that make a set (or the pair) with the claimed tile.
+      winPartners(serverHand, view.seats[bottomSeat]?.melds ?? [], round.offered.tile).forEach((id) => out.add(id));
+    }
     return out;
   })();
   /** Tapping the offered discard claims it (or shows the choices). */
@@ -1126,8 +1138,8 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
             lang={lang}
             panel={panel}
             dealing={!!dealAnim}
-            openingFlowers={openingFlowers?.key === roundKey}
             winMoment={showMoment}
+            sendNext={() => command({ type: 'tutorialNext' })}
             finished={roundOver && showReady === roundKey}
             onDone={onLeave}
           />
@@ -1503,12 +1515,6 @@ function SettingsPanel({
             <button className={prefs.lang === 'zh' ? 'on' : ''} onClick={() => setPrefs({ ...prefs, lang: 'zh' })}>中文</button>
           </div>
 
-          <span>{tr('callAll')}</span>
-          <div className="segmented" title={tr('callAllNote')} data-tut="callAll">
-            <button className={!prefs.callAll ? 'on' : ''} onClick={() => setPrefs({ ...prefs, callAll: false })}>{tr('no')}</button>
-            <button className={prefs.callAll ? 'on' : ''} onClick={() => setPrefs({ ...prefs, callAll: true })}>{tr('yes')}</button>
-          </div>
-
           <span>{tr('celebration')}</span>
           <div className="segmented celebration-choice" data-tut="cele">
             {CELEBRATION_STYLES.map((style) => (
@@ -1523,6 +1529,12 @@ function SettingsPanel({
                 {tr(`celebration_${style}` as StringKey)}
               </button>
             ))}
+          </div>
+
+          <span>{tr('callAll')}</span>
+          <div className="segmented" title={tr('callAllNote')} data-tut="callAll">
+            <button className={!prefs.callAll ? 'on' : ''} onClick={() => setPrefs({ ...prefs, callAll: false })}>{tr('no')}</button>
+            <button className={prefs.callAll ? 'on' : ''} onClick={() => setPrefs({ ...prefs, callAll: true })}>{tr('yes')}</button>
           </div>
         </div>
 
@@ -1900,4 +1912,37 @@ function PausedCard({ view, lang }: { view: RoomView; lang: Prefs['lang'] }): Re
       </div>
     </div>
   );
+}
+
+/**
+ * Winning on a discard: the tiles in your hand that make a set (or the pair) together with
+ * the claimed tile, so only they glow. Empty if the hand's shape can't be worked out.
+ */
+function winPartners(hand: Tile[], melds: Meld[], claimed: Tile): number[] {
+  const shape = findWinShape([...hand, claimed], melds);
+  if (!shape) return [];
+  if (shape.kind !== 'standard') return hand.map((t) => t.id); // special hands: every tile counts
+  const d = shape.decompositions[0];
+  if (!d) return [];
+  const want = NORMAL_TYPES.indexOf(claimed.type as NormalType);
+  const pick = (types: string[]): number[] => {
+    const left = [...hand];
+    const ids: number[] = [];
+    let skipped = false;
+    for (const type of types) {
+      if (type === claimed.type && !skipped) {
+        skipped = true; // that one is the claimed tile itself
+        continue;
+      }
+      const i = left.findIndex((t) => t.type === type);
+      if (i >= 0) ids.push(left.splice(i, 1)[0]!.id);
+    }
+    return ids;
+  };
+  if (d.pair === want) return pick([claimed.type, claimed.type]);
+  for (const set of d.sets) {
+    const types = set.kind === 'pong' ? [0, 0, 0].map(() => NORMAL_TYPES[set.start]!) : [0, 1, 2].map((k) => NORMAL_TYPES[set.start + k]!);
+    if (types.includes(claimed.type as NormalType)) return pick(types);
+  }
+  return [];
 }

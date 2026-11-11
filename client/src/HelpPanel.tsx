@@ -44,7 +44,7 @@ export function HelpPanel({ lang, onClose }: { lang: Lang; onClose: () => void }
             <p className="muted">{tr('helpNote', { n: MAX_FAN })}</p>
           </div>
         </div>
-        <button className="btn" onClick={onClose}>{tr('close')}</button>
+        <button className="btn help-close" onClick={onClose}>{tr('close')}</button>
       </div>
     </div>
   );
