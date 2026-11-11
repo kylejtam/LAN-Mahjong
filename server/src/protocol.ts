@@ -21,6 +21,8 @@ export interface GameListEntry {
 export type ClientMessage =
   | { type: 'listGames' }
   | { type: 'joinGame'; gameId: string; name: string }
+  /** Start a private tutorial game (with 3 computer players). */
+  | { type: 'startTutorial'; name: string }
   | { type: 'command'; command: Command }
   /** Check-in every few seconds: proves the connection works. rev = the last state this device has. */
   | { type: 'ping'; rev?: number }

@@ -20,7 +20,7 @@
  *   empty seat; during a round the game waits on it until the host adds a CPU.
  *   (To hand over to a spectator, use a swap instead of dropping out.)
  */
-import { DEFAULT_SETTINGS, GameSettings, INTRO_BUILD_MS, NormalType, Rng, SEATS, Tile, introAfterRollMs } from '@lan-mahjong/shared';
+import { DEFAULT_SETTINGS, GameSettings, INTRO_BUILD_MS, NormalType, Rng, SEATS, Tile, TileType, introAfterRollMs } from '@lan-mahjong/shared';
 import { MatchState, beginRound, closeRound, matchLabel, newMatch } from './match.js';
 import {
   Claim,
@@ -45,6 +45,7 @@ import {
   undo,
 } from './round.js';
 import { cpuMove } from './cpu.js';
+import { ALWAYS_OK, STAGES, TUTORIAL_CPUS, TUTORIAL_CPU_GAP_MS, TutorialCmd, tutorialRound } from './tutorial.js';
 
 export type CpuDifficulty = 'easy' | 'medium' | 'hard';
 /** How long CPUs wait before each move (seconds), set on the host page. Same for every level. */
@@ -138,6 +139,11 @@ export interface Room {
   /** Last time anything changed (used to pace CPU moves). */
   lastChangeAt: number;
   ended: boolean;
+  /**
+   * The tutorial (a private practice game): which step it's on, the next computer move
+   * in that step, when it may happen, and how many times Ready was pressed.
+   */
+  tutorial?: { stage: number; step: number; nextAt: number; readyPresses: number };
   /** Finished hands, oldest first (may be missing in old save files). */
   history?: HandRecord[];
   /** Seconds each CPU waits before a move (missing in old save files = default). */
@@ -263,6 +269,7 @@ function cloneRoom(prev: Room): Room {
     undoWinVotes: prev.undoWinVotes.slice(),
     pendingSwap: prev.pendingSwap ? { ...prev.pendingSwap } : null,
     match: { ...prev.match, settings: { ...prev.match.settings } },
+    tutorial: prev.tutorial ? { ...prev.tutorial } : undefined,
   };
 }
 
@@ -419,6 +426,8 @@ function makeCpu(room: Room, seat: number, difficulty: CpuDifficulty): string {
 /** If everyone needed has pressed Start, move on to the dice roll. */
 function maybeBeginRolling(room: Room): void {
   if (room.phase !== 'betweenRounds') return;
+  // The tutorial asks for Ready, Unready, then Ready again before the hand starts.
+  if (room.tutorial && room.tutorial.readyPresses < 2) return;
   if (room.seats.some((s) => s === null)) return;
   if (seatedHumans(room).every((k) => room.startPressed.includes(k))) {
     room.phase = 'rolling';
@@ -520,6 +529,33 @@ function maybeUndoWin(room: Room): void {
 // ---------- commands ----------
 
 export function handleCommand(prev: Room, key: string, cmd: Command, now: number, rng: Rng): Room {
+  const t = prev.tutorial;
+  if (!t || prev.people[key]?.cpu) return handleCommandInner(prev, key, cmd, now, rng);
+  // The tutorial: during the hand, only the move the current step asks for is allowed.
+  const round = prev.phase === 'playing' ? prev.match.round : null;
+  const stage = STAGES[t.stage];
+  const tileType = (id: number): TileType | undefined => round?.core.hands.flat().find((x) => x.id === id)?.type;
+  const matches = !!round && !!stage && 'you' in stage && stage.you(cmd as TutorialCmd, tileType);
+  if (round && round.core.phase !== 'ended' && !matches && !ALWAYS_OK.has(cmd.type)) fail('Follow the tutorial: see the note on the table.');
+  if (round && cmd.type === 'reorderHand' && !matches && stage && !('you' in stage && stage.id === 'rearrange')) {
+    // Rearranging your hand is always fine.
+  }
+  const room = handleCommandInner(prev, key, cmd, now, rng);
+  if (room.tutorial) {
+    if (cmd.type === 'pressStart') {
+      room.tutorial.readyPresses++;
+      maybeBeginRolling(room);
+    }
+    if (matches) {
+      room.tutorial.stage++;
+      room.tutorial.step = 0;
+      room.tutorial.nextAt = now + 900;
+    }
+  }
+  return room;
+}
+
+function handleCommandInner(prev: Room, key: string, cmd: Command, now: number, rng: Rng): Room {
   if (prev.ended) fail('This game has ended.');
   const actor = prev.people[key];
   if (!actor) fail('You are not in this game.');
@@ -913,7 +949,8 @@ function cleanupAfterSeatChange(room: Room, oldKey: string): void {
 }
 
 function startDealing(room: Room, rng: Rng): void {
-  room.match = beginRound(room.match, rng);
+  // The tutorial deals its prepared hand.
+  room.match = room.tutorial && !room.match.round ? { ...room.match, round: tutorialRound(room.match.roundWind, rng) } : beginRound(room.match, rng);
   room.phase = 'playing';
   room.confirmed = [];
   room.undoWinVotes = [];
@@ -988,6 +1025,7 @@ export function settleWall(prev: Room, now: number): Room {
  * The server calls this regularly.
  */
 export function cpuTick(prev: Room, now: number, rng: Rng): Room {
+  if (prev.tutorial) return tutorialTick(prev, now, rng);
   if (pausedBy(prev).length > 0) return prev; // someone lost their connection: everyone waits
   if (prev.ended || now - prev.lastChangeAt < cpuDelay(prev) || now < (prev.cpuPauseUntil ?? 0)) return prev;
   const cpuSeats = prev.seats
@@ -1058,4 +1096,64 @@ export function cpuTick(prev: Room, now: number, rng: Rng): Room {
     }
   }
   return prev;
+}
+
+// ---------- the tutorial ----------
+
+/** A private tutorial game for one player, with Ming, Fong and Kei (CPUs). */
+export function createTutorialRoom(id: string, now: number): Room {
+  const room = createRoom({ id, name: 'Tutorial', startingBalance: 200, now });
+  room.tutorial = { stage: 0, step: 0, nextAt: 0, readyPresses: 0 };
+  TUTORIAL_CPUS.forEach((name, i) => {
+    const key = `cpu-${name.toLowerCase()}`;
+    room.people[key] = {
+      key,
+      name: `${name} (CPU)`,
+      joinOrder: room.nextJoinOrder++,
+      connected: true,
+      balance: 200,
+      cpu: 'easy',
+      cpuName: name,
+      watchingSeats: [],
+      prefs: {},
+    };
+    room.seats[i + 1] = key;
+  });
+  return room;
+}
+
+/** The tutorial's computer players make their scripted moves, one at a time. */
+function tutorialTick(prev: Room, now: number, rng: Rng): Room {
+  const t = prev.tutorial!;
+  const round = prev.match.round;
+  const stage = STAGES[t.stage];
+  if (prev.phase !== 'playing' || !round || round.core.phase === 'ended' || !stage || !('cpu' in stage) || now < t.nextAt) return prev;
+  const [seat, step] = stage.cpu[t.step]!;
+  const key = prev.seats[seat]!;
+  const hand = round.core.hands[seat]!;
+  const id = (type: string, from: Tile[] = hand): number => from.find((x) => x.type === type)!.id;
+  let cmd: Command;
+  if (step.type === 'discard') cmd = { type: 'discard', tileId: id(step.tile!) };
+  else if (step.type === 'claim') {
+    const base = round.window?.base.hands[seat] ?? hand;
+    const c = step.claim!;
+    cmd = c.kind === 'chow' ? { type: 'claim', claim: { kind: 'chow', tileIds: [id(c.tiles![0]!, base), id(c.tiles![1]!, base)] } } : { type: 'claim', claim: { kind: c.kind as 'pong' | 'gong' | 'win' } };
+  } else cmd = { type: step.type } as Command;
+  let room: Room;
+  try {
+    room = handleCommandInner(prev, key, cmd, now, rng);
+  } catch (err) {
+    // Shouldn't happen; skip the move rather than stop the tutorial.
+    console.error('Tutorial move failed', step, err);
+    room = cloneRoom(prev);
+  }
+  const tt = room.tutorial!;
+  tt.step++;
+  tt.nextAt = now + TUTORIAL_CPU_GAP_MS;
+  if (tt.step >= stage.cpu.length) {
+    tt.stage++;
+    tt.step = 0;
+    tt.nextAt = now + stage.read;
+  }
+  return room;
 }

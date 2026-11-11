@@ -19,7 +19,7 @@ import QRCode from 'qrcode';
 import { WebSocketServer, WebSocket } from 'ws';
 import { Rng } from '@lan-mahjong/shared';
 import { CLAIM_AFTER_DRAW_MS, GRACE_MS, GameError, WIN_OVERRIDE_MS, lastTileDeadline } from './game/round.js';
-import { Room, cpuTick, settleWall, createRoom, disconnect, handleCommand, handleHostCommand, joinRoom, nameKey } from './game/room.js';
+import { Room, cpuTick, settleWall, createRoom, createTutorialRoom, disconnect, handleCommand, handleHostCommand, joinRoom, nameKey } from './game/room.js';
 import { matchLabel } from './game/match.js';
 import { hostViewOf, viewFor } from './game/view.js';
 import { ClientMessage, GameListEntry, HostMessage, ServerHostMessage, ServerMessage } from './protocol.js';
@@ -143,7 +143,7 @@ export async function startServer(opts: ServerOptions): Promise<RunningServer> {
   const saveNow = (): void => {
     if (!opts.dataFile) return;
     try {
-      saveRooms(opts.dataFile, rooms.values());
+      saveRooms(opts.dataFile, [...rooms.values()].filter((r) => !r.tutorial));
     } catch (err) {
       console.error('Could not save games:', err);
     }
@@ -163,7 +163,7 @@ export async function startServer(opts: ServerOptions): Promise<RunningServer> {
 
   const gameList = (): GameListEntry[] =>
     [...rooms.values()]
-      .filter((r) => !r.ended)
+      .filter((r) => !r.ended && !r.tutorial)
       .sort((a, b) => a.createdAt - b.createdAt)
       .map((r) => ({
         id: r.id,
@@ -188,7 +188,7 @@ export async function startServer(opts: ServerOptions): Promise<RunningServer> {
     if (hostSockets.size === 0) return;
     const msg: ServerHostMessage = {
       type: 'hostState',
-      games: [...rooms.values()].sort((a, b) => a.createdAt - b.createdAt).map(hostViewOf),
+      games: [...rooms.values()].filter((r) => !r.tutorial).sort((a, b) => a.createdAt - b.createdAt).map(hostViewOf),
       urls: urlsFor(actualPortOf()),
     };
     for (const ws of hostSockets) send(ws, msg);
@@ -254,6 +254,18 @@ export async function startServer(opts: ServerOptions): Promise<RunningServer> {
         else Object.assign(h, { x, y, on, at: now() });
         return;
       }
+      case 'startTutorial': {
+        // A private practice game for this player, with 3 computer players.
+        const name = String(msg.name ?? '').trim() || 'You';
+        disconnectClient(c);
+        const room = createTutorialRoom(`tutorial-${randomUUID()}`, now());
+        const { room: joined, person } = joinRoom(room, name, now());
+        c.roomId = joined.id;
+        c.key = person.key;
+        send(ws, { type: 'joined', gameId: joined.id, name: person.name });
+        setRoom(joined);
+        return;
+      }
       case 'ping': {
         // A device checking in. If it missed an update, send it the latest state now.
         const room = c.roomId ? rooms.get(c.roomId) : undefined;
@@ -305,10 +317,18 @@ export async function startServer(opts: ServerOptions): Promise<RunningServer> {
       case 'leaveGame': {
         const room = c.roomId ? rooms.get(c.roomId) : undefined;
         if (room && c.key) {
-          const updated = handleCommand(room, c.key, { type: 'leaveGame' }, now(), rng);
-          c.roomId = null;
-          c.key = null;
-          setRoom(updated);
+          if (room.tutorial) {
+            // Leaving the tutorial: it's gone.
+            c.roomId = null;
+            c.key = null;
+            rooms.delete(room.id);
+            piles.delete(room.id);
+          } else {
+            const updated = handleCommand(room, c.key, { type: 'leaveGame' }, now(), rng);
+            c.roomId = null;
+            c.key = null;
+            setRoom(updated);
+          }
         }
         send(ws, { type: 'games', games: gameList() });
         return;
@@ -528,6 +548,12 @@ export async function startServer(opts: ServerOptions): Promise<RunningServer> {
   const tick = (): void => {
     const t = now();
     for (const room of [...rooms.values()]) {
+      // A tutorial nobody has had open for 10 minutes is cleared away.
+      if (room.tutorial && t - room.lastChangeAt > 600_000 && ![...clients.values()].some((c) => c.roomId === room.id)) {
+        rooms.delete(room.id);
+        piles.delete(room.id);
+        continue;
+      }
       const settled = settleWall(room, t);
       if (settled !== room) {
         setRoom(settled);

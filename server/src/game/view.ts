@@ -13,6 +13,7 @@
  */
 import { GameSettings, Meld, SEATS, Tile, tilesLeft } from '@lan-mahjong/shared';
 import { closeRound, matchLabel } from './match.js';
+import { STAGES } from './tutorial.js';
 import { AvailableActions, CLAIM_AFTER_DRAW_MS, DiscardEntry, Phase, RoundResult, availableActions, currentPlayer, lastMover, undoProblem } from './round.js';
 import { CpuDifficulty, DEFAULT_CPU_SECONDS, HandRecord, HistoryEdit, PendingSwap, Room, RoomPhase, TableColour, pendingChange, roundCanClose, seatOf, undoableForSeat, pausedBy } from './room.js';
 import { sortHand } from '@lan-mahjong/shared';
@@ -78,6 +79,7 @@ export interface RoomView {
   /** Once the hand is over: true if it was the last hand of the whole game. */
   lastHand: boolean;
   pausedSeats: number[];
+  tutorial: { stage: string } | null;
   /** The server's clock when this was sent (to show "disconnected 14 seconds ago"). */
   serverNow: number;
   /** Your buttons. Null if you are not seated or no round is on. */
@@ -201,6 +203,8 @@ export function viewFor(room: Room, viewerKey: string, now: number): RoomView {
     ...nextGame(room),
     /** Seats whose player lost their connection mid-hand: the game waits for them. */
     pausedSeats: pausedBy(room).map((k) => room.seats.indexOf(k)),
+    /** In the tutorial: the step it's on (see tutorial.ts). */
+    tutorial: room.tutorial ? { stage: STAGES[room.tutorial.stage]?.id ?? 'won' } : null,
     serverNow: now,
     actions: round && mySeat !== null ? withRoomUndo(room, availableActions(round, mySeat, now)) : null,
     /** At an all-CPU table, spectators confirm the end of a round. */

@@ -49,6 +49,16 @@ export function Lobby({ conn, prefs, setPrefs }: { conn: Connection; prefs: Pref
       {conn.status !== 'open' && <p className="muted">{t(lang, 'connecting')}</p>}
       {conn.status === 'open' && conn.games.length === 0 && <p className="muted">{t(lang, 'noGames')}</p>}
       <ul className="game-list">
+        {/* Always here, even before the host has made a game: learn the controls. */}
+        {conn.status === 'open' && (
+          <li>
+            <div>
+              <b>{t(lang, 'tutorial')}</b>
+              <div className="muted small">{t(lang, 'tutorialAbout')}</div>
+            </div>
+            <button className="btn primary" onClick={() => conn.startTutorial(name.trim())}>{t(lang, 'start')}</button>
+          </li>
+        )}
         {conn.games.map((g) => (
           <li key={g.id}>
             <div>

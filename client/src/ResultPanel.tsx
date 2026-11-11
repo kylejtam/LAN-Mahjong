@@ -161,11 +161,11 @@ export function ResultPanel({ view, lang, command, canClaimWin, onWin, winLabel,
         <div className="row">
           {canClaimWin && <button className="act act-win" onClick={onWin}>{winLabel}</button>}
           {wallCount > 0 && (
-            <button className="btn" onClick={() => setShowWall(true)}>{tr('remainingTiles')}</button>
+            <button className="btn remaining-btn" onClick={() => setShowWall(true)}>{tr('remainingTiles')}</button>
           )}
           {me && (
             // Next: back to the table (after the last hand: the final scores).
-            <button className="btn primary big" onClick={onContinue}>{tr('continue')}</button>
+            <button className="btn primary big continue-btn" onClick={onContinue}>{tr('continue')}</button>
           )}
           {!me && view.spectatorsConfirm && (
             // All-CPU table: a spectator moves the game on to the next hand.

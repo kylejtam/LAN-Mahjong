@@ -27,6 +27,7 @@ import { ChipIcon } from './ChipIcon';
 import { DICE_MS, DiceRoll, DieFace } from './DiceRoll';
 import { buildFromPile, countIntro, countMs, finishIntro, hidePile, introKeyIs, introStackPoint, pileShowing, pileUnits, setIntroStacks, showPile, startIntro, stopIntro } from './TableIntro';
 import { latestPile, onPile } from './pileBus';
+import { TutorialGuide } from './Tutorial';
 import { APP_VERSION } from './version';
 import { CELEBRATION_STYLES, celebrate } from './celebrate';
 import { ResultPanel } from './ResultPanel';
@@ -168,6 +169,12 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
       return null;
     }
   });
+  /** The tutorial needs to know when you rearrange your hand (normally only this device knows). */
+  const tellTutorialReordered = (ids: number[]): void => {
+    if (!view.tutorial || !serverHand) return;
+    const rest = serverHand.map((t) => t.id).filter((id) => !ids.includes(id));
+    command({ type: 'reorderHand', tileIds: [...ids, ...rest] });
+  };
   const setManual = (m: { key: string; ids: number[] }): void => {
     setManualState(m);
     try {
@@ -241,6 +248,7 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
         const ids = [...gap.otherIds];
         ids.splice(gap.target, 0, src.tileId);
         setManual({ key: roundKey, ids });
+        tellTutorialReordered(ids);
       } else if (drop.zone === 'hand') {
         // Reorder (on this device only): put the tile where it was dropped.
         const els = [...document.querySelectorAll<HTMLElement>('[data-hand-tile]')].filter(
@@ -255,6 +263,7 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
         const ids = others.map((el) => Number(el.dataset.handTile));
         ids.splice(index, 0, src.tileId);
         setManual({ key: roundKey, ids });
+        tellTutorialReordered(ids);
       }
     } else if (src.kind === 'wallFront' && drop.zone === 'hand' && a?.draw) {
       command({ type: 'draw' });
@@ -1019,7 +1028,8 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
           )}
         </div>
         <div className="topbar-centre">
-          <span className="round-label">{(showReady === roundKey && view.nextLabel ? view.nextLabel : view.label)[lang]}</span>
+          <span className="round-label">{view.tutorial ? `${tr('tutorial')} · ` : ''}{(showReady === roundKey && view.nextLabel ? view.nextLabel : view.label)[lang]}</span>
+          {view.tutorial && <button className="btn leave-tutorial" onClick={onLeave}>{tr('leaveTutorial')}</button>}
           <span className="min-fan" title={tr('minFanTitle')}>{tr('minFanShort', { n: view.settings.minFan })}</span>
           <span className="compass">
             {SIDES.map((side) => {
@@ -1037,8 +1047,8 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
             <span className="chip-total"><ChipIcon size="1.05em" />{me.balance}</span>
           )}
           <FullscreenButton title={tr('fullscreen')} />
-          <button className="btn icon" title={tr('help')} onClick={() => setPanel('help')}>?</button>
-          <button className="btn icon" title={tr('settings')} onClick={() => setPanel('settings')}>⚙</button>
+          <button className="btn icon help-btn" title={tr('help')} onClick={() => setPanel('help')}>?</button>
+          <button className="btn icon settings-btn" title={tr('settings')} onClick={() => setPanel('settings')}>⚙</button>
         </div>
       </header>
 
@@ -1110,6 +1120,18 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
           );
         })}
         <PausedCard view={view} lang={lang} />
+        {view.tutorial && (
+          <TutorialGuide
+            view={view}
+            lang={lang}
+            panel={panel}
+            dealing={!!dealAnim}
+            openingFlowers={openingFlowers?.key === roundKey}
+            winMoment={showMoment}
+            finished={roundOver && showReady === roundKey}
+            onDone={onLeave}
+          />
+        )}
         {openingFlowers?.key === roundKey &&
           openingFlowers.items.map((o) => (
             <div key={o.seat} className="opening-flowers" style={{ left: o.x, top: o.y }} aria-label={personName(view.seats[o.seat]?.name, lang)}>
@@ -1195,6 +1217,7 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
                 <span
                   key={t.id}
                   data-hand-tile={t.id}
+                  data-type={t.type}
                   className={`hand-tile${drag?.moved && drag.src.kind === 'hand' && drag.src.tileId === t.id ? (handGap?.over ? ' dragging gap' : ' dragging') : ''}${
                     chowLit ? (chowLit.has(t.type) ? (t.type === chowPick?.first ? ' chow-pick chow-first' : ' chow-pick') : ' chow-faded') : holdGlow.has(t.id) ? ` hold-glow hold-${myHold!.kind}` : ''
                   }`}
@@ -1211,6 +1234,7 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
               key={drawnTile.id}
               ref={drawnRef}
               data-hand-tile={drawnTile.id}
+              data-type={drawnTile.type}
               data-drawn="true"
               className={`hand-tile drawn-tile${drag?.moved && drag.src.kind === 'hand' && drag.src.tileId === drawnTile.id ? ' dragging' : ''}`}
               onPointerDown={start({ kind: 'hand', tileId: drawnTile.id, type: drawnTile.type })}
@@ -1521,6 +1545,7 @@ function SettingsPanel({
           <label htmlFor="name-input">{tr('yourName')}</label>
           <form
             className="name-row"
+            data-tut="name"
             onSubmit={(e) => {
               e.preventDefault();
               if (nameChanged) command({ type: 'rename', newName: name.trim() });
@@ -1531,19 +1556,19 @@ function SettingsPanel({
           </form>
 
           <span>{tr('language')}</span>
-          <div className="segmented">
+          <div className="segmented" data-tut="lang">
             <button className={prefs.lang === 'en' ? 'on' : ''} onClick={() => setPrefs({ ...prefs, lang: 'en' })}>English</button>
             <button className={prefs.lang === 'zh' ? 'on' : ''} onClick={() => setPrefs({ ...prefs, lang: 'zh' })}>中文</button>
           </div>
 
           <span>{tr('callAll')}</span>
-          <div className="segmented" title={tr('callAllNote')}>
+          <div className="segmented" title={tr('callAllNote')} data-tut="callAll">
             <button className={!prefs.callAll ? 'on' : ''} onClick={() => setPrefs({ ...prefs, callAll: false })}>{tr('no')}</button>
             <button className={prefs.callAll ? 'on' : ''} onClick={() => setPrefs({ ...prefs, callAll: true })}>{tr('yes')}</button>
           </div>
 
           <span>{tr('celebration')}</span>
-          <div className="segmented celebration-choice">
+          <div className="segmented celebration-choice" data-tut="cele">
             {CELEBRATION_STYLES.map((style) => (
               <button
                 key={style}
@@ -1559,7 +1584,7 @@ function SettingsPanel({
           </div>
         </div>
 
-        <div className="row">
+        <div className="row" data-tut="leave">
           {mySeat !== null && (
             <button className="btn" onClick={() => { command({ type: 'dropOut', replacement: { none: true } }); onClose(); }}>
               {tr('leaveMySeat')}

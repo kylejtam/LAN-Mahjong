@@ -45,6 +45,8 @@ export interface Connection {
   ended: boolean;
   send: (msg: ClientMessage) => void;
   join: (gameId: string, name: string) => void;
+  /** Start a private tutorial game. */
+  startTutorial: (name: string) => void;
   leave: () => void;
   dismissEnded: () => void;
 }
@@ -210,6 +212,14 @@ export function useConnection(): Connection {
     [send],
   );
 
+  const startTutorial = useCallback(
+    (name: string) => {
+      session.current = null;
+      send({ type: 'startTutorial', name });
+    },
+    [send],
+  );
+
   const leave = useCallback(() => {
     send({ type: 'leaveGame' });
     session.current = null;
@@ -217,5 +227,5 @@ export function useConnection(): Connection {
     setView(null);
   }, [send, setView]);
 
-  return { status, games, view, error, ended, send, join, leave, dismissEnded: () => setEnded(false) };
+  return { status, games, view, error, ended, send, join, startTutorial, leave, dismissEnded: () => setEnded(false) };
 }
