@@ -13,7 +13,7 @@
  */
 import { GameSettings, Meld, SEATS, Tile, tilesLeft } from '@lan-mahjong/shared';
 import { closeRound, matchLabel } from './match.js';
-import { AvailableActions, CLAIM_AFTER_DRAW_MS, DiscardEntry, Phase, RoundResult, availableActions, currentPlayer } from './round.js';
+import { AvailableActions, CLAIM_AFTER_DRAW_MS, DiscardEntry, Phase, RoundResult, availableActions, currentPlayer, lastMover, undoProblem } from './round.js';
 import { CpuDifficulty, DEFAULT_CPU_SECONDS, HandRecord, HistoryEdit, PendingSwap, Room, RoomPhase, TableColour, pendingChange, roundCanClose, seatOf, undoableForSeat } from './room.js';
 import { sortHand } from '@lan-mahjong/shared';
 
@@ -61,6 +61,7 @@ export interface RoomView {
     wallCount: number;
     /** The tile that can currently be claimed, if any. */
     offered: { tile: Tile; by: number } | null;
+    holds: { seat: number; kind: 'chow' | 'pong' | 'gong' | 'win' | null }[];
     offeredDrawn: boolean;
     /** After the next player drew: how long others can still claim (ms, when this was sent). */
     claimMsLeft: number | null;
@@ -93,9 +94,9 @@ export interface RoomView {
 function withRoomUndo(room: Room, a: AvailableActions): AvailableActions {
   const round = room.match.round;
   if (a.undo || !round) return a;
-  const current = currentPlayer(round);
-  const last = round.history[round.history.length - 1];
-  const ok = current !== null && !!last && last.move !== 'win' && undoableForSeat(room, current);
+  // Anyone seated may undo a CPU's (or an empty seat's) last move.
+  const mover = lastMover(round);
+  const ok = mover !== null && undoableForSeat(room, mover) && undoProblem(round, mover, false) === null;
   return ok ? { ...a, undo: true } : a;
 }
 
@@ -180,6 +181,8 @@ export function viewFor(room: Room, viewerKey: string, now: number): RoomView {
           wall: round.core.wall.stacks.map((s) => ({ seat: s.seat, position: s.position, count: s.tiles.length })),
           wallCount: tilesLeft(round.core.wall),
           offered: round.window ? { tile: round.window.tile, by: round.window.by } : null,
+          /** Who is holding the offered tile while they decide (kind null: not chosen yet). Public. */
+          holds: round.window?.holds ?? [],
           /** The next player has drawn: claim buttons are hidden (a quick tap on the tile still works for 3 s). */
           offeredDrawn: round.window?.status.type === 'drawn',
           claimMsLeft:

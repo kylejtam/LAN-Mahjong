@@ -96,6 +96,12 @@ const en = {
   justWatch: 'Just watch',
   ready: 'Ready',
   remainingTiles: 'Remaining tiles',
+  callAll: 'Call all possible claims',
+  callAllNote: 'Any tile you could claim is held for you, so it never slips past.',
+  hintWaitClaim: 'Waiting for {name} to decide on the tile',
+  hintHolding: 'Tap Confirm to claim, or Cancel to let it go',
+  no: 'No',
+  yes: 'Yes',
   fullscreen: 'Fullscreen',
   // swaps
   swapInTitle: 'Swap in?',
@@ -227,6 +233,12 @@ const zh: Strings = {
   justWatch: '淨係睇',
   ready: '準備好',
   remainingTiles: '剩餘牌',
+  callAll: '自動叫所有可以食嘅牌',
+  callAllNote: '凡係你可以食嘅牌，都會自動幫你留住，唔會走甩。',
+  hintWaitClaim: '等緊{name}決定要唔要呢隻牌',
+  hintHolding: '撳確定食牌，或者撳取消放棄',
+  no: '唔要',
+  yes: '要',
   fullscreen: '全螢幕',
   swapInTitle: '換入嚟？',
   swapInText: '{name} 想你頂佢個位。',
@@ -328,8 +340,10 @@ export interface Prefs {
   lang: Lang;
   /** Confetti style when someone wins (only changes this player's screen). */
   celebration: CelebrationStyle;
+  /** "Call all possible claims": hold every tile you could claim automatically. */
+  callAll: boolean;
 }
-export const DEFAULT_PREFS: Prefs = { lang: 'en', celebration: 'cannons' };
+export const DEFAULT_PREFS: Prefs = { lang: 'en', celebration: 'cannons', callAll: false };
 const PREFS_KEY = 'lan-mahjong-prefs';
 
 export function loadPrefs(): Prefs {
@@ -354,6 +368,7 @@ export function cleanPrefs(raw: unknown): Partial<Prefs> {
     const r = raw as Record<string, unknown>;
     if (r.lang === 'en' || r.lang === 'zh') out.lang = r.lang;
     if (CELEBRATION_STYLES.includes(r.celebration as CelebrationStyle)) out.celebration = r.celebration as CelebrationStyle;
+    if (typeof r.callAll === 'boolean') out.callAll = r.callAll;
   }
   return out;
 }

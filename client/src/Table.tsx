@@ -399,10 +399,31 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
   }, [showMoment]);
 
   // ---------- action buttons ----------
-  const onWin = (): void => (a?.selfDrawWin ? command({ type: 'selfDrawWin' }) : doClaim({ kind: 'win' }));
-  const onPong = (): void => doClaim({ kind: 'pong' });
+  // Claiming a discard is two taps: the first holds the tile (the next player has to wait,
+  // and everyone sees your bubble), the second (Confirm) claims it. Cancel lets it go.
+  const myHold = mySeat !== null ? round?.holds.find((h) => h.seat === mySeat) ?? null : null;
+  const hold = (kind: 'chow' | 'pong' | 'gong' | 'win'): void => command({ type: 'hold', kind });
+  const cancelHold = (): void => {
+    setChowPick(null);
+    setChosenChow(null);
+    command({ type: 'releaseHold' });
+  };
+  const [chosenChow, setChosenChow] = useState<[number, number] | null>(null);
+  const onConfirm = (): void => {
+    if (!myHold?.kind) return;
+    if (myHold.kind === 'chow') {
+      const ids = a?.chow.length === 1 ? a.chow[0]! : chosenChow;
+      if (!ids) return;
+      setChosenChow(null);
+      setChowPick(null);
+      return doClaim({ kind: 'chow', tileIds: ids });
+    }
+    doClaim({ kind: myHold.kind } as Claim);
+  };
+  const onWin = (): void => (a?.selfDrawWin ? command({ type: 'selfDrawWin' }) : hold('win'));
+  const onPong = (): void => hold('pong');
   const onGong = (): void => {
-    if (a?.gong) return doClaim({ kind: 'gong' });
+    if (a?.gong && claimable) return hold('gong');
     if (!a) return;
     if (ownGongs === 1) {
       const t = a.concealedGongs[0] ?? a.addedGongs[0]!;
@@ -410,10 +431,11 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
     } else setChooser({ kind: 'ownGong', concealed: a.concealedGongs, added: a.addedGongs });
   };
   const onChow = (): void => {
-    if (!a) return;
-    if (a.chow.length === 1) doClaim({ kind: 'chow', tileIds: a.chow[0]! });
-    else if (chowPick) setChowPick(null); // tapping Soeng again stops choosing
-    else if (round?.offered) setChowPick({ offerId: round.offered.tile.id, first: null });
+    if (!a || !round?.offered) return;
+    hold('chow');
+    setChosenChow(null);
+    // Several ways to Soeng: the possible tiles glow, and you tap the ones you want.
+    if (a.chow.length > 1) setChowPick({ offerId: round.offered.tile.id, first: null });
   };
   /** Each Soeng you could make: the two tile ids and their types. */
   const chowOptions = (a?.chow ?? []).map((ids) => ({ ids, types: ids.map((id) => serverHand?.find((t) => t.id === id)?.type) as TileType[] }));
@@ -430,13 +452,15 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
     const first = chowPick.first;
     const matches = chowOptions.filter((o) => o.types.includes(type) && (!first || o.types.includes(first)));
     if (matches.length === 1) {
+      // Chosen: these two glow until you press Confirm.
       setChowPick(null);
-      doClaim({ kind: 'chow', tileIds: matches[0]!.ids });
+      setChosenChow(matches[0]!.ids);
     } else setChowPick({ ...chowPick, first: type }); // in two runs: keep only its partners lit
   };
   // Stop choosing when the chance to claim has gone (or a different tile is offered).
   useEffect(() => {
     if (chowPick && (!claimable || !a?.chow.length || round?.offered?.tile.id !== chowPick.offerId)) setChowPick(null);
+    if (chosenChow && myHold?.kind !== 'chow') setChosenChow(null);
   });
   // Tapping anywhere outside your hand starts the choice again.
   useEffect(() => {
@@ -447,6 +471,19 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
     window.addEventListener('pointerdown', away);
     return () => window.removeEventListener('pointerdown', away);
   }, [chowPick?.first]);
+  /** While holding a claim: the tiles in your hand it would use glow in its colour. */
+  const holdGlow = ((): Set<number> => {
+    const out = new Set<number>();
+    if (!myHold?.kind || !serverHand || !round?.offered) return out;
+    const type = round.offered.tile.type;
+    if (myHold.kind === 'pong' || myHold.kind === 'gong') {
+      serverHand.filter((t) => t.type === type).slice(0, myHold.kind === 'pong' ? 2 : 3).forEach((t) => out.add(t.id));
+    } else if (myHold.kind === 'chow') {
+      const ids = a?.chow.length === 1 ? a.chow[0]! : chosenChow;
+      ids?.forEach((id) => out.add(id));
+    } else serverHand.forEach((t) => out.add(t.id)); // Wu: your whole hand
+    return out;
+  })();
   /** Tapping the offered discard claims it (or shows the choices). */
   const onTapOffered = (): void => {
     if (!a || !claimOptions) return;
@@ -465,7 +502,10 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
   const waitingOnEmptySeat = !!round && round.phase !== 'ended' && !turnName;
   let hint = '';
   if (view.phase === 'playing' && round && round.phase !== 'ended') {
+    const otherHold = round.holds.find((h) => h.seat !== mySeat);
     if (chowPick) hint = tr('hintPickChow');
+    else if (myHold?.kind) hint = tr('hintHolding');
+    else if (otherHold && round.turn === mySeat) hint = tr('hintWaitClaim', { name: personName(view.seats[otherHold.seat]?.name, lang) });
     else if (a?.draw) hint = tr('hintDraw');
     else if (a?.drawReplacement) hint = tr('hintReplace');
     else if (a?.discard) hint = tr('hintDiscard');
@@ -975,6 +1015,20 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
             ))}
           </div>
         )}
+        {/* Someone is holding the offered tile: their bubble stays by their name until they
+            confirm (then the usual claim pop-up) or cancel. Not chosen yet: no words, and it
+            fades through all the claim colours. */}
+        {round?.holds.map((h) => {
+          const b = bubbleBeside(h.seat);
+          if (!b) return null;
+          return (
+            <div key={`hold-${h.seat}`} className="claim-bubble-at hold-at" style={b.anchor === 'left' ? { left: b.x, top: b.y } : { right: window.innerWidth - b.x, top: b.y }}>
+              <span className={`claim-bubble hold-bubble ${h.kind ? `act-${h.kind}` : 'hold-any'}${b.anchor === 'right' ? ' from-right' : ''}`}>
+                {h.kind ? (h.kind === 'win' ? labels.win : labels[h.kind]) : ''}
+              </span>
+            </div>
+          );
+        })}
         {openingFlowers?.key === roundKey &&
           openingFlowers.items.map((o) => (
             <div key={o.seat} className="opening-flowers" style={{ left: o.x, top: o.y }} aria-label={personName(view.seats[o.seat]?.name, lang)}>
@@ -1061,7 +1115,7 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
                   key={t.id}
                   data-hand-tile={t.id}
                   className={`hand-tile${drag?.moved && drag.src.kind === 'hand' && drag.src.tileId === t.id ? (handGap?.over ? ' dragging gap' : ' dragging') : ''}${
-                    chowLit ? (chowLit.has(t.type) ? (t.type === chowPick?.first ? ' chow-pick chow-first' : ' chow-pick') : ' chow-faded') : ''
+                    chowLit ? (chowLit.has(t.type) ? (t.type === chowPick?.first ? ' chow-pick chow-first' : ' chow-pick') : ' chow-faded') : holdGlow.has(t.id) ? ` hold-glow hold-${myHold!.kind}` : ''
                   }`}
                   style={slideOf(t.id, i) ? { transform: `translateX(${slideOf(t.id, i)}px)` } : undefined}
                   onPointerDown={mySeat !== null ? start({ kind: 'hand', tileId: t.id, type: t.type }) : undefined}
@@ -1085,11 +1139,19 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
           )}
           </div>
         </div>
-        <div className={`actions${claimable ? ' actions-claim' : ''}`}>
-          {showButtons && claimable && a.chow.length > 0 && <button className="act act-chow" onClick={onChow}>{labels.chow}</button>}
-          {showButtons && claimable && a.pong && <button className="act act-pong" onClick={onPong}>{labels.pong}</button>}
-          {showButtons && ((claimable && a.gong) || ownGongs > 0) && <button className="act act-gong" onClick={onGong}>{labels.gong}</button>}
-          {a && (a.selfDrawWin || (a.win && (claimable || round?.phase === 'ended'))) && <button className="act act-win" onClick={onWin}>{winLabel}</button>}
+        <div className={`actions${claimable && !myHold ? ' actions-claim' : ''}`}>
+          {/* Holding a tile: Cancel (no colour) to its left, and Confirm in the claim's colour. */}
+          {showButtons && myHold && <button className="act act-pass" onClick={cancelHold}>{tr('cancel')}</button>}
+          {showButtons && myHold?.kind ? (
+            <button className={`act act-${myHold.kind} act-confirm`} disabled={myHold.kind === 'chow' && (a.chow.length > 1 && !chosenChow)} onClick={onConfirm}>{tr('confirm')}</button>
+          ) : (
+            <>
+              {showButtons && claimable && a.chow.length > 0 && <button className="act act-chow" onClick={onChow}>{labels.chow}</button>}
+              {showButtons && claimable && a.pong && <button className="act act-pong" onClick={onPong}>{labels.pong}</button>}
+              {showButtons && ((claimable && a.gong) || ownGongs > 0) && <button className="act act-gong" onClick={onGong}>{labels.gong}</button>}
+              {a && (a.selfDrawWin || (a.win && (claimable || round?.phase === 'ended'))) && <button className="act act-win" onClick={onWin}>{winLabel}</button>}
+            </>
+          )}
           {/* Wall empty: say no to the last tile. Plain (no colour) so it isn't pressed by mistake. */}
           {a?.pass && round?.phase !== 'ended' && <button className="act act-pass" onClick={() => command({ type: 'pass' })}>{tr('pass')}</button>}
         </div>
@@ -1393,6 +1455,12 @@ function SettingsPanel({
           <div className="segmented">
             <button className={prefs.lang === 'en' ? 'on' : ''} onClick={() => setPrefs({ ...prefs, lang: 'en' })}>English</button>
             <button className={prefs.lang === 'zh' ? 'on' : ''} onClick={() => setPrefs({ ...prefs, lang: 'zh' })}>中文</button>
+          </div>
+
+          <span>{tr('callAll')}</span>
+          <div className="segmented" title={tr('callAllNote')}>
+            <button className={!prefs.callAll ? 'on' : ''} onClick={() => setPrefs({ ...prefs, callAll: false })}>{tr('no')}</button>
+            <button className={prefs.callAll ? 'on' : ''} onClick={() => setPrefs({ ...prefs, callAll: true })}>{tr('yes')}</button>
           </div>
 
           <span>{tr('celebration')}</span>

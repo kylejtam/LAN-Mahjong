@@ -573,7 +573,7 @@ describe('playing with CPUs', () => {
   it('cannot undo for another human player', () => {
     let r = startedTable();
     r = cmd(r, 'Kyle', { type: 'discard', tileId: r.match.round!.core.hands[0]![0]!.id });
-    expect(() => cmd(r, 'Ben', { type: 'undo' })).toThrow(/Only the player whose turn/);
+    expect(() => cmd(r, 'Ben', { type: 'undo' })).toThrow(/your own move/);
     expect(viewFor(r, 'ben', tick()).actions!.undo).toBe(false);
   });
 

@@ -15,6 +15,8 @@ import {
   settleEmptyWall,
   startRound,
   undo,
+  holdClaim,
+  releaseHold,
 } from '../src/game/round.js';
 import { Setup, idOf, setupRound } from './helpers.js';
 
@@ -498,21 +500,26 @@ describe('the wall running out', () => {
 });
 
 describe('undo', () => {
-  it('the next player can undo a discard: the tile goes back and it is the discarder\'s turn', () => {
+  it('you undo your own discard: the tile goes back and it is your turn again', () => {
     let r = dealerDiscards(table(), 'dR');
-    expect(availableActions(r, 1, 0).undo).toBe(true);
-    expect(availableActions(r, 0, 0).undo).toBe(false);
-    r = undo(r, 1);
+    expect(availableActions(r, 0, 0).undo).toBe(true);
+    expect(availableActions(r, 1, 0).undo).toBe(false);
+    r = undo(r, 0);
     expect(r.core.turn).toBe(0);
     expect(r.core.phase).toBe('mustDiscard');
     expect(r.core.hands[0]).toHaveLength(14);
     expect(r.core.discards).toHaveLength(0);
   });
 
-  it('only the current player can undo', () => {
+  it('only the player who made the move can undo it', () => {
     const r = dealerDiscards(table(), 'dR');
-    expect(() => undo(r, 0)).toThrow(/Only the player whose turn/);
-    expect(() => undo(r, 2)).toThrow(/Only the player whose turn/);
+    expect(() => undo(r, 1)).toThrow(/your own move/);
+    expect(() => undo(r, 2)).toThrow(/your own move/);
+  });
+
+  it('a discard can no longer be undone once the next player has drawn', () => {
+    const r = draw(dealerDiscards(table(), 'dR'), 1, 0);
+    expect(() => undo(r, 0)).toThrow(/Too late/);
   });
 
   it('multiple undos go most recent first (example from the notes)', () => {
@@ -522,21 +529,18 @@ describe('undo', () => {
     r = draw(r, 1, 0);
     r = discard(r, 1, idOf(r, 1, 'wE'), 0);
     expect(r.core.turn).toBe(2);
-    // Seat 2 undoes seat 1's move: seat 1 holds 14 tiles again.
-    r = undo(r, 2);
+    // Seat 1 undoes its own discard: it holds 14 tiles again.
+    r = undo(r, 1);
     expect(r.core.turn).toBe(1);
     expect(r.core.hands[1]).toHaveLength(14);
-    // Now seat 1 undoes seat 0's move: seat 1's draw goes back to the wall.
-    r = undo(r, 1);
-    expect(r.core.turn).toBe(0);
-    expect(tilesLeft(r.core.wall)).toBe(wallAfterFirst);
-    expect(r.core.hands[0]).toHaveLength(14);
-    expect(r.history).toHaveLength(0);
-    expect(() => undo(r, 0)).toThrow(/nothing to undo/);
+    // Seat 0's discard can't be undone now: seat 1 has drawn since.
+    expect(() => undo(r, 0)).toThrow(/Too late/);
+    expect(tilesLeft(r.core.wall)).toBe(wallAfterFirst - 1);
   });
 
   it('undoing a 碰 puts the tile back on the table', () => {
     let r = claim(dealerDiscards(table(), 'dR'), 2, { kind: 'pong' }, 0);
+    expect(() => undo(r, 0)).toThrow(/your own move/);
     r = undo(r, 2);
     expect(r.core.melds[2]).toHaveLength(0);
     expect(r.core.discards).toHaveLength(1);
@@ -549,6 +553,35 @@ describe('undo', () => {
     r = undo(r, 1, true);
     expect(r.core.result).toBeNull();
     expect(r.core.phase).toBe('mustDraw');
+  });
+});
+
+describe('holding a claim', () => {
+  it('a hold stops the next player drawing, and Cancel lets them draw', () => {
+    let r = dealerDiscards(table(), 'dR');
+    r = holdClaim(r, 2, 'pong', 0);
+    expect(r.window!.holds).toEqual([{ seat: 2, kind: 'pong' }]);
+    expect(availableActions(r, 1, 0).draw).toBe(false);
+    expect(() => draw(r, 1, 0)).toThrow(/Waiting for a claim/);
+    r = releaseHold(r, 2);
+    expect(availableActions(r, 1, 0).draw).toBe(true);
+  });
+
+  it('holding after the next player drew puts their tile back on the wall', () => {
+    let r = dealerDiscards(table(), 'dR');
+    const left = tilesLeft(r.core.wall);
+    r = draw(r, 1, 0);
+    r = holdClaim(r, 2, 'pong', 100);
+    expect(tilesLeft(r.core.wall)).toBe(left);
+    expect(r.core.hands[1]).toHaveLength(13);
+    r = claim(r, 2, { kind: 'pong' }, 200);
+    expect(r.core.melds[2]).toHaveLength(1);
+    expect(r.window!.holds).toBeUndefined();
+  });
+
+  it('cannot hold a claim you cannot make', () => {
+    const r = dealerDiscards(table(), 'dR');
+    expect(() => holdClaim(r, 1, 'pong', 0)).toThrow(/cannot claim/);
   });
 });
 

@@ -943,3 +943,18 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; }
 .wall-left-head .panel-close { position: static; }
 .wall-left-tiles { display: flex; flex-wrap: wrap; gap: 0.5em 0.4em; max-height: 60vh; overflow-y: auto; }
 .wall-left-stack { display: flex; gap: 1px; }
+
+/* Holding a claim: the tiles it would use glow in the claim's colour (behind the tile). */
+.hand-tile.hold-glow .tile::before, .hold-glow::before { content: ''; position: absolute; inset: -4px; border-radius: 7px; z-index: -1; pointer-events: none; }
+.hold-glow.hold-chow .tile::before, .hold-glow.hold-chow::before { background: #2f8f5b; box-shadow: 0 0 10px 3px rgba(47, 143, 91, 0.8); }
+.hold-glow.hold-pong .tile::before, .hold-glow.hold-pong::before { background: #2f6fbf; box-shadow: 0 0 10px 3px rgba(47, 111, 191, 0.8); }
+.hold-glow.hold-gong .tile::before, .hold-glow.hold-gong::before { background: #8a4fc0; box-shadow: 0 0 10px 3px rgba(138, 79, 192, 0.8); }
+.hold-glow.hold-win .tile::before, .hold-glow.hold-win::before { background: #d23b3b; box-shadow: 0 0 10px 3px rgba(210, 59, 59, 0.8); }
+/* A held claim's bubble stays (no pop-in-and-out); "not chosen yet" cycles through the colours. */
+.hold-at { z-index: 26; }
+.claim-bubble.hold-bubble { animation: none; }
+.claim-bubble.hold-any { min-width: 3em; min-height: 1.7em; animation: hold-cycle 3.2s linear infinite; }
+@keyframes hold-cycle { 0%, 100% { background: #2f8f5b; } 25% { background: #2f6fbf; } 50% { background: #8a4fc0; } 75% { background: #d23b3b; } }
+@media (prefers-reduced-motion: reduce) { .claim-bubble.hold-any { animation-duration: 12s; } }
+.act-confirm { font-size: 0.85em; }
+.act:disabled { opacity: 0.45; }

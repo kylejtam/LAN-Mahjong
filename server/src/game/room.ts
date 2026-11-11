@@ -24,7 +24,12 @@ import { DEFAULT_SETTINGS, GameSettings, INTRO_BUILD_MS, NormalType, Rng, SEATS,
 import { MatchState, beginRound, closeRound, matchLabel, newMatch } from './match.js';
 import {
   Claim,
+  ClaimKind,
   GameError,
+  canClaimOffered,
+  holdClaim,
+  lastMover,
+  releaseHold,
   RoundState,
   addedGong,
   availableActions,
@@ -162,6 +167,10 @@ export type Command =
   | { type: 'drawReplacement' }
   | { type: 'discard'; tileId: number }
   | { type: 'claim'; claim: Claim }
+  /** Hold the offered tile while deciding (kind null = not chosen yet). */
+  | { type: 'hold'; kind: ClaimKind | null }
+  /** Let go of a held tile. */
+  | { type: 'releaseHold' }
   | { type: 'concealedGong'; tileType: NormalType }
   | { type: 'addedGong'; tileType: NormalType }
   | { type: 'selfDrawWin' }
@@ -543,7 +552,21 @@ export function handleCommand(prev: Room, key: string, cmd: Command, now: number
     case 'selfDrawWin': {
       const round = requireRound(room);
       const s = requireSeated(room, key);
-      setRound(room, applyRoundMove(round, s, cmd, now));
+      setRound(room, autoHolds(room, applyRoundMove(round, s, cmd, now), now));
+      break;
+    }
+    case 'hold': {
+      const round = requireRound(room);
+      const s = requireSeated(room, key);
+      const kind = cmd.kind;
+      if (kind !== null && !['chow', 'pong', 'gong', 'win'].includes(kind)) fail('Unknown claim.');
+      setRound(room, holdClaim(round, s, kind, now));
+      break;
+    }
+    case 'releaseHold': {
+      const round = requireRound(room);
+      const s = requireSeated(room, key);
+      setRound(room, releaseHold(round, s));
       break;
     }
     case 'reorderHand': {
@@ -569,13 +592,12 @@ export function handleCommand(prev: Room, key: string, cmd: Command, now: number
         if (!room.undoWinVotes.includes(key)) room.undoWinVotes.push(key);
         maybeUndoWin(room);
       } else {
-        // The player whose turn it is may undo. If that seat is a CPU (or empty),
-        // any seated player may undo for it.
-        const current = currentPlayer(round);
-        if (current !== s && !(current !== null && undoableForSeat(room, current))) {
-          fail('Only the player whose turn it is can undo.');
-        }
-        setRound(room, undo(round, current!));
+        // You undo your own last move. A CPU's (or an empty seat's) last move can be
+        // undone by any seated player.
+        const mover = lastMover(round);
+        if (mover === null) return fail('There is nothing to undo.');
+        if (mover !== s && !undoableForSeat(room, mover)) fail('You can only undo your own move.');
+        setRound(room, undo(round, mover));
         // Give players time to press undo again before the CPUs move.
         room.cpuPauseUntil = now + UNDO_PAUSE_MS;
       }
@@ -859,6 +881,27 @@ function startDealing(room: Room, rng: Rng): void {
   room.phase = 'playing';
   room.confirmed = [];
   room.undoWinVotes = [];
+}
+
+/**
+ * "Call all possible claims": when a new tile is offered, hold it straight away for every
+ * seated player who turned that on and could claim it.
+ */
+function autoHolds(room: Room, round: RoundState, now: number): RoundState {
+  const w = round.window;
+  if (!w || w.status.type !== 'open' || w.holds?.length || round.core.phase === 'ended') return round;
+  let out = round;
+  room.seats.forEach((k, seat) => {
+    const p = k ? room.people[k] : null;
+    if (!p || p.cpu || !p.connected || p.prefs.callAll !== true || seat === w.by) return;
+    if (!canClaimOffered(out, seat, now)) return;
+    try {
+      out = holdClaim(out, seat, null, now);
+    } catch {
+      /* can't hold after all */
+    }
+  });
+  return out;
 }
 
 function applyRoundMove(round: RoundState, seat: number, cmd: Command, now: number): RoundState {
