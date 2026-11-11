@@ -945,11 +945,12 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; }
 .remaining-stack { display: flex; gap: 1px; }
 
 /* Holding a claim: the tiles it would use glow in the claim's colour (behind the tile). */
-.hand-tile.hold-glow .tile::before, .hold-glow::before { content: ''; position: absolute; inset: -4px; border-radius: 7px; z-index: -1; pointer-events: none; }
-.hold-glow.hold-chow .tile::before, .hold-glow.hold-chow::before { background: #2f8f5b; box-shadow: 0 0 10px 3px rgba(47, 143, 91, 0.8); }
-.hold-glow.hold-pong .tile::before, .hold-glow.hold-pong::before { background: #2f6fbf; box-shadow: 0 0 10px 3px rgba(47, 111, 191, 0.8); }
-.hold-glow.hold-gong .tile::before, .hold-glow.hold-gong::before { background: #8a4fc0; box-shadow: 0 0 10px 3px rgba(138, 79, 192, 0.8); }
-.hold-glow.hold-win .tile::before, .hold-glow.hold-win::before { background: #d23b3b; box-shadow: 0 0 10px 3px rgba(210, 59, 59, 0.8); }
+/* Only the tile itself glows (the glow sits on the tile, never around the whole hand). */
+.hand-tile.hold-glow .tile::before { content: ''; position: absolute; inset: -4px; border-radius: 7px; z-index: -1; pointer-events: none; }
+.hold-glow.hold-chow .tile::before { background: #2f8f5b; box-shadow: 0 0 10px 3px rgba(47, 143, 91, 0.8); }
+.hold-glow.hold-pong .tile::before { background: #2f6fbf; box-shadow: 0 0 10px 3px rgba(47, 111, 191, 0.8); }
+.hold-glow.hold-gong .tile::before { background: #8a4fc0; box-shadow: 0 0 10px 3px rgba(138, 79, 192, 0.8); }
+.hold-glow.hold-win .tile::before { background: #d23b3b; box-shadow: 0 0 10px 3px rgba(210, 59, 59, 0.8); }
 /* A held claim's bubble stays (no pop-in-and-out); "not chosen yet" cycles through the colours. */
 .hold-at { z-index: 26; }
 .claim-bubble.hold-bubble { animation: none; }
@@ -989,13 +990,25 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; }
 .ready-tag { background: #3fb56f; color: #08210f; border-radius: 999px; padding: 0 0.5em; font-size: 0.8em; font-weight: 800; margin-left: 0.3em; }
 
 /* The tutorial: a small, quiet note in the corner of the table, and a soft glow on the control to use. */
-.tutorial-guide { position: fixed; left: max(12px, var(--safe-l, 0px)); bottom: 24vh; z-index: 60; max-width: min(22em, 46vw); background: rgba(10, 24, 16, 0.86); color: #fff; border-radius: 8px; padding: 0.45em 0.75em; display: grid; gap: 0.1em; font-size: 0.92rem; box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35); }
+.tutorial-guide { position: fixed; left: max(12px, var(--safe-l, 0px)); bottom: 24vh; z-index: 62; max-width: min(22em, 46vw); background: rgba(10, 24, 16, 0.86); color: #fff; border-radius: 8px; padding: 0.45em 0.75em; display: grid; gap: 0.1em; font-size: 0.92rem; box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35); }
 .tutorial-guide .count { color: #aab3bd; font-size: 0.78em; }
 .tutorial-guide .say { font-weight: 600; }
 .tutorial-guide .why { color: #c3cbd3; font-size: 0.86em; }
 .tutorial-guide .tut-next { justify-self: end; margin-top: 0.3em; }
-.tut-target { outline: 2px solid rgba(255, 255, 255, 0.65); outline-offset: 3px; border-radius: 8px; animation: tut-pulse 1.6s ease-in-out infinite alternate; }
-@keyframes tut-pulse { from { outline-color: rgba(255, 255, 255, 0.7); } to { outline-color: rgba(255, 255, 255, 0.1); } }
+/* What to press next: a gold pulsing outline. */
+.tut-target { outline: 3px solid #f5c542; outline-offset: 3px; border-radius: 8px; animation: tut-pulse 1.1s ease-in-out infinite alternate; }
+@keyframes tut-pulse {
+  from { outline-color: rgba(245, 197, 66, 1); box-shadow: 0 0 12px 4px rgba(245, 197, 66, 0.55); }
+  to { outline-color: rgba(245, 197, 66, 0.35); box-shadow: 0 0 2px 0 rgba(245, 197, 66, 0); }
+}
+/* Everything else is dimmed, with a clear circle around each thing to press (taps elsewhere are blocked). */
+.tut-dim { position: fixed; inset: 0; z-index: 58; pointer-events: none; }
+.tut-dim path { fill: rgba(0, 0, 0, 0.55); pointer-events: visiblePainted; }
+.tut-ring { fill: none; stroke: rgba(245, 197, 66, 0.55); stroke-width: 2; pointer-events: none; }
 @media (prefers-reduced-motion: reduce) { .tut-target { animation: none; } }
 .leave-tutorial { font-size: 0.85em; padding: 0.25em 0.8em; background: none; border: 1px solid #59616d; border-radius: 999px; }
 .tutorial-done { z-index: 70; }
+
+/* Host page: close LAN Mahjong (two clicks). */
+.close-host { font-size: 0.8rem; padding: 0.3em 0.9em; margin-left: 0.6em; vertical-align: middle; }
+.close-host.danger { background: #a3302d; border-color: #a3302d; color: #fff; }

@@ -37,6 +37,8 @@ export interface ServerOptions {
   rng?: Rng;
   /** How often CPUs and timers are checked (milliseconds). */
   tickMs?: number;
+  /** Called when the host page asks to close LAN Mahjong. */
+  onShutdown?: () => void;
   /** How often to check each connection is still there (ms). */
   pingMs?: number;
   /** Folder with the built screens (client/dist). */
@@ -351,6 +353,12 @@ export async function startServer(opts: ServerOptions): Promise<RunningServer> {
         });
         setRoom(room);
         send(ws, { type: 'hostCreated', gameId: room.id });
+        return;
+      }
+      case 'hostShutdown': {
+        // Close LAN Mahjong: tell the host page, then stop (games are saved on the way out).
+        for (const h of hostSockets) send(h, { type: 'shuttingDown' });
+        setTimeout(() => opts.onShutdown?.(), 300);
         return;
       }
       case 'hostCommand': {

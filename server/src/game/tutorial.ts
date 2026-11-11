@@ -105,9 +105,13 @@ export interface TutorialCmd {
 /** One computer move: [seat, command]. Tile names are turned into the real tiles when played. */
 export type CpuStep = [seat: number, cmd: { type: string; tile?: string; claim?: { kind: string; tiles?: string[] } }];
 
+/**
+ * A step either waits for one move of yours, or lets the computer players make their
+ * moves and then waits for you to press Next (nothing moves on by itself).
+ */
 export type Stage =
   | { id: string; you: (cmd: TutorialCmd, tileType: (id: number) => TileType | undefined) => boolean }
-  | { id: string; cpu: CpuStep[]; read: number };
+  | { id: string; cpu: CpuStep[] };
 
 const discardOf = (type: string) => (c: TutorialCmd, tt: (id: number) => TileType | undefined): boolean => c.type === 'discard' && tt(c.tileId!) === type;
 const holdOf = (kind: string) => (c: TutorialCmd): boolean => c.type === 'hold' && c.kind === kind;
@@ -119,28 +123,27 @@ export const STAGES: Stage[] = [
   { id: 'discard1', you: discardOf('m1') },
   { id: 'undo', you: is('undo') },
   { id: 'discard2', you: discardOf('m1') },
-  { id: 'mingDiscards', cpu: [[1, { type: 'draw' }], [1, { type: 'discard', tile: 's9' }]], read: 3500 },
-  { id: 'fongFlower', cpu: [[2, { type: 'draw' }], [2, { type: 'drawReplacement' }]], read: 3500 },
-  { id: 'fongRed', cpu: [[2, { type: 'discard', tile: 'dR' }]], read: 0 },
+  { id: 'mingDiscards', cpu: [[1, { type: 'draw' }], [1, { type: 'discard', tile: 's9' }]] },
+  { id: 'fongFlower', cpu: [[2, { type: 'draw' }], [2, { type: 'drawReplacement' }], [2, { type: 'discard', tile: 'dR' }]] },
   { id: 'holdPung', you: holdOf('pong') },
   { id: 'confirmPung', you: claimOf('pong') },
   { id: 'discardNorth', you: discardOf('wN') },
-  { id: 'othersPlay', cpu: [[1, { type: 'draw' }], [1, { type: 'discard', tile: 's1' }], [2, { type: 'draw' }], [2, { type: 'discard', tile: 'p8' }], [3, { type: 'draw' }], [3, { type: 'discard', tile: 's6' }]], read: 0 },
+  { id: 'othersPlay', cpu: [[1, { type: 'draw' }], [1, { type: 'discard', tile: 's1' }], [2, { type: 'draw' }], [2, { type: 'discard', tile: 'p8' }], [3, { type: 'draw' }], [3, { type: 'discard', tile: 's6' }]] },
   { id: 'holdSeung', you: holdOf('chow') },
   {
     id: 'confirmSeung',
     you: (c, tt) => c.type === 'claim' && c.claim?.kind === 'chow' && [...(c.claim.tileIds ?? [])].map((id) => tt(id)).sort().join() === 's4,s5',
   },
   { id: 'discard7s', you: discardOf('s7') },
-  { id: 'mingSeung', cpu: [[1, { type: 'claim', claim: { kind: 'chow', tiles: ['s5', 's6'] } }], [1, { type: 'discard', tile: 'm3' }]], read: 3500 },
-  { id: 'fongPung', cpu: [[2, { type: 'claim', claim: { kind: 'pong' } }], [2, { type: 'discard', tile: 'm9' }]], read: 2500 },
+  { id: 'mingSeung', cpu: [[1, { type: 'claim', claim: { kind: 'chow', tiles: ['s5', 's6'] } }], [1, { type: 'discard', tile: 'm3' }]] },
+  { id: 'fongPung', cpu: [[2, { type: 'claim', claim: { kind: 'pong' } }], [2, { type: 'discard', tile: 'm9' }]] },
   { id: 'holdPung9', you: holdOf('pong') },
   { id: 'cancel9', you: is('releaseHold') },
   { id: 'holdGong9', you: holdOf('gong') },
   { id: 'confirmGong9', you: claimOf('gong') },
   { id: 'replace1', you: is('drawReplacement') },
   { id: 'discard7p', you: discardOf('p7') },
-  { id: 'keiGong', cpu: [[1, { type: 'draw' }], [1, { type: 'discard', tile: 'dW' }], [3, { type: 'claim', claim: { kind: 'gong' } }], [3, { type: 'drawReplacement' }], [3, { type: 'discard', tile: 'm5' }]], read: 3500 },
+  { id: 'keiGong', cpu: [[1, { type: 'draw' }], [1, { type: 'discard', tile: 'dW' }], [3, { type: 'claim', claim: { kind: 'gong' } }], [3, { type: 'drawReplacement' }], [3, { type: 'discard', tile: 'm5' }]] },
   { id: 'draw', you: is('draw') },
   { id: 'replaceFlower', you: is('drawReplacement') },
   { id: 'hiddenGong', you: is('concealedGong') },
@@ -149,14 +152,14 @@ export const STAGES: Stage[] = [
   { id: 'replace3', you: is('drawReplacement') },
   { id: 'discard8m', you: discardOf('m8') },
   { id: 'callAll', you: (c) => c.type === 'setPrefs' && c.prefs?.callAll === true },
-  { id: 'fongTwoDots', cpu: [[1, { type: 'draw' }], [1, { type: 'discard', tile: 'p6' }], [2, { type: 'draw' }], [2, { type: 'discard', tile: 'p2' }]], read: 0 },
+  { id: 'fongTwoDots', cpu: [[1, { type: 'draw' }], [1, { type: 'discard', tile: 'p6' }], [2, { type: 'draw' }], [2, { type: 'discard', tile: 'p2' }]] },
   { id: 'holdWu', you: holdOf('win') },
   { id: 'confirmWu', you: claimOf('win') },
   { id: 'won', you: () => false },
 ];
 
 /** Commands the player may always use in the tutorial (they don't change the hand). */
-export const ALWAYS_OK = new Set(['setPrefs', 'rename', 'setWatchedSeat', 'setWatchAll', 'reorderHand', 'leaveGame', 'confirmRound', 'unready', 'pressStart', 'takeSeat', 'rollDice']);
+export const ALWAYS_OK = new Set(['tutorialNext', 'setPrefs', 'rename', 'setWatchedSeat', 'setWatchAll', 'reorderHand', 'leaveGame', 'confirmRound', 'unready', 'pressStart', 'takeSeat', 'rollDice']);
 
 /** Time between one computer move and the next (ms). */
 export const TUTORIAL_CPU_GAP_MS = 1100;

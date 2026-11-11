@@ -79,7 +79,8 @@ export interface RoomView {
   /** Once the hand is over: true if it was the last hand of the whole game. */
   lastHand: boolean;
   pausedSeats: number[];
-  tutorial: { stage: string } | null;
+  /** In the tutorial: the step, and (for the computer players' steps) whether their moves are done so Next can be pressed. */
+  tutorial: { stage: string; waitingNext: boolean } | null;
   /** The server's clock when this was sent (to show "disconnected 14 seconds ago"). */
   serverNow: number;
   /** Your buttons. Null if you are not seated or no round is on. */
@@ -204,7 +205,7 @@ export function viewFor(room: Room, viewerKey: string, now: number): RoomView {
     /** Seats whose player lost their connection mid-hand: the game waits for them. */
     pausedSeats: pausedBy(room).map((k) => room.seats.indexOf(k)),
     /** In the tutorial: the step it's on (see tutorial.ts). */
-    tutorial: room.tutorial ? { stage: STAGES[room.tutorial.stage]?.id ?? 'won' } : null,
+    tutorial: room.tutorial ? tutorialView(room.tutorial) : null,
     serverNow: now,
     actions: round && mySeat !== null ? withRoomUndo(room, availableActions(round, mySeat, now)) : null,
     /** At an all-CPU table, spectators confirm the end of a round. */
@@ -327,4 +328,9 @@ function nextGame(room: Room): { nextLabel: { en: string; zh: string } | null; l
   } catch {
     return { nextLabel: null, lastHand: false };
   }
+}
+
+function tutorialView(t: NonNullable<Room['tutorial']>): { stage: string; waitingNext: boolean } {
+  const st = STAGES[t.stage];
+  return { stage: st?.id ?? 'won', waitingNext: !!st && 'cpu' in st && t.step >= st.cpu.length };
 }

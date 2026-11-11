@@ -41,7 +41,7 @@ if (process.env.LAN_MAHJONG_UPDATES === '1') {
 
 let server: Awaited<ReturnType<typeof startServer>>;
 try {
-  server = await startServer({ port, dataFile, clientDir });
+  server = await startServer({ port, dataFile, clientDir, onShutdown: () => void stop() });
 } catch (err) {
   if ((err as NodeJS.ErrnoException).code === 'EADDRINUSE') {
     // Most likely LAN Mahjong is already running (e.g. the icon was double-clicked twice).
@@ -74,11 +74,11 @@ console.log('  Keep this window open while playing. Close it to stop the game.')
 console.log('');
 if (openBrowser) open(hostUrl);
 
-const stop = async (): Promise<void> => {
+async function stop(): Promise<void> {
   console.log('\n  Saving games and stopping...');
   await server.close();
   process.exit(0);
-};
+}
 process.on('SIGINT', () => void stop());
 process.on('SIGTERM', () => void stop());
 // Windows: closing the window or pressing Ctrl+Break.
