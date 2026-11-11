@@ -626,7 +626,7 @@ input { font: inherit; }
   padding: 0.6em 1em; box-shadow: 0 0 22px 4px rgba(245, 197, 66, 0.55), 0 8px 18px rgba(0, 0, 0, 0.5);
   animation: flower-pop 3s ease-out forwards;
 }
-.flower-pop-tiles { display: flex; gap: 0.3em; }
+.flower-pop-tiles { display: flex; gap: 0.3em; isolation: isolate; }
 .flower-pop-text { color: #fff; font-weight: 700; font-size: 1.05em; white-space: nowrap; }
 .flower-pop-wind { font-family: serif; margin-right: 0.4em; color: #f5c542; }
 @keyframes flower-pop {
@@ -636,11 +636,30 @@ input { font: inherit; }
   85% { opacity: 1; transform: scale(1); }
   100% { opacity: 0; transform: scale(0.92); }
 }
-.flower-new::before { animation: flower-glow 0.6s ease-in-out 8 alternate; }
-@keyframes flower-glow {
-  from { box-shadow: 0 0 0 2px #f5c542, 0 0 4px 2px rgba(245, 197, 66, 0.4); }
-  to { box-shadow: 0 0 0 3px #f5c542, 0 0 16px 6px rgba(245, 197, 66, 0.9); }
+/* A new flower glows green if it scores for that player (matches their seat), red if not. */
+.flower-new::before { animation: flower-glow-ok 0.6s ease-in-out 8 alternate; }
+.flower-new.no-score::before { animation-name: flower-glow-no; }
+@keyframes flower-glow-ok {
+  from { box-shadow: 0 0 0 2px #3fd97a, 0 0 4px 2px rgba(63, 217, 122, 0.4); }
+  to { box-shadow: 0 0 0 3px #3fd97a, 0 0 16px 6px rgba(63, 217, 122, 0.9); }
 }
+@keyframes flower-glow-no {
+  from { box-shadow: 0 0 0 2px #e5484d, 0 0 4px 2px rgba(229, 72, 77, 0.4); }
+  to { box-shadow: 0 0 0 3px #e5484d, 0 0 16px 6px rgba(229, 72, 77, 0.9); }
+}
+/* A plain ring: green = this flower scores for its owner, red = it doesn't. */
+.ring-scores::before, .ring-no-score::before { content: ''; position: absolute; inset: -3px; border-radius: 6px; z-index: -1; }
+.ring-scores::before { background: #3fd97a; }
+.ring-no-score::before { background: #e5484d; }
+/* Opening flowers: in front of each player for a moment after the deal. */
+.opening-flowers { position: fixed; z-index: 25; transform: translate(-50%, -50%); display: flex; gap: 7px; isolation: isolate; pointer-events: none; animation: opening-flowers 2.5s ease-out forwards; }
+@keyframes opening-flowers {
+  0% { opacity: 0; transform: translate(-50%, -50%) scale(0.6); }
+  10% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  85% { opacity: 1; }
+  100% { opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) { .opening-flowers { animation: none; } }
 
 /* Host page: "Stop this hand" above the settings. */
 .stop-hand { display: flex; align-items: center; gap: 0.8em; flex-wrap: wrap; margin: 0 0 0.8em; }
@@ -896,7 +915,9 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; }
 
 /* The start of each hand (TableIntro): the big wall drawn over the table. */
 /* While the big wall shrinks into the small box, the box waits for it. */
-.intro-arriving .wall-box { visibility: hidden; }
+.intro-arriving .wall-box { opacity: 0; }
+.intro-fading .wall-box { animation: wall-box-in 0.45s ease forwards; }
+@keyframes wall-box-in { from { opacity: 0; } to { opacity: 1; } }
 .intro-layer { position: fixed; inset: 0; pointer-events: none; z-index: 14; }
 .intro-tile {
   position: absolute; left: 0; top: 0; border-radius: 3px; background: var(--tile-back);
@@ -912,3 +933,13 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; }
 @media (prefers-reduced-motion: reduce) { .roll-btn { animation: none; } }
 /* The dice sit in the middle of the wall (inside the square), clear of the tiles. */
 .dice-tray.in-wall { bottom: auto; top: 46%; transform: translate(-50%, -50%); z-index: 16; font-size: 1.2em; }
+
+/* Game summary: the tiles left in the wall, in drawing order (a small gap between stacks). */
+.wall-left-overlay { z-index: 30; }
+.wall-left { max-width: min(46rem, 94vw); }
+.wall-left-head { display: flex; align-items: center; gap: 0.8em; }
+.wall-left-head h3 { margin: 0; }
+.wall-left-count { margin-left: auto; font-weight: 800; color: #f5c542; font-variant-numeric: tabular-nums; }
+.wall-left-head .panel-close { position: static; }
+.wall-left-tiles { display: flex; flex-wrap: wrap; gap: 0.5em 0.4em; max-height: 60vh; overflow-y: auto; }
+.wall-left-stack { display: flex; gap: 1px; }

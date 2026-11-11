@@ -136,6 +136,8 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
   const screen = useScreenSize();
   /** After the win summary, players continue to the "Ready / Leave seat" popup. */
   const [showReady, setShowReady] = useState<string | null>(null);
+  /** After the last hand: this player has left the summary and sees the final scores. */
+  const [showFinal, setShowFinal] = useState<string | null>(null);
   /** Spectators can close the seat picker and just watch. */
   const [justWatching, setJustWatching] = useState(false);
   const [chooser, setChooser] = useState<Chooser>(null);
@@ -476,22 +478,24 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
   }
 
   // ---------- pieces ----------
-  const renderMelds = (melds: Meld[], flowers: Tile[], size: string, sideways?: 'left' | 'right'): ReactElement => (
+  // Flowers come first: on that player's left (for the right player, whose row runs
+  // bottom to top, that is the bottom; for the left player, the top).
+  const renderMelds = (melds: Meld[], flowers: Tile[], size: string, wind: number, sideways?: 'left' | 'right'): ReactElement => (
     <div className={`melds${sideways ? ' melds-sideways' : ''}`}>
-      {melds.map((m, i) => (
-        <span className="meld" key={i}>
-          {m.tiles.map((t, j) => (
-            <TileView key={t.id} type={t.type} back={m.concealed && (j === 0 || j === 3)} width={size} sideways={sideways} className={newFlowerIds.has(t.id) ? 'flower-new' : undefined} />
-          ))}
-        </span>
-      ))}
       {flowers.length > 0 && (
         <span className="meld flowers">
           {flowers.map((t) => (
-            <TileView key={t.id} type={t.type} width={size} sideways={sideways} className={newFlowerIds.has(t.id) ? 'flower-new' : undefined} />
+            <TileView key={t.id} type={t.type} width={size} sideways={sideways} className={newFlowerIds.has(t.id) ? `flower-new ${flowerScores(t.type, wind) ? 'scores' : 'no-score'}` : undefined} />
           ))}
         </span>
       )}
+      {melds.map((m, i) => (
+        <span className="meld" key={i}>
+          {m.tiles.map((t, j) => (
+            <TileView key={t.id} type={t.type} back={m.concealed && (j === 0 || j === 3)} width={size} sideways={sideways} />
+          ))}
+        </span>
+      ))}
     </div>
   );
 
@@ -632,7 +636,7 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
         {nameTag(sv)}
         {/* Public tiles (shown sets and flowers); hidden tiles only when a spectator chose "Show". */}
         <div className="opp-tiles">
-          {renderMelds(sv.melds, dealAnim ? [] : sv.flowers, 'var(--public-w)', sideways)}
+          {renderMelds(sv.melds, dealAnim ? [] : sv.flowers, 'var(--public-w)', sv.wind, sideways)}
           {sv.hand && (
             <div className={`opp-hand${sideways ? ' melds-sideways' : ''}`}>
               {sortHand(sv.hand).map((t) => <TileView key={t.id} type={t.type} width="var(--opp-w)" sideways={sideways} />)}
@@ -751,6 +755,38 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [flowerSig, roundKey, !!dealAnim]);
 
+  // ---------- opening flowers: after the deal, each player's flowers pop up in front of them ----------
+  const [openingFlowers, setOpeningFlowers] = useState<{ key: string; items: { seat: number; types: TileType[]; x: number; y: number }[] } | null>(null);
+  const hadDealAnim = useRef(false);
+  useEffect(() => {
+    if (dealAnim) {
+      hadDealAnim.current = true;
+      return;
+    }
+    if (!hadDealAnim.current || !round || round.discards.length > 0) return;
+    hadDealAnim.current = false;
+    const mid = document.querySelector('.centre')?.getBoundingClientRect();
+    if (!mid) return;
+    const cx = mid.left + mid.width / 2;
+    const cy = mid.top + mid.height / 2;
+    const items = view.seats
+      .filter((sv) => sv.flowers.length > 0)
+      .map((sv) => {
+        const side = sideOf(sv.seat);
+        const tag = (side === 'bottom' ? document.querySelector('.me-row') : document.querySelector(`.opp-${side} .nametag`))?.getBoundingClientRect();
+        const tx = tag ? tag.left + tag.width / 2 : cx;
+        const ty = tag ? (side === 'bottom' ? tag.top : tag.top + tag.height / 2) : cy;
+        // Halfway between that player and the middle of the table.
+        return { seat: sv.seat, types: sv.flowers.map((f) => f.type), x: (tx + cx) / 2, y: (ty + cy) / 2 };
+      });
+    if (items.length === 0) return;
+    const key = roundKey;
+    setOpeningFlowers({ key, items });
+    const t = setTimeout(() => setOpeningFlowers((o) => (o?.key === key ? null : o)), OPENING_FLOWERS_MS);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [!!dealAnim, roundKey]);
+
   /** Where a claim bubble goes: just beside that player's name tag (left of it for the right player). */
   const bubbleBeside = (seat: number): Pop['bubble'] => {
     const side = sideOf(seat);
@@ -818,7 +854,16 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
   const rowW = screen.w * 0.76 - 16;
   const maxHand = Math.min(screen.w * 0.059, screen.h * 0.11);
   const PUBLIC_RATIO = 0.72;
-  const handW = Math.max(14, Math.min(maxHand, rowW / (handCount + publicCount * PUBLIC_RATIO + groups * 0.3 + 0.6)));
+  // Room for a full hand (14 tiles, minus 3 for each shown set, plus the gap before a new
+  // tile), so drawing, discarding and claiming never change the size. Worked out once per
+  // hand; it only ever gets smaller (lots of flowers and Gongs) until the next hand.
+  void handCount;
+  const handSlots = 14 - 3 * bottom.melds.length + 0.35;
+  const fitW = Math.max(14, Math.min(maxHand, rowW / (handSlots + publicCount * PUBLIC_RATIO + groups * 0.3 + 0.6)));
+  const sizeRef = useRef<{ key: string; w: number } | null>(null);
+  const sizeKey = `${roundKey}|${screen.w}x${screen.h}`;
+  if (!sizeRef.current || sizeRef.current.key !== sizeKey || fitW < sizeRef.current.w) sizeRef.current = { key: sizeKey, w: fitW };
+  const handW = sizeRef.current.w;
   // --hand-max: the biggest your tiles can be, so your row keeps the same height all hand.
   const rowSizes = {
     '--hand-w': `${handW.toFixed(1)}px`,
@@ -854,7 +899,7 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
           )}
         </div>
         <div className="topbar-centre">
-          <span className="round-label">{view.label[lang]}</span>
+          <span className="round-label">{(showReady === roundKey && view.nextLabel ? view.nextLabel : view.label)[lang]}</span>
           <span className="min-fan" title={tr('minFanTitle')}>{tr('minFanShort', { n: view.settings.minFan })}</span>
           <span className="compass">
             {SIDES.map((side) => {
@@ -871,6 +916,7 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
           {me && (
             <span className="chip-total"><ChipIcon size="1.05em" />{me.balance}</span>
           )}
+          <FullscreenButton title={tr('fullscreen')} />
           <button className="btn icon" title={tr('help')} onClick={() => setPanel('help')}>?</button>
           <button className="btn icon" title={tr('settings')} onClick={() => setPanel('settings')}>⚙</button>
         </div>
@@ -912,7 +958,7 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
                 <div className="flower-pop-tiles">
                   {fp.kind !== 'flower' && <span className={`act pop-badge act-${fp.kind}`}>{labels[fp.kind]}</span>}
                   {fp.types.map((type, i) => (
-                    <TileView key={i} type={type} back={!!fp.concealed && (i === 0 || i === 3)} width="clamp(40px, 6vw, 72px)" />
+                    <TileView key={i} type={type} back={!!fp.concealed && (i === 0 || i === 3)} width="clamp(40px, 6vw, 72px)" className={fp.kind === 'flower' ? (flowerScores(type, view.seats[fp.seat]!.wind) ? 'ring-scores' : 'ring-no-score') : undefined} />
                   ))}
                 </div>
                 <div className="flower-pop-text">
@@ -929,6 +975,14 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
             ))}
           </div>
         )}
+        {openingFlowers?.key === roundKey &&
+          openingFlowers.items.map((o) => (
+            <div key={o.seat} className="opening-flowers" style={{ left: o.x, top: o.y }} aria-label={personName(view.seats[o.seat]?.name, lang)}>
+              {o.types.map((type, i) => (
+                <TileView key={i} type={type} width="clamp(30px, 4.4vw, 54px)" className={flowerScores(type, view.seats[o.seat]!.wind) ? 'ring-scores' : 'ring-no-score'} />
+              ))}
+            </div>
+          ))}
         {renderOpponent('top')}
         {renderOpponent('left')}
         <section className="centre" data-drop="centre">
@@ -991,27 +1045,16 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
       <footer className={`me${dealAnim?.rolling ? ' dealing' : ''}`} style={rowSizes}>
         <div className="me-row">
           {/* Your public tiles (shown sets and flowers) sit to the left of your hand. */}
-          {renderMelds(bottom.melds, dealAnim ? [] : bottom.flowers, 'var(--mine-w)')}
+          {renderMelds(bottom.melds, dealAnim ? [] : bottom.flowers, 'var(--mine-w)', bottom.wind)}
           <div className={`hand${handGap?.over ? ' reordering' : ''}`} data-drop="hand" ref={handRef}>
           {dealAnim && serverHand && bottomSeat !== null ? (
-            // During the deal: your tiles arrive 4 at a time and are sorted as they come in.
-            // The dealer's 14th tile sits apart on the right, as it will after the deal.
-            (() => {
-              const dealtSoFar = serverHand.slice(0, Math.min(serverHand.length, dealAnim.dealt[bottomSeat] ?? 0));
-              const extra = dealtSoFar.find((t) => t.id === drawnId);
-              return [
-                ...sortHand(dealtSoFar.filter((t) => t.id !== drawnId)).map((t) => (
-                  <span key={t.id} className="hand-tile dealt-tile">
-                    <TileView type={t.type} width="var(--hand-w)" />
-                  </span>
-                )),
-                extra && (
-                  <span key={extra.id} className="hand-tile drawn-tile dealt-tile">
-                    <TileView type={extra.type} width="var(--hand-w)" />
-                  </span>
-                ),
-              ];
-            })()
+            // During the deal: your tiles arrive and are sorted as they come in (the dealer's
+            // 14th tile is sorted in with the rest).
+            sortHand(serverHand.slice(0, Math.min(serverHand.length, dealAnim.dealt[bottomSeat] ?? 0))).map((t) => (
+              <span key={t.id} className="hand-tile dealt-tile">
+                <TileView type={t.type} width="var(--hand-w)" />
+              </span>
+            ))
           ) : serverHand
             ? hand.map((t, i) => (
                 <span
@@ -1116,7 +1159,14 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
             canClaimWin={!!a?.win}
             onWin={onWin}
             winLabel={winLabel}
-            onContinue={() => setShowReady(roundKey)}
+            onContinue={() => {
+              if (view.lastHand) {
+                // The last hand: leaving the summary counts as done, and the final scores show straight away.
+                if (mySeat !== null || view.spectatorsConfirm) command({ type: 'confirmRound' });
+                setShowFinal(roundKey);
+              } else setShowReady(roundKey);
+            }}
+            finalPreview={showFinal === roundKey && view.lastHand}
           />
         )
       )}
@@ -1224,7 +1274,7 @@ function AllHands({ view, tr, newFlowerIds, hideFlowers, onClose }: { view: Room
               ))}
               {!hideFlowers && s.flowers.length > 0 && (
                 <span className="meld flowers">
-                  {s.flowers.map((t) => <TileView key={t.id} type={t.type} width="var(--allhands-w)" className={newFlowerIds.has(t.id) ? 'flower-new' : undefined} />)}
+                  {s.flowers.map((t) => <TileView key={t.id} type={t.type} width="var(--allhands-w)" className={newFlowerIds.has(t.id) ? `flower-new ${flowerScores(t.type, s.wind) ? 'scores' : 'no-score'}` : undefined} />)}
                 </span>
               )}
             </span>
@@ -1473,6 +1523,13 @@ export function flyBacks(from: { x: number; y: number }, to: { x: number; y: num
 }
 
 const DEAL_MS = DEAL_ANIM_MS;
+/** How long the opening flowers stay in front of each player after the deal. */
+const OPENING_FLOWERS_MS = 2500;
+
+/** Does this flower score for a player with this seat wind (0 East ... 3 North)? Its number matches the seat. */
+function flowerScores(type: TileType, wind: number): boolean {
+  return Number(type[1]) === wind + 1;
+}
 
 /**
  * At the start of each hand, replay the deal in about 5 seconds: tiles slide from
@@ -1491,7 +1548,7 @@ function useDealAnimation(
   const [plan, setPlan] = useState<null | {
     key: string;
     start: number;
-    steps: { seat: number; n: number; from: 'front' | 'back' }[];
+    steps: { seat: number; n: number; from: 'front' | 'back'; jump?: boolean }[];
     order: { seat: number; position: number }[];
     total: number;
     from: { x: number; y: number };
@@ -1517,10 +1574,11 @@ function useDealAnimation(
     const order = [...F.slice(N - frontFull), ...F.slice(0, N - frontFull)];
     const dealer = round.turn; // the dealer is to move at the start of a hand
     const seats = [0, 1, 2, 3].map((i) => (dealer + i) % 4);
-    const steps: { seat: number; n: number; from: 'front' | 'back' }[] = [];
+    const steps: { seat: number; n: number; from: 'front' | 'back'; jump?: boolean }[] = [];
     for (let r = 0; r < 3; r++) for (const s of seats) steps.push({ seat: s, n: 4, from: 'front' });
-    for (const s of seats) steps.push({ seat: s, n: 1, from: 'front' });
-    steps.push({ seat: dealer, n: 1, from: 'front' });
+    // The dealer takes the next 1st and 5th tiles together, then the others take one each.
+    steps.push({ seat: dealer, n: 2, from: 'front', jump: true });
+    for (const s of seats.slice(1)) steps.push({ seat: s, n: 1, from: 'front' });
     // Flower replacements came from the back of the wall.
     const total = round.wallCount + 53 + round.flowersDealt.reduce((a, b) => a + b, 0);
     for (const s of seats) for (let i = 0; i < round.flowersDealt[s]!; i++) steps.push({ seat: s, n: 1, from: 'back' });
@@ -1587,7 +1645,13 @@ function useDealAnimation(
     const taken = step.from === 'front' ? Math.floor((f - step.n) / 2) : N - 1 - Math.floor((b - step.n) / 2);
     const st = plan.order[Math.max(0, Math.min(N - 1, taken))]!;
     const from = introStackPoint(introKey, st.seat, st.position) ?? plan.from;
-    flyBacks(from, plan.to[sideOf(step.seat)], step.n, Math.max(150, stepMs * 0.9));
+    if (step.jump) {
+      // One tile from this stack and one from two stacks further on (the 1st and 5th tiles).
+      const st5 = plan.order[Math.max(0, Math.min(N - 1, taken + 2))]!;
+      const from5 = introStackPoint(introKey, st5.seat, st5.position) ?? plan.from;
+      flyBacks(from, plan.to[sideOf(step.seat)], 1, Math.max(150, stepMs * 0.9));
+      flyBacks(from5, plan.to[sideOf(step.seat)], 1, Math.max(150, stepMs * 0.9));
+    } else flyBacks(from, plan.to[sideOf(step.seat)], step.n, Math.max(150, stepMs * 0.9));
   }
   return { wall: { stacks, count: plan.total - f - b }, dealt };
 }
@@ -1676,3 +1740,51 @@ function WinningHand({ seat, winningTileId, name }: { seat: SeatView; winningTil
   );
 }
 
+
+/**
+ * Fills the whole screen (hides the browser bar). Not shown where the browser can't do it
+ * (iPhone Safari only allows videos to go fullscreen).
+ */
+function FullscreenButton({ title }: { title: string }): ReactElement | null {
+  type Doc = Document & { webkitFullscreenEnabled?: boolean; webkitFullscreenElement?: Element | null; webkitExitFullscreen?: () => void };
+  type El = HTMLElement & { webkitRequestFullscreen?: () => void };
+  const doc = document as Doc;
+  const supported = !!(doc.fullscreenEnabled || doc.webkitFullscreenEnabled);
+  const [on, setOn] = useState(() => !!(doc.fullscreenElement || doc.webkitFullscreenElement));
+  useEffect(() => {
+    const update = (): void => setOn(!!(doc.fullscreenElement || doc.webkitFullscreenElement));
+    document.addEventListener('fullscreenchange', update);
+    document.addEventListener('webkitfullscreenchange', update);
+    return () => {
+      document.removeEventListener('fullscreenchange', update);
+      document.removeEventListener('webkitfullscreenchange', update);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  if (!supported) return null;
+  const toggle = (): void => {
+    try {
+      if (doc.fullscreenElement || doc.webkitFullscreenElement) {
+        if (doc.exitFullscreen) void doc.exitFullscreen().catch(() => undefined);
+        else doc.webkitExitFullscreen?.();
+      } else {
+        const el = document.documentElement as El;
+        if (el.requestFullscreen) void el.requestFullscreen().catch(() => undefined);
+        else el.webkitRequestFullscreen?.();
+      }
+    } catch {
+      /* not allowed here: nothing happens */
+    }
+  };
+  return (
+    <button className="btn icon fullscreen-btn" title={title} aria-pressed={on} onClick={toggle}>
+      <svg viewBox="0 0 24 24" width="1em" height="1em" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+        {on ? (
+          <path d="M9 3v6H3M15 3v6h6M9 21v-6H3M15 21v-6h6" />
+        ) : (
+          <path d="M3 9V3h6M21 9V3h-6M3 15v6h6M21 15v6h-6" />
+        )}
+      </svg>
+    </button>
+  );
+}

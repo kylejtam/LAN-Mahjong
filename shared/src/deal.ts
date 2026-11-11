@@ -6,7 +6,8 @@
  * 2. Check the set is exactly right (stops with an error if not).
  * 3. Build the wall and break it using the dice.
  * 4. Deal from the front: 3 rounds of 4 tiles each to every player (dealer
- *    first, then in turn order), then 1 more each, then 1 extra for the dealer.
+ *    first, then in turn order). Then the dealer takes the next 1st and 5th
+ *    tiles together, and the others take the 2nd, 3rd and 4th (one each).
  *    Result: dealer 14 tiles, everyone else 13.
  * 5. Flowers on: starting with the dealer, each player sets their flowers aside
  *    and draws replacements from the back of the wall. Repeat until no hand
@@ -53,8 +54,11 @@ export function dealRound({ dealer, flowersOn, rng, dice }: DealOptions): DealRe
       for (let i = 0; i < 4; i++) hands[seat]!.push(drawFront(wall));
     }
   }
-  for (const seat of seatOrder) hands[seat]!.push(drawFront(wall));
-  hands[dealer]!.push(drawFront(wall));
+  // The last part, like at a real table: the dealer takes the next 1st and 5th tiles
+  // at the same time ("jumping"), then the others take the 2nd, 3rd and 4th, one each.
+  const five = [0, 1, 2, 3, 4].map(() => drawFront(wall));
+  hands[dealer]!.push(five[0]!, five[4]!);
+  seatOrder.slice(1).forEach((seat, k) => hands[seat]!.push(five[k + 1]!));
 
   if (flowersOn) {
     let anyFlower = true;

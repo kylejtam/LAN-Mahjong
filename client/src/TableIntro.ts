@@ -18,7 +18,7 @@
  * else is happening (between hands), so it never makes the screen stutter.
  */
 
-import { WALL_SHRINK_MS, wallCountMs } from '@lan-mahjong/shared';
+import { INTRO_FADE_MS, WALL_SHRINK_MS, wallCountMs } from '@lan-mahjong/shared';
 
 export type Side = 'bottom' | 'right' | 'top' | 'left';
 const SEATS = 4;
@@ -248,7 +248,7 @@ let current: {
 } | null = null;
 
 function clear(): void {
-  document.body.classList.remove('intro-arriving');
+  document.body.classList.remove('intro-arriving', 'intro-fading');
   if (!current) return;
   current.timers.forEach(clearTimeout);
   current.box.remove();
@@ -433,38 +433,76 @@ export function introStackPoint(key: string, seat: number, position: number): { 
 export function finishIntro(key: string): void {
   const c = current;
   if (!c || c.key !== key) return;
-  const target = document.querySelector('.wall-box')?.getBoundingClientRect();
-  if (!target || reducedMotion()) {
+  const boxEl = document.querySelector('.wall-box');
+  const target = boxEl?.getBoundingClientRect();
+  if (!boxEl || !target || reducedMotion()) {
     clear();
     return;
   }
-  const g = c.g;
-  const sx = target.width / g.S;
-  const sy = target.height / g.S;
-  const scale = Math.min(sx, sy);
-  const tx = target.left + target.width / 2;
-  const ty = target.top + target.height / 2;
-  // The small box stays hidden until the tiles get there, then takes their place.
+  // Each stack still in the wall shrinks onto exactly the bar that stands for it in the small
+  // box (WallBox in Table: a 100 × 100 square, wall lines 7 thick), in the box's colours.
+  // Then the box fades in while the shrunk wall fades out, so nothing pops into view.
+  const css = getComputedStyle(boxEl);
+  const full = css.getPropertyValue('--tile-back').trim() || '#2f7d5b';
+  const light = css.getPropertyValue('--tile-back-light').trim() || '#6aa88b';
+  const B = 100;
+  const W = 7;
+  const seg = (B - 2 * W) / c.perWall;
+  const kx = target.width / B;
+  const ky = target.height / B;
+  const stackCount = new Map<string, number>();
+  for (const t of c.tiles) if (t.el.style.visibility !== 'hidden') stackCount.set(`${t.seat}-${t.position}`, (stackCount.get(`${t.seat}-${t.position}`) ?? 0) + 1);
   document.body.classList.add('intro-arriving');
-  const SHRINK = WALL_SHRINK_MS - 100;
+  const SHRINK = WALL_SHRINK_MS - INTRO_FADE_MS;
   for (const t of c.tiles) {
     if (t.el.style.visibility === 'hidden') continue;
-    const nx = tx + (t.x + g.tw / 2 - g.cx) * sx - g.tw / 2;
-    const ny = ty + (t.y + g.th / 2 - g.cy) * sy - g.th / 2;
+    const side = c.sideOf(t.seat);
+    let x = 0, y = 0, w = seg, h = W;
+    if (side === 'bottom') { x = W + (c.perWall - 1 - t.position) * seg; y = B - W; }
+    else if (side === 'top') { x = W + t.position * seg; y = 0; }
+    else if (side === 'right') { x = B - W; y = W + t.position * seg; w = W; h = seg; }
+    else { x = 0; y = W + (c.perWall - 1 - t.position) * seg; w = W; h = seg; }
+    const pw = w * kx;
+    const ph = h * ky;
+    const ncx = target.left + (x + w / 2) * kx;
+    const ncy = target.top + (y + h / 2) * ky;
+    const g = c.g;
+    // Scale in the tile's own direction: a tile turned 90° has its width running up the screen.
+    const turned = t.r === 90;
+    const scX = turned ? ph / g.tw : pw / g.tw;
+    const scY = turned ? pw / g.th : ph / g.th;
+    const colour = (stackCount.get(`${t.seat}-${t.position}`) ?? 0) >= 2 ? full : light;
     t.el.getAnimations().forEach((a) => a.cancel());
     t.el.animate(
       [
-        { transform: T(t.x, t.y, t.r), opacity: 1, easing: 'ease-in-out' },
-        { transform: T(nx, ny, t.r, scale), opacity: 1, offset: 0.88 },
-        { transform: T(nx, ny, t.r, scale), opacity: 0 },
+        { transform: T(t.x, t.y, t.r), borderRadius: '3px' },
+        { transform: `translate(${ncx - g.tw / 2}px, ${ncy - g.th / 2}px) rotate(${t.r}deg) scale(${scX}, ${scY})`, borderRadius: '0px', backgroundColor: colour, boxShadow: 'none', borderColor: 'transparent' },
       ],
-      { duration: SHRINK, fill: 'forwards' },
+      { duration: SHRINK, easing: 'ease-in-out', fill: 'forwards' },
     );
   }
   c.timers.push(
-    setTimeout(() => document.body.classList.remove('intro-arriving'), SHRINK * 0.88),
-    setTimeout(() => current === c && clear(), SHRINK + 50),
+    setTimeout(() => {
+      if (current !== c) return;
+      // The small box fades in exactly where the shrunk wall is, as the wall fades out.
+      document.body.classList.remove('intro-arriving');
+      document.body.classList.add('intro-fading');
+      c.box.animate([{ opacity: 1 }, { opacity: 0 }], { duration: INTRO_FADE_MS, fill: 'forwards' });
+    }, SHRINK),
+    setTimeout(() => {
+      document.body.classList.remove('intro-fading');
+      if (current === c) clear();
+    }, SHRINK + INTRO_FADE_MS + 30),
   );
+}
+
+/** The space inside the big wall (screen pixels), for the dice to bounce in; null if no wall. */
+export function introInnerBox(): { l: number; t: number; r: number; b: number } | null {
+  if (!current) return null;
+  const g = current.g;
+  const half = g.S / 2;
+  const pad = g.th / 2 + 4;
+  return { l: g.cx - half + pad, t: g.cy - half + pad, r: g.cx + half - pad, b: g.cy + half - pad };
 }
 
 /** Remove the wall drawing (a hand was stopped, the page changes, ...). */

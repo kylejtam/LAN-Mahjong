@@ -95,6 +95,8 @@ const en = {
   spectate: 'Spectate',
   justWatch: 'Just watch',
   ready: 'Ready',
+  remainingTiles: 'Remaining tiles',
+  fullscreen: 'Fullscreen',
   // swaps
   swapInTitle: 'Swap in?',
   swapInText: '{name} would like you to take their seat.',
@@ -224,6 +226,8 @@ const zh: Strings = {
   spectate: '旁觀',
   justWatch: '淨係睇',
   ready: '準備好',
+  remainingTiles: '剩餘牌',
+  fullscreen: '全螢幕',
   swapInTitle: '換入嚟？',
   swapInText: '{name} 想你頂佢個位。',
   swapIn: '換入',

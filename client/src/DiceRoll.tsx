@@ -1,6 +1,6 @@
 /**
  * The dice roll at the start of each hand: three dice are thrown from the
- * dealer's side, bounce around the screen while their faces flicker, then
+ * dealer's side, bounce around inside the wall while their faces flicker, then
  * settle side by side in the middle showing the real roll. The deal starts
  * once they have landed (see DICE_MS in Table.tsx).
  *
@@ -9,6 +9,7 @@
  * (no React re-render each frame) to keep it smooth on phones.
  */
 import { useEffect, useRef } from 'react';
+import { introInnerBox } from './TableIntro';
 import type { ReactElement } from 'react';
 
 /** How long the whole roll lasts, landing included. */
@@ -53,21 +54,26 @@ export function DiceRoll({ values, from }: { values: [number, number, number]; f
 
   useEffect(() => {
     const els = refs.map((r) => r.current!);
-    const W = window.innerWidth;
-    const H = window.innerHeight;
     const size = els[0]!.offsetWidth || 48;
+    // The dice stay inside the wall (when the big wall is on screen), else inside the screen.
+    const inner = introInnerBox();
+    const box = inner ?? { l: 0, t: 0, r: window.innerWidth, b: window.innerHeight };
+    const W = box.r - box.l;
+    const H = box.b - box.t;
+    const midX = (box.l + box.r) / 2;
+    const midY = inner ? (box.t + box.b) / 2 : window.innerHeight * 0.45;
     const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     // Where they land: side by side in the middle.
-    const land = [-1, 0, 1].map((k) => ({ x: W / 2 + k * size * 1.25 - size / 2, y: H * 0.45 - size / 2 }));
-    // Thrown from the dealer's edge of the screen, towards the middle.
+    const land = [-1, 0, 1].map((k) => ({ x: midX + k * size * 1.25 - size / 2, y: midY - size / 2 }));
+    // Thrown from just inside the dealer's side, towards the far side.
     const start = (i: number): { x: number; y: number; vx: number; vy: number } => {
-      const spread = (i - 1) * size * 1.1;
-      const speed = Math.max(W, H) * (1.1 + Math.random() * 0.5); // pixels per second
-      const wobble = (Math.random() - 0.5) * 0.9;
-      if (from === 'bottom') return { x: W / 2 + spread, y: H - size, vx: speed * wobble, vy: -speed };
-      if (from === 'top') return { x: W / 2 + spread, y: 0, vx: speed * wobble, vy: speed };
-      if (from === 'left') return { x: 0, y: H / 2 + spread, vx: speed, vy: speed * wobble };
-      return { x: W - size, y: H / 2 + spread, vx: -speed, vy: speed * wobble };
+      const spread = (i - 1) * size * 1.3;
+      const speed = Math.max(W, H) * (2 + Math.random() * 0.6); // pixels per second
+      const wobble = (Math.random() - 0.5) * 0.8;
+      if (from === 'bottom') return { x: midX - size / 2 + spread, y: box.b - size, vx: speed * wobble, vy: -speed };
+      if (from === 'top') return { x: midX - size / 2 + spread, y: box.t, vx: speed * wobble, vy: speed };
+      if (from === 'left') return { x: box.l, y: midY - size / 2 + spread, vx: speed, vy: speed * wobble };
+      return { x: box.r - size, y: midY - size / 2 + spread, vx: -speed, vy: speed * wobble };
     };
     const dice = els.map((_, i) => ({ ...start(i), rot: Math.random() * 360, vr: (Math.random() - 0.5) * 1400, face: 1 + ((i * 2) % 6) }));
     // Which face shows is chosen in the CSS from data-value.
@@ -103,11 +109,29 @@ export function DiceRoll({ values, from }: { values: [number, number, number]; f
           d.x += d.vx * dt;
           d.y += d.vy * dt;
           d.rot += d.vr * dt;
-          if (d.x < 0) { d.x = 0; d.vx = Math.abs(d.vx) * 0.75; }
-          if (d.x > W - size) { d.x = W - size; d.vx = -Math.abs(d.vx) * 0.75; }
-          if (d.y < 0) { d.y = 0; d.vy = Math.abs(d.vy) * 0.75; }
-          if (d.y > H - size) { d.y = H - size; d.vy = -Math.abs(d.vy) * 0.75; }
+          if (d.x < box.l) { d.x = box.l; d.vx = Math.abs(d.vx) * 0.7; d.vr *= -0.8; }
+          if (d.x > box.r - size) { d.x = box.r - size; d.vx = -Math.abs(d.vx) * 0.7; d.vr *= -0.8; }
+          if (d.y < box.t) { d.y = box.t; d.vy = Math.abs(d.vy) * 0.7; d.vr *= -0.8; }
+          if (d.y > box.b - size) { d.y = box.b - size; d.vy = -Math.abs(d.vy) * 0.7; d.vr *= -0.8; }
         });
+        // The dice knock into each other instead of passing through.
+        for (let i = 0; i < 3; i++) {
+          for (let j = i + 1; j < 3; j++) {
+            const a = dice[i]!;
+            const b = dice[j]!;
+            const dx = b.x - a.x;
+            const dy = b.y - a.y;
+            const dist = Math.hypot(dx, dy) || 1;
+            const min = size * 1.05;
+            if (dist >= min) continue;
+            const nx = dx / dist;
+            const ny = dy / dist;
+            const push = (min - dist) / 2;
+            a.x -= nx * push; a.y -= ny * push; b.x += nx * push; b.y += ny * push;
+            const rel = (b.vx - a.vx) * nx + (b.vy - a.vy) * ny;
+            if (rel < 0) { a.vx += nx * rel * 0.9; a.vy += ny * rel * 0.9; b.vx -= nx * rel * 0.9; b.vy -= ny * rel * 0.9; }
+          }
+        }
         // Faces flicker while they tumble (slower as they slow down).
         if (now - lastFlick > 70 + (t / BOUNCE_MS) * 120) {
           lastFlick = now;
