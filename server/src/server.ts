@@ -19,13 +19,14 @@ import QRCode from 'qrcode';
 import { WebSocketServer, WebSocket } from 'ws';
 import { Rng } from '@lan-mahjong/shared';
 import { CLAIM_AFTER_DRAW_MS, GRACE_MS, GameError, WIN_OVERRIDE_MS, lastTileDeadline } from './game/round.js';
-import { Room, cpuTick, settleWall, createRoom, disconnect, handleCommand, handleHostCommand, joinRoom, nameKey } from './game/room.js';
+import { Room, cpuTick, settleWall, createRoom, createTutorialRoom, disconnect, handleCommand, handleHostCommand, joinRoom, nameKey } from './game/room.js';
 import { matchLabel } from './game/match.js';
 import { hostViewOf, viewFor } from './game/view.js';
 import { ClientMessage, GameListEntry, HostMessage, ServerHostMessage, ServerMessage } from './protocol.js';
 import { loadRooms, saveRooms } from './storage.js';
 import { lanAddresses } from './addresses.js';
 import { APP_VERSION } from './update.js';
+import { Pile, cpuHand, newPile, pileFrame, shovesDone, startShoves, stepPile } from './pile.js';
 
 export interface ServerOptions {
   port: number;
@@ -36,6 +37,8 @@ export interface ServerOptions {
   rng?: Rng;
   /** How often CPUs and timers are checked (milliseconds). */
   tickMs?: number;
+  /** How often to check each connection is still there (ms). */
+  pingMs?: number;
   /** Folder with the built screens (client/dist). */
   clientDir?: string;
   /** Which connections may use the host page. Default: only this computer. */
@@ -140,7 +143,7 @@ export async function startServer(opts: ServerOptions): Promise<RunningServer> {
   const saveNow = (): void => {
     if (!opts.dataFile) return;
     try {
-      saveRooms(opts.dataFile, rooms.values());
+      saveRooms(opts.dataFile, [...rooms.values()].filter((r) => !r.tutorial));
     } catch (err) {
       console.error('Could not save games:', err);
     }
@@ -160,7 +163,7 @@ export async function startServer(opts: ServerOptions): Promise<RunningServer> {
 
   const gameList = (): GameListEntry[] =>
     [...rooms.values()]
-      .filter((r) => !r.ended)
+      .filter((r) => !r.ended && !r.tutorial)
       .sort((a, b) => a.createdAt - b.createdAt)
       .map((r) => ({
         id: r.id,
@@ -185,11 +188,16 @@ export async function startServer(opts: ServerOptions): Promise<RunningServer> {
     if (hostSockets.size === 0) return;
     const msg: ServerHostMessage = {
       type: 'hostState',
-      games: [...rooms.values()].sort((a, b) => a.createdAt - b.createdAt).map(hostViewOf),
+      games: [...rooms.values()].filter((r) => !r.tutorial).sort((a, b) => a.createdAt - b.createdAt).map(hostViewOf),
       urls: urlsFor(actualPortOf()),
     };
     for (const ws of hostSockets) send(ws, msg);
   };
+
+  /** The shared pile of tiles between hands, for each room that has one. */
+  const piles = new Map<string, { id: number; pile: Pile; sentDone?: boolean }>();
+  /** How many times each room's state has been sent (devices check they have the latest). */
+  const revs = new Map<string, number>();
 
   /** Send every device in a room its own view. */
   const broadcast = (roomId: string): void => {
@@ -197,8 +205,10 @@ export async function startServer(opts: ServerOptions): Promise<RunningServer> {
     if (!room) return;
     const t = now();
     lastSent.set(roomId, t);
+    const rev = (revs.get(roomId) ?? 0) + 1;
+    revs.set(roomId, rev);
     for (const [ws, c] of clients) {
-      if (c.roomId === roomId && c.key && room.people[c.key]) send(ws, { type: 'state', view: viewFor(room, c.key, t) });
+      if (c.roomId === roomId && c.key && room.people[c.key]) send(ws, { type: 'state', view: viewFor(room, c.key, t), rev });
     }
     sendGameListIfChanged();
     sendHostState();
@@ -230,15 +240,62 @@ export async function startServer(opts: ServerOptions): Promise<RunningServer> {
       case 'listGames':
         send(ws, { type: 'games', games: gameList() });
         return;
+      case 'shove': {
+        // Shuffling: only seated players, and only while the tiles are loose on the table.
+        const room = c.roomId ? rooms.get(c.roomId) : undefined;
+        const p = room ? piles.get(room.id) : undefined;
+        if (!room || !p || !c.key || !room.seats.includes(c.key) || p.pile.shovesAt !== null) return;
+        const x = Number(msg.x);
+        const y = Number(msg.y);
+        if (!Number.isFinite(x) || !Number.isFinite(y)) return;
+        const h = p.pile.hands.get(c.key);
+        const on = !!msg.on;
+        if (!h || !h.on) p.pile.hands.set(c.key, { x, y, px: x, py: y, on, at: now() });
+        else Object.assign(h, { x, y, on, at: now() });
+        return;
+      }
+      case 'startTutorial': {
+        // A private practice game for this player, with 3 computer players.
+        const name = String(msg.name ?? '').trim() || 'You';
+        disconnectClient(c);
+        const room = createTutorialRoom(`tutorial-${randomUUID()}`, now());
+        const { room: joined, person } = joinRoom(room, name, now());
+        c.roomId = joined.id;
+        c.key = person.key;
+        send(ws, { type: 'joined', gameId: joined.id, name: person.name });
+        setRoom(joined);
+        return;
+      }
+      case 'ping': {
+        // A device checking in. If it missed an update, send it the latest state now.
+        const room = c.roomId ? rooms.get(c.roomId) : undefined;
+        const rev = room ? revs.get(room.id) ?? 0 : null;
+        if (room && c.key && room.people[c.key] && typeof msg.rev === 'number' && msg.rev !== rev) {
+          send(ws, { type: 'state', view: viewFor(room, c.key, now()), rev: rev ?? 0 });
+        }
+        send(ws, { type: 'pong', rev });
+        return;
+      }
       case 'joinGame': {
         const room = rooms.get(String(msg.gameId));
         if (!room) throw new GameError('That game no longer exists.');
-        const { room: joined, person } = joinRoom(room, String(msg.name ?? ''), now());
+        let joined: Room;
+        let person: { key: string; name: string };
+        try {
+          ({ room: joined, person } = joinRoom(room, String(msg.name ?? ''), now()));
+        } catch (err) {
+          // "Name in use": maybe that's this same phone, whose old connection died quietly.
+          // Check the old connection now; if it doesn't answer, drop it so the retry works.
+          if (err instanceof GameError && /already in use/.test(err.message)) checkOldConnection(room.id, nameKey(String(msg.name ?? '')));
+          throw err;
+        }
         disconnectClient(c);
         c.roomId = joined.id;
         c.key = person.key;
         send(ws, { type: 'joined', gameId: joined.id, name: person.name });
         setRoom(joined);
+        const p = piles.get(joined.id);
+        if (p) send(ws, { type: 'pile', id: p.id, perWall: p.pile.perWall, tiles: pileFrame(p.pile), done: shovesDone(p.pile, now()) });
         return;
       }
       case 'command': {
@@ -260,10 +317,18 @@ export async function startServer(opts: ServerOptions): Promise<RunningServer> {
       case 'leaveGame': {
         const room = c.roomId ? rooms.get(c.roomId) : undefined;
         if (room && c.key) {
-          const updated = handleCommand(room, c.key, { type: 'leaveGame' }, now(), rng);
-          c.roomId = null;
-          c.key = null;
-          setRoom(updated);
+          if (room.tutorial) {
+            // Leaving the tutorial: it's gone.
+            c.roomId = null;
+            c.key = null;
+            rooms.delete(room.id);
+            piles.delete(room.id);
+          } else {
+            const updated = handleCommand(room, c.key, { type: 'leaveGame' }, now(), rng);
+            c.roomId = null;
+            c.key = null;
+            setRoom(updated);
+          }
         }
         send(ws, { type: 'games', games: gameList() });
         return;
@@ -402,27 +467,55 @@ export async function startServer(opts: ServerOptions): Promise<RunningServer> {
     ws.on('close', () => hostSockets.delete(ws));
   });
 
-  // Every 15 s check each phone is still there; drop connections that died
-  // silently (so the person shows as disconnected and can rejoin with their name).
-  const alive = new WeakMap<WebSocket, boolean>();
+  // Every 5 s check each phone is still there; a connection that misses two checks in a
+  // row (about 10 s) died quietly and is dropped, so the person shows as disconnected
+  // (and the game pauses) and can rejoin with their name.
+  const missed = new WeakMap<WebSocket, number>();
+  /** When each player's device last sent anything (it checks in every 3 s). */
+  const heardAt = new WeakMap<WebSocket, number>();
   const pingTimer = setInterval(() => {
     for (const ws of [...clients.keys(), ...hostSockets]) {
-      if (alive.get(ws) === false) {
+      const m = (missed.get(ws) ?? 0) + 1;
+      // A device at a table that has said nothing for 10 s has gone, even if the
+      // connection still looks open (a frozen page can't check in).
+      const quiet = clients.get(ws)?.roomId && Date.now() - (heardAt.get(ws) ?? Date.now()) > 10_000;
+      if (m > 2 || quiet) {
         ws.terminate();
         continue;
       }
-      alive.set(ws, false);
+      missed.set(ws, m);
       try {
         ws.ping();
       } catch {
         /* ignore */
       }
     }
-  }, 15000);
+  }, opts.pingMs ?? 5000);
   const watch = (ws: WebSocket): void => {
-    alive.set(ws, true);
-    ws.on('pong', () => alive.set(ws, true));
-    ws.on('message', () => alive.set(ws, true));
+    missed.set(ws, 0);
+    heardAt.set(ws, Date.now());
+    ws.on('pong', () => missed.set(ws, 0));
+    ws.on('message', () => {
+      missed.set(ws, 0);
+      heardAt.set(ws, Date.now());
+    });
+  };
+  /** Someone rejoined with a name that is still connected: is that old connection really there? */
+  const checkOldConnection = (roomId: string, key: string): void => {
+    for (const [old, oc] of clients) {
+      if (oc.roomId !== roomId || oc.key !== key) continue;
+      const before = missed.get(old) ?? 0;
+      missed.set(old, before + 1);
+      try {
+        old.ping();
+      } catch {
+        old.terminate();
+        continue;
+      }
+      setTimeout(() => {
+        if ((missed.get(old) ?? 0) > 0 && clients.has(old)) old.terminate();
+      }, 2000);
+    }
   };
 
   wss.on('connection', (ws) => {
@@ -464,6 +557,12 @@ export async function startServer(opts: ServerOptions): Promise<RunningServer> {
   const tick = (): void => {
     const t = now();
     for (const room of [...rooms.values()]) {
+      // A tutorial nobody has had open for 10 minutes is cleared away.
+      if (room.tutorial && t - room.lastChangeAt > 600_000 && ![...clients.values()].some((c) => c.roomId === room.id)) {
+        rooms.delete(room.id);
+        piles.delete(room.id);
+        continue;
+      }
       const settled = settleWall(room, t);
       if (settled !== room) {
         setRoom(settled);
@@ -488,11 +587,51 @@ export async function startServer(opts: ServerOptions): Promise<RunningServer> {
   };
   const interval = setInterval(tick, opts.tickMs ?? 250);
 
+  // ---------- the shared pile between hands (shuffling) ----------
+  let pileIds = 0;
+  const pileTimer = setInterval(() => {
+    const t = now();
+    for (const room of rooms.values()) {
+      const round = room.match.round;
+      const loose = room.phase === 'betweenRounds' || (room.phase === 'playing' && !!round && round.core.phase === 'ended');
+      const rolling = room.phase === 'rolling';
+      let p = piles.get(room.id);
+      if (!loose && !rolling) {
+        if (p) piles.delete(room.id); // the hand is on: the wall has been built
+        continue;
+      }
+      const watchers = [...clients.values()].filter((c) => c.roomId === room.id);
+      if (watchers.length === 0) continue;
+      if (!p) {
+        const perWall = room.match.settings.flowersOn ? 18 : 17;
+        p = { id: ++pileIds, pile: newPile(perWall * 8, perWall) };
+        piles.set(room.id, p);
+      }
+      const pile = p.pile;
+      if (rolling && pile.shovesAt === null) startShoves(pile, t);
+      if (!rolling) {
+        // Computer players shuffle too while they wait for the people at the table.
+        room.seats.forEach((k, i) => {
+          if (k && room.people[k]?.cpu) cpuHand(pile, `cpu${i}`, i, t);
+        });
+      }
+      const done = shovesDone(pile, t);
+      if (!done) for (let i = 0; i < 4; i++) stepPile(pile, 1 / 60, t - 50 + i * 16);
+      if (pile.moving || (done && !p.sentDone)) {
+        pile.moving = false;
+        if (done) p.sentDone = true;
+        const msg: ServerMessage = { type: 'pile', id: p.id, perWall: pile.perWall, tiles: pileFrame(pile), done };
+        for (const [ws, c] of clients) if (c.roomId === room.id) send(ws, msg);
+      }
+    }
+  }, 66);
+
   await new Promise<void>((resolve, reject) => {
     // Report problems such as "port already in use" instead of waiting forever.
     const onError = (err: Error): void => {
       clearInterval(interval);
       clearInterval(pingTimer);
+      clearInterval(pileTimer);
       reject(err);
     };
     http.once('error', onError);
@@ -510,6 +649,7 @@ export async function startServer(opts: ServerOptions): Promise<RunningServer> {
     close: async () => {
       clearInterval(interval);
       clearInterval(pingTimer);
+      clearInterval(pileTimer);
       if (saveTimer) clearTimeout(saveTimer);
       saveNow();
       for (const ws of [...clients.keys(), ...hostSockets]) ws.terminate();

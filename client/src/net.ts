@@ -8,8 +8,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ClientMessage, GameListEntry, ServerMessage } from '../../server/src/protocol';
 import type { RoomView } from '../../server/src/game/view';
+import { emitPile } from './pileBus';
 
 const SESSION_KEY = 'lan-mahjong-session';
+/** Commands that change the game: each must be answered by the server quickly. */
+const MOVES = new Set(['draw', 'drawReplacement', 'discard', 'claim', 'hold', 'releaseHold', 'concealedGong', 'addedGong', 'selfDrawWin', 'pass', 'undo', 'rollDice']);
 
 interface Session {
   gameId: string;
@@ -42,6 +45,8 @@ export interface Connection {
   ended: boolean;
   send: (msg: ClientMessage) => void;
   join: (gameId: string, name: string) => void;
+  /** Start a private tutorial game. */
+  startTutorial: (name: string) => void;
   leave: () => void;
   dismissEnded: () => void;
 }
@@ -62,8 +67,13 @@ export function useConnection(): Connection {
   const session = useRef<Session | null>(loadSession());
   const rejoinTries = useRef(0);
 
+  /** When a move was sent that the server hasn't answered yet (null = none waiting). */
+  const moveSentAt = useRef<number | null>(null);
+  /** The last state number received (the server resends if this device missed one). */
+  const lastRev = useRef<number | null>(null);
   const send = useCallback((msg: ClientMessage) => {
     const ws = wsRef.current;
+    if (msg.type === 'command' && MOVES.has(msg.command.type) && moveSentAt.current === null) moveSentAt.current = Date.now();
     if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(msg));
   }, []);
 
@@ -86,7 +96,13 @@ export function useConnection(): Connection {
       ws.onmessage = (e) => {
         lastMessageAt = Date.now();
         const msg = JSON.parse(String(e.data)) as ServerMessage;
+        if (msg.type === 'state' || msg.type === 'error') moveSentAt.current = null; // the move was answered
         switch (msg.type) {
+          case 'pong':
+            break;
+          case 'pile':
+            emitPile(msg);
+            break;
           case 'games':
             setGames(msg.games);
             break;
@@ -96,6 +112,7 @@ export function useConnection(): Connection {
             rejoinTries.current = 0;
             break;
           case 'state':
+            if (typeof msg.rev === 'number') lastRev.current = msg.rev;
             setView(msg.view);
             // After a name change, rejoin later with the new name.
             if (session.current && session.current.name !== msg.view.you.name) {
@@ -142,21 +159,33 @@ export function useConnection(): Connection {
       connect();
     };
     /**
-     * Phones (especially iPhones) can freeze a page's connection while it is in
-     * the background (e.g. while scanning the QR code with the camera) without
-     * telling the page. So: every 10 s ask for the game list (keeps it fresh and
-     * proves the connection works), and if nothing arrives for 25 s, reconnect.
+     * Phones (especially iPhones) can keep a connection that looks open but carries
+     * nothing (after the screen locks, or in the background), without telling the page.
+     * So: check in with the server every 3 s (it answers straight away, and resends the
+     * game if this device missed an update). If nothing comes back for 8 s, or a move
+     * isn't answered within 3 s, show "Reconnecting…" and open a fresh connection.
+     * (A move is never sent again by itself, so a tile can't be thrown twice.)
      */
+    let beat = 0;
     const heartbeat = setInterval(() => {
       const ws = wsRef.current;
-      if (Date.now() - lastMessageAt > 25000) reconnectNow();
-      else if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'listGames' }));
-    }, 10000);
+      const t = Date.now();
+      if (t - lastMessageAt > 8000 || (moveSentAt.current !== null && t - moveSentAt.current > 3000)) {
+        moveSentAt.current = null;
+        reconnectNow();
+        return;
+      }
+      if (!ws || ws.readyState !== WebSocket.OPEN) return;
+      beat++;
+      if (beat % 3 === 0) {
+        ws.send(JSON.stringify(viewRef.current ? { type: 'ping', rev: lastRev.current ?? undefined } : { type: 'listGames' }));
+      }
+    }, 1000);
     /** When the page comes back into view, check the connection straight away. */
     const onVisible = (): void => {
       if (document.visibilityState !== 'visible') return;
       const ws = wsRef.current;
-      if (!ws || ws.readyState !== WebSocket.OPEN || Date.now() - lastMessageAt > 12000) reconnectNow();
+      if (!ws || ws.readyState !== WebSocket.OPEN || Date.now() - lastMessageAt > 5000) reconnectNow();
       else ws.send(JSON.stringify({ type: 'listGames' }));
     };
     document.addEventListener('visibilitychange', onVisible);
@@ -183,6 +212,14 @@ export function useConnection(): Connection {
     [send],
   );
 
+  const startTutorial = useCallback(
+    (name: string) => {
+      session.current = null;
+      send({ type: 'startTutorial', name });
+    },
+    [send],
+  );
+
   const leave = useCallback(() => {
     send({ type: 'leaveGame' });
     session.current = null;
@@ -190,5 +227,5 @@ export function useConnection(): Connection {
     setView(null);
   }, [send, setView]);
 
-  return { status, games, view, error, ended, send, join, leave, dismissEnded: () => setEnded(false) };
+  return { status, games, view, error, ended, send, join, startTutorial, leave, dismissEnded: () => setEnded(false) };
 }

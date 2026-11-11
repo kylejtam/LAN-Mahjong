@@ -14,7 +14,7 @@ export function App(): ReactElement {
   const setPrefs = (p: Prefs): void => {
     setPrefsState(p);
     savePrefs(p);
-    if (conn.view) conn.send({ type: 'command', command: { type: 'setPrefs', prefs: { lang: p.lang, celebration: p.celebration } } });
+    if (conn.view) conn.send({ type: 'command', command: { type: 'setPrefs', prefs: { lang: p.lang, celebration: p.celebration, callAll: p.callAll } } });
   };
 
   // When you join (or log in on another device), your saved choices follow your name.
@@ -22,12 +22,12 @@ export function App(): ReactElement {
   useEffect(() => {
     if (!conn.view) return;
     const fromServer = cleanPrefs(conn.view.you.prefs);
-    if (fromServer.lang || fromServer.celebration) {
+    if (fromServer.lang || fromServer.celebration || fromServer.callAll !== undefined) {
       const merged = { ...prefs, ...fromServer };
       setPrefsState(merged);
       savePrefs(merged);
     } else {
-      conn.send({ type: 'command', command: { type: 'setPrefs', prefs: { lang: prefs.lang, celebration: prefs.celebration } } });
+      conn.send({ type: 'command', command: { type: 'setPrefs', prefs: { lang: prefs.lang, celebration: prefs.celebration, callAll: prefs.callAll } } });
     }
     // Only when you join or change name.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -48,7 +48,15 @@ export function App(): ReactElement {
       ) : (
         <Lobby conn={conn} prefs={prefs} setPrefs={setPrefs} />
       )}
-      {conn.view && conn.status !== 'open' && <div className="banner">{t(prefs.lang, 'reconnecting')}</div>}
+      {conn.view && conn.status !== 'open' && (
+        // Lost the connection: dim everything, with a message nobody can miss.
+        <div className="reconnecting" role="alert">
+          <div>
+            <div className="reconnecting-big">{t(prefs.lang, 'reconnectingBig')}<span className="dots"><span>.</span><span>.</span><span>.</span></span></div>
+            <div className="reconnecting-small">{t(prefs.lang, 'reconnectingNote')}</div>
+          </div>
+        </div>
+      )}
       {conn.ended && (
         <div className="overlay" onClick={conn.dismissEnded}>
           <div className="panel">

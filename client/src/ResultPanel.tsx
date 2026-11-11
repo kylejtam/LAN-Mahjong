@@ -4,6 +4,7 @@
  * (−), and the total chips transferred. Everyone presses Confirm before the
  * next round. (Chips can only be changed by hand on the laptop's host page.)
  */
+import { useState } from 'react';
 import type { ReactElement } from 'react';
 import type { ClientMessage } from '../../server/src/protocol';
 import type { RoomView } from '../../server/src/game/view';
@@ -41,14 +42,20 @@ interface Props {
   canClaimWin: boolean;
   onWin: () => void;
   winLabel: string;
-  /** Seated players go on to the "Ready / Leave seat" popup. */
+  /** Seated players go back to the table (or, after the last hand, to the final scores). */
   onContinue: () => void;
+  /** After the last hand: show the final scores now (this hand's chips included). */
+  finalPreview?: boolean;
 }
 
-export function ResultPanel({ view, lang, command, canClaimWin, onWin, winLabel, onContinue }: Props): ReactElement {
+export function ResultPanel({ view, lang, command, canClaimWin, onWin, winLabel, onContinue, finalPreview }: Props): ReactElement {
   const tr = (k: Parameters<typeof t>[1], v?: Record<string, string | number>): string => t(lang, k, v);
-  if (view.phase === 'finished') {
-    const ranked = [...view.seats].sort((a, b) => (b.balance ?? 0) - (a.balance ?? 0));
+  const [showWall, setShowWall] = useState(false);
+  if (view.phase === 'finished' || finalPreview) {
+    // Before the server has paid out the last hand, add its chips here.
+    const res = view.phase === 'finished' ? null : view.round?.result;
+    const final = (seat: number, balance: number | null): number => (balance ?? 0) + (res?.type === 'win' ? res.changes[seat] ?? 0 : 0);
+    const ranked = [...view.seats].map((s) => ({ ...s, balance: final(s.seat, s.balance) })).sort((a, b) => b.balance - a.balance);
     return (
       <div className="overlay">
         <div className="panel">
@@ -72,6 +79,8 @@ export function ResultPanel({ view, lang, command, canClaimWin, onWin, winLabel,
   const waitingFor = view.seats.filter((s) => s.name && !s.cpu && !s.confirmed).map((s) => personName(s.name, lang));
   /** Chips with a clear sign: +48, −16 (a real minus sign), or 0. */
   const signed = (n: number): string => (n > 0 ? `+${n}` : n < 0 ? `−${Math.abs(n)}` : '0');
+  const wall = view.round?.remainingWall ?? [];
+  const wallCount = wall.reduce((n, st) => n + st.length, 0);
   return (
     <div className="overlay">
       <div className="panel result">
@@ -151,14 +160,17 @@ export function ResultPanel({ view, lang, command, canClaimWin, onWin, winLabel,
         </div>
         <div className="row">
           {canClaimWin && <button className="act act-win" onClick={onWin}>{winLabel}</button>}
+          {wallCount > 0 && (
+            <button className="btn remaining-btn" onClick={() => setShowWall(true)}>{tr('remainingTiles')}</button>
+          )}
           {me && (
-            // Next: the "Ready / Leave seat" popup.
-            <button className="btn primary big" onClick={onContinue}>{tr('continue')}</button>
+            // Next: back to the table (after the last hand: the final scores).
+            <button className="btn primary big continue-btn" onClick={onContinue}>{tr('continue')}</button>
           )}
           {!me && view.spectatorsConfirm && (
             // All-CPU table: a spectator moves the game on to the next hand.
-            <button className="btn primary big" onClick={() => command({ type: 'confirmRound' })}>
-              {tr('nextHand')}
+            <button className="btn primary big" onClick={() => (view.lastHand ? onContinue() : command({ type: 'confirmRound' }))}>
+              {view.lastHand ? tr('continue') : tr('nextHand')}
             </button>
           )}
           {me && result.type === 'win' && result.isChicken && (
@@ -169,6 +181,25 @@ export function ResultPanel({ view, lang, command, canClaimWin, onWin, winLabel,
         </div>
         {waitingFor.length > 0 && <p className="muted">{tr('waitingFor', { names: waitingFor.join(lang === 'zh' ? '、' : ', ') })}</p>}
       </div>
+      {showWall && (
+        // The tiles left in the wall, in the order they would have been drawn.
+        <div className="overlay remaining-overlay" onClick={() => setShowWall(false)}>
+          <div className="panel remaining-panel" role="dialog" aria-label={tr('remainingTiles')} onClick={(e) => e.stopPropagation()}>
+            <div className="remaining-head">
+              <h3>{tr('remainingTiles')}</h3>
+              <span className="remaining-count">{wallCount}</span>
+              <button className="panel-close" aria-label={tr('close')} onClick={() => setShowWall(false)}>×</button>
+            </div>
+            <div className="remaining-tiles">
+              {wall.map((st, i) => (
+                <span key={i} className="remaining-stack">
+                  {st.map((tile) => <TileView key={tile.id} type={tile.type} width="var(--result-w)" />)}
+                </span>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

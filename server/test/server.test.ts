@@ -26,6 +26,11 @@ class Device {
       this.inbox.push(msg);
       this.waiters.splice(0).forEach((w) => w());
     });
+    // Like a real device: check in every 3 s (the server drops devices that go quiet).
+    const beat = setInterval(() => {
+      if (this.ws.readyState === WebSocket.OPEN) this.ws.send(JSON.stringify({ type: 'ping' }));
+    }, 3000);
+    this.ws.on('close', () => clearInterval(beat));
   }
   open(): Promise<void> {
     return new Promise((res) => (this.ws.readyState === WebSocket.OPEN ? res() : this.ws.once('open', () => res())));

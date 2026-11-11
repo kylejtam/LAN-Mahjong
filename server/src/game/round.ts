@@ -148,6 +148,12 @@ export interface ClaimWindow {
   openedAt?: number;
   /** Wall empty: players who chose not to take this tile (the Pass button). */
   passed?: number[];
+  /**
+   * Players holding the tile while they decide (tapped a claim button, or "Call all
+   * possible claims" did it for them). kind null = not chosen yet. While anyone holds,
+   * the next player cannot draw.
+   */
+  holds?: { seat: number; kind: ClaimKind | null }[];
 }
 
 export interface HistoryEntry {
@@ -300,6 +306,7 @@ export function roundFromDeal(deal: DealResult, roundWind: number, settings: Rou
 /** Normal draw: drag a tile from the front of the wall into your hand. */
 export function draw(prev: RoundState, seat: number, now: number): RoundState {
   requireTurn(prev.core, seat, 'mustDraw');
+  if (prev.window?.holds?.length) fail('Waiting for a claim.');
   const state = startEdit(prev);
   const { core } = state;
   if (tilesLeft(core.wall) === 0) {
@@ -484,7 +491,15 @@ export function claim(prev: RoundState, seat: number, c: Claim, now: number): Ro
   requireSeat(seat);
   const problem = claimProblem(prev, seat, c, now);
   if (problem) fail(problem);
-  const w = prev.window!;
+  const w = { ...prev.window!, holds: undefined };
+  // Someone else is holding the tile: only a stronger claim can go ahead.
+  for (const h of prev.window!.holds ?? []) {
+    if (h.seat === seat) continue;
+    const theirs = h.kind ?? bestClaim(prev, h.seat, now);
+    if (!theirs) continue;
+    const beats = strength(c.kind) > strength(theirs) || (c.kind === 'win' && theirs === 'win' && priority(w.by, seat) < priority(w.by, h.seat));
+    if (!beats) fail('Someone else is claiming that tile.');
+  }
 
   // Jump back to the moment the tile was offered, then apply the claim.
   const state: RoundState = {
@@ -544,6 +559,72 @@ export function claim(prev: RoundState, seat: number, c: Claim, now: number): Ro
     core.phase = 'mustDiscard';
     core.replacementFor = null;
   }
+  return finish(state);
+}
+
+/** The strongest claim this seat could make on the offered tile, or null. */
+function bestClaim(state: RoundState, seat: number, now: number): ClaimKind | null {
+  if (claimProblem(state, seat, { kind: 'win' }, now) === null) return 'win';
+  if (claimProblem(state, seat, { kind: 'gong' }, now) === null) return 'gong';
+  if (claimProblem(state, seat, { kind: 'pong' }, now) === null) return 'pong';
+  return chowOptions(state, seat, now).length > 0 ? 'chow' : null;
+}
+
+/** Every way this seat could Soeng the offered tile (pairs of tile ids). */
+function chowOptions(state: RoundState, seat: number, now: number): [number, number][] {
+  const w = state.window;
+  const out: [number, number][] = [];
+  if (!w || w.source !== 'discard' || !isSuited(w.tile.type)) return out;
+  const seen = new Set<string>();
+  for (const a of w.base.hands[seat]!) {
+    for (const b of w.base.hands[seat]!) {
+      if (a.id >= b.id) continue;
+      const key = [a.type, b.type].sort().join();
+      if (seen.has(key)) continue;
+      if (claimProblem(state, seat, { kind: 'chow', tileIds: [a.id, b.id] }, now) === null) {
+        seen.add(key);
+        out.push([a.id, b.id]);
+      }
+    }
+  }
+  return out;
+}
+
+/** Could this seat claim the offered tile in any way right now? */
+export function canClaimOffered(state: RoundState, seat: number, now: number): boolean {
+  return !!state.window && bestClaim(state, seat, now) !== null;
+}
+
+/**
+ * Hold the offered tile while deciding (kind null: any claim, not chosen yet). The next
+ * player can't draw meanwhile; if they already drew, their tile goes back to the wall.
+ */
+export function holdClaim(prev: RoundState, seat: number, kind: ClaimKind | null, now: number): RoundState {
+  requireSeat(seat);
+  const w0 = prev.window;
+  if (!w0) fail('There is no tile to claim.');
+  const ok =
+    kind === null ? bestClaim(prev, seat, now) !== null
+    : kind === 'chow' ? chowOptions(prev, seat, now).length > 0
+    : claimProblem(prev, seat, { kind }, now) === null;
+  if (!ok) fail('You cannot claim that tile.');
+  let state = startEdit(prev);
+  if (w0.status.type === 'drawn') {
+    // The next player had drawn: put their tile back, as a claim would.
+    state = { core: clone(w0.base), history: prev.history.slice(0, w0.baseHistory), window: { ...w0, status: { type: 'open' } } };
+  }
+  const w = state.window!;
+  w.holds = [...(w.holds ?? []).filter((h) => h.seat !== seat), { seat, kind }];
+  return finish(state);
+}
+
+/** Let go of a held tile (Cancel). */
+export function releaseHold(prev: RoundState, seat: number): RoundState {
+  if (!prev.window?.holds?.some((h) => h.seat === seat)) return prev;
+  const state = startEdit(prev);
+  const w = state.window!;
+  w.holds = w.holds!.filter((h) => h.seat !== seat);
+  if (w.holds.length === 0) delete w.holds;
   return finish(state);
 }
 
@@ -657,13 +738,29 @@ export function currentPlayer(state: RoundState): number | null {
   return state.core.phase === 'ended' && state.core.result?.type === 'win' ? null : state.core.turn;
 }
 
-/** Can `seat` press undo right now? Returns a reason if not. */
+/**
+ * Can `seat` undo the last move right now? Returns a reason if not. You undo your own
+ * last move (a discard, Soeng, Pung or Gong), until someone else makes a move: after a
+ * discard, until the next player draws or anyone claims or holds the tile.
+ */
 export function undoProblem(state: RoundState, seat: number, allAgreed: boolean): string | null {
   const last = state.history[state.history.length - 1];
   if (!last) return 'There is nothing to undo.';
   if (last.move === 'win') return allAgreed ? null : 'Undoing a win needs every player to agree.';
-  if (currentPlayer(state) !== seat) return 'Only the player whose turn it is can undo.';
-  return null;
+  if (last.seat !== seat) return 'You can only undo your own move.';
+  const c = state.core;
+  if (last.move === 'discard') {
+    const w = state.window;
+    const untouched = c.phase === 'mustDraw' && !!w && w.by === seat && w.status.type === 'open' && !w.holds?.length;
+    return untouched ? null : 'Too late: someone else has moved.';
+  }
+  return c.turn === seat && c.phase !== 'ended' ? null : 'Too late: someone else has moved.';
+}
+
+/** Who made the last move that could be undone (null if none). */
+export function lastMover(state: RoundState): number | null {
+  const last = state.history[state.history.length - 1];
+  return last && last.move !== 'win' ? last.seat : null;
 }
 
 /** Undo the most recent move. */
@@ -729,7 +826,7 @@ export function availableActions(state: RoundState, seat: number, now: number): 
   // With the wall empty, the game moves on by itself once nobody can take the last tile.
   const waiting = wallEmpty && lastTileWaiting(state, now);
   return {
-    draw: myTurn && core.phase === 'mustDraw' && !waiting,
+    draw: myTurn && core.phase === 'mustDraw' && !waiting && !w?.holds?.length,
     drawReplacement: myTurn && core.phase === 'mustReplace' && !waiting,
     discard: mustDiscard,
     selfDrawWin: mustDiscard && core.lastDraw !== null && canWinSelfDraw(hand, melds),

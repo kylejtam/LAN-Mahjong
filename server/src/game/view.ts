@@ -12,9 +12,10 @@
  * the game, but no hidden tiles (the laptop owner may be playing too).
  */
 import { GameSettings, Meld, SEATS, Tile, tilesLeft } from '@lan-mahjong/shared';
-import { matchLabel } from './match.js';
-import { AvailableActions, CLAIM_AFTER_DRAW_MS, DiscardEntry, Phase, RoundResult, availableActions, currentPlayer } from './round.js';
-import { CpuDifficulty, DEFAULT_CPU_SECONDS, HandRecord, HistoryEdit, PendingSwap, Room, RoomPhase, TableColour, pendingChange, roundCanClose, seatOf, undoableForSeat } from './room.js';
+import { closeRound, matchLabel } from './match.js';
+import { STAGES } from './tutorial.js';
+import { AvailableActions, CLAIM_AFTER_DRAW_MS, DiscardEntry, Phase, RoundResult, availableActions, currentPlayer, lastMover, undoProblem } from './round.js';
+import { CpuDifficulty, DEFAULT_CPU_SECONDS, HandRecord, HistoryEdit, PendingSwap, Room, RoomPhase, TableColour, pendingChange, roundCanClose, seatOf, undoableForSeat, pausedBy } from './room.js';
 import { sortHand } from '@lan-mahjong/shared';
 
 export interface SeatView {
@@ -22,6 +23,8 @@ export interface SeatView {
   name: string | null;
   cpu: CpuDifficulty | null;
   connected: boolean;
+  /** When this player's connection dropped (null while connected). */
+  offlineSince: number | null;
   balance: number | null;
   isDealer: boolean;
   /** This seat's wind for the current round: 0 East ... 3 North. */
@@ -61,13 +64,24 @@ export interface RoomView {
     wallCount: number;
     /** The tile that can currently be claimed, if any. */
     offered: { tile: Tile; by: number } | null;
+    holds: { seat: number; kind: 'chow' | 'pong' | 'gong' | 'win' | null }[];
     offeredDrawn: boolean;
     /** After the next player drew: how long others can still claim (ms, when this was sent). */
     claimMsLeft: number | null;
     /** Flowers each seat has set aside (face up, so public). Used by the deal animation. */
     flowersDealt: number[];
     result: RoundResult | null;
+    /** Once the hand is over: the tiles still in the wall, in drawing order (each stack top tile first). */
+    remainingWall: Tile[][] | null;
   };
+  /** Once the hand is over: the game that comes next (null if this was the last hand). */
+  nextLabel: { en: string; zh: string } | null;
+  /** Once the hand is over: true if it was the last hand of the whole game. */
+  lastHand: boolean;
+  pausedSeats: number[];
+  tutorial: { stage: string } | null;
+  /** The server's clock when this was sent (to show "disconnected 14 seconds ago"). */
+  serverNow: number;
   /** Your buttons. Null if you are not seated or no round is on. */
   actions: AvailableActions | null;
   /** True when you are a spectator at an all-CPU table and the round is over. */
@@ -87,9 +101,9 @@ export interface RoomView {
 function withRoomUndo(room: Room, a: AvailableActions): AvailableActions {
   const round = room.match.round;
   if (a.undo || !round) return a;
-  const current = currentPlayer(round);
-  const last = round.history[round.history.length - 1];
-  const ok = current !== null && !!last && last.move !== 'win' && undoableForSeat(room, current);
+  // Anyone seated may undo a CPU's (or an empty seat's) last move.
+  const mover = lastMover(round);
+  const ok = mover !== null && undoableForSeat(room, mover) && undoProblem(round, mover, false) === null;
   return ok ? { ...a, undo: true } : a;
 }
 
@@ -113,6 +127,7 @@ export function viewFor(room: Room, viewerKey: string, now: number): RoomView {
       name: p?.name ?? null,
       cpu: p?.cpu ?? null,
       connected: p?.connected ?? false,
+      offlineSince: p && !p.connected ? p.offlineSince ?? null : null,
       // While the win summary shows, include the payout straight away.
       balance: p ? p.balance + pendingChange(room, seat) : null,
       isDealer: seat === dealer,
@@ -174,14 +189,23 @@ export function viewFor(room: Room, viewerKey: string, now: number): RoomView {
           wall: round.core.wall.stacks.map((s) => ({ seat: s.seat, position: s.position, count: s.tiles.length })),
           wallCount: tilesLeft(round.core.wall),
           offered: round.window ? { tile: round.window.tile, by: round.window.by } : null,
+          /** Who is holding the offered tile while they decide (kind null: not chosen yet). Public. */
+          holds: round.window?.holds ?? [],
           /** The next player has drawn: claim buttons are hidden (a quick tap on the tile still works for 3 s). */
           offeredDrawn: round.window?.status.type === 'drawn',
           claimMsLeft:
             round.window?.status.type === 'drawn' ? Math.max(0, CLAIM_AFTER_DRAW_MS - (now - round.window.status.at)) : null,
           flowersDealt: round.core.flowers.map((f) => f.length),
           result: round.core.result,
+          remainingWall: round.core.phase === 'ended' ? round.core.wall.stacks.map((st) => st.tiles.slice()) : null,
         }
       : null,
+    ...nextGame(room),
+    /** Seats whose player lost their connection mid-hand: the game waits for them. */
+    pausedSeats: pausedBy(room).map((k) => room.seats.indexOf(k)),
+    /** In the tutorial: the step it's on (see tutorial.ts). */
+    tutorial: room.tutorial ? { stage: STAGES[room.tutorial.stage]?.id ?? 'won' } : null,
+    serverNow: now,
     actions: round && mySeat !== null ? withRoomUndo(room, availableActions(round, mySeat, now)) : null,
     /** At an all-CPU table, spectators confirm the end of a round. */
     spectatorsConfirm: mySeat === null && !!round && round.core.phase === 'ended' && room.seats.every((k) => !k || !!room.people[k]?.cpu),
@@ -193,7 +217,7 @@ export function viewFor(room: Room, viewerKey: string, now: number): RoomView {
         ? { toName: room.swapResult.toName, accepted: room.swapResult.accepted, at: room.swapResult.at }
         : null,
     justDrawnId:
-      round && mySeat !== null && round.core.turn === mySeat && round.core.phase === 'mustDiscard' && round.core.lastDraw !== null
+      round && mySeat !== null && round.core.turn === mySeat && round.core.phase === 'mustDiscard' && round.core.lastDraw !== null && !dealerFirstTurn(round)
         ? round.core.hands[mySeat]!.at(-1)?.id ?? null
         : null,
     ended: room.ended,
@@ -284,4 +308,23 @@ export function hostViewOf(room: Room): HostGameView {
     })),
     historyEdits: [...(room.historyEdits ?? [])].reverse(),
   };
+}
+
+/** The dealer's very first turn: their 14th tile came from the deal, so it is sorted in, not shown apart. */
+function dealerFirstTurn(round: { core: { discardCount: number; turn: number; dealer: number; lastDraw: unknown; melds: Meld[][] } }): boolean {
+  const c = round.core;
+  return c.discardCount === 0 && c.turn === c.dealer && c.lastDraw === 'wall' && c.melds.every((m) => m.length === 0);
+}
+
+/** What closing the finished hand would lead to: the next game's name, or the end of the whole game. */
+function nextGame(room: Room): { nextLabel: { en: string; zh: string } | null; lastHand: boolean } {
+  const round = room.match.round;
+  if (!round || round.core.phase !== 'ended' || !round.core.result) return { nextLabel: null, lastHand: false };
+  try {
+    const { match } = closeRound(room.match);
+    if (match.finished) return { nextLabel: null, lastHand: true };
+    return { nextLabel: { en: matchLabel(match, 'en'), zh: matchLabel(match, 'zh') }, lastHand: false };
+  } catch {
+    return { nextLabel: null, lastHand: false };
+  }
 }

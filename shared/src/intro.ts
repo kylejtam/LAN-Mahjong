@@ -10,8 +10,10 @@ export const INTRO_BUILD_MS = 4500;
 export const DICE_ROLL_MS = 2600;
 /** Dealing the tiles from the wall. */
 export const DEAL_ANIM_MS = 5000;
-/** The rest of the wall shrinking into the small box. */
-export const WALL_SHRINK_MS = 900;
+/** The rest of the wall shrinking into the small box, then fading into it. */
+export const WALL_SHRINK_MS = 1300;
+/** The last part of that: the shrunk wall fades out as the small box fades in. */
+export const INTRO_FADE_MS = 450;
 
 /** The counting wipe after the dice: round the walls, then along the stacks, then the break. */
 export function wallCountMs(diceTotal: number): number {

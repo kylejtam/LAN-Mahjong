@@ -95,6 +95,14 @@ const en = {
   spectate: 'Spectate',
   justWatch: 'Just watch',
   ready: 'Ready',
+  remainingTiles: 'Remaining tiles',
+  callAll: 'Call all possible claims',
+  callAllNote: 'Any tile you could claim is held for you, so it never slips past.',
+  hintWaitClaim: 'Waiting for {name} to decide on the tile',
+  hintHolding: 'Tap Confirm to claim, or Cancel to let it go',
+  no: 'No',
+  yes: 'Yes',
+  fullscreen: 'Fullscreen',
   // swaps
   swapInTitle: 'Swap in?',
   swapInText: '{name} would like you to take their seat.',
@@ -121,6 +129,27 @@ const en = {
   fan: '{n} fan',
   maxFan: ' (max)',
   confirm: 'Confirm',
+  returnToSummary: 'Return to Game Summary',
+  tutorial: 'Tutorial',
+  tutorialAbout: 'Learn the controls with 3 computer players',
+  leaveTutorial: 'Leave tutorial',
+  tutorialDone: 'Tutorial complete',
+  tutorialDoneNote: "You know all the controls. Pick a real game when you're ready.",
+  backToGames: 'Back to games',
+  next: 'Next',
+  stepOf: 'Step {n} of {total}',
+  unready: 'Unready',
+  hintSitHere: "You're watching. Press Sit here on an empty seat to play.",
+  hintSeatsFull: 'Every seat is taken, so you can watch this game.',
+  hintShuffle: 'Move your mouse (or drag your finger) over the tiles to shuffle them.',
+  reconnectingBig: 'Reconnecting',
+  reconnectingNote: "Check your Wi-Fi. The game is paused for everyone until you're back.",
+  disconnectedTitle: '{name} disconnected',
+  disconnectedTag: 'Disconnected',
+  pausedUntil: 'Game paused until they reconnect',
+  secondsAgo: '{n} seconds ago',
+  minutesAgo: '{m} min {s} s ago',
+  isBack: '{name} is back',
   waiting: 'Waiting…',
   undoWin: 'Undo win',
   nextHand: 'Next round',
@@ -224,6 +253,14 @@ const zh: Strings = {
   spectate: '旁觀',
   justWatch: '淨係睇',
   ready: '準備好',
+  remainingTiles: '剩餘牌',
+  callAll: '自動叫所有可以食嘅牌',
+  callAllNote: '凡係你可以食嘅牌，都會自動幫你留住，唔會走甩。',
+  hintWaitClaim: '等緊{name}決定要唔要呢隻牌',
+  hintHolding: '撳確定食牌，或者撳取消放棄',
+  no: '唔要',
+  yes: '要',
+  fullscreen: '全螢幕',
   swapInTitle: '換入嚟？',
   swapInText: '{name} 想你頂佢個位。',
   swapIn: '換入',
@@ -232,6 +269,27 @@ const zh: Strings = {
   swapDeclined: '{name} 拒絕咗換位。',
   swapAccepted: '{name} 頂咗你個位。',
   cancel: '取消',
+  returnToSummary: '返回結算',
+  tutorial: '教學',
+  tutorialAbout: '同 3 個電腦玩家一齊，學識所有操作',
+  leaveTutorial: '離開教學',
+  tutorialDone: '教學完成',
+  tutorialDoneNote: '你已經識晒所有操作。準備好就揀一局真嘅遊戲啦。',
+  backToGames: '返去遊戲列表',
+  next: '下一步',
+  stepOf: '第 {n} 步，共 {total} 步',
+  unready: '取消準備',
+  hintSitHere: '你喺度睇緊。撳空位嘅「坐呢度」就可以打。',
+  hintSeatsFull: '所有位都有人坐，你可以睇住呢局。',
+  hintShuffle: '用滑鼠（或者手指）喺啲牌上面郁嚟郁去，就可以洗牌。',
+  reconnectingBig: '重新連接緊',
+  reconnectingNote: '請檢查 Wi-Fi。你返嚟之前，所有人嘅遊戲都會暫停。',
+  disconnectedTitle: '{name} 斷咗線',
+  disconnectedTag: '斷咗線',
+  pausedUntil: '佢重新連接之前，遊戲暫停',
+  secondsAgo: '{n} 秒前',
+  minutesAgo: '{m} 分 {s} 秒前',
+  isBack: '{name} 返嚟喇',
   sitHere: '坐呢度',
   yourName: '你個名',
   save: '儲存',
@@ -324,8 +382,10 @@ export interface Prefs {
   lang: Lang;
   /** Confetti style when someone wins (only changes this player's screen). */
   celebration: CelebrationStyle;
+  /** "Call all possible claims": hold every tile you could claim automatically. */
+  callAll: boolean;
 }
-export const DEFAULT_PREFS: Prefs = { lang: 'en', celebration: 'cannons' };
+export const DEFAULT_PREFS: Prefs = { lang: 'en', celebration: 'cannons', callAll: false };
 const PREFS_KEY = 'lan-mahjong-prefs';
 
 export function loadPrefs(): Prefs {
@@ -350,6 +410,7 @@ export function cleanPrefs(raw: unknown): Partial<Prefs> {
     const r = raw as Record<string, unknown>;
     if (r.lang === 'en' || r.lang === 'zh') out.lang = r.lang;
     if (CELEBRATION_STYLES.includes(r.celebration as CelebrationStyle)) out.celebration = r.celebration as CelebrationStyle;
+    if (typeof r.callAll === 'boolean') out.callAll = r.callAll;
   }
   return out;
 }

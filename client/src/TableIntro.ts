@@ -18,7 +18,7 @@
  * else is happening (between hands), so it never makes the screen stutter.
  */
 
-import { WALL_SHRINK_MS, wallCountMs } from '@lan-mahjong/shared';
+import { INTRO_FADE_MS, WALL_SHRINK_MS, wallCountMs } from '@lan-mahjong/shared';
 
 export type Side = 'bottom' | 'right' | 'top' | 'left';
 const SEATS = 4;
@@ -248,7 +248,7 @@ let current: {
 } | null = null;
 
 function clear(): void {
-  document.body.classList.remove('intro-arriving');
+  document.body.classList.remove('intro-arriving', 'intro-fading');
   if (!current) return;
   current.timers.forEach(clearTimeout);
   current.box.remove();
@@ -433,38 +433,211 @@ export function introStackPoint(key: string, seat: number, position: number): { 
 export function finishIntro(key: string): void {
   const c = current;
   if (!c || c.key !== key) return;
-  const target = document.querySelector('.wall-box')?.getBoundingClientRect();
-  if (!target || reducedMotion()) {
+  const boxEl = document.querySelector('.wall-box');
+  const target = boxEl?.getBoundingClientRect();
+  if (!boxEl || !target || reducedMotion()) {
     clear();
     return;
   }
-  const g = c.g;
-  const sx = target.width / g.S;
-  const sy = target.height / g.S;
-  const scale = Math.min(sx, sy);
-  const tx = target.left + target.width / 2;
-  const ty = target.top + target.height / 2;
-  // The small box stays hidden until the tiles get there, then takes their place.
+  // Each stack still in the wall shrinks onto exactly the bar that stands for it in the small
+  // box (WallBox in Table: a 100 × 100 square, wall lines 7 thick), in the box's colours.
+  // Then the box fades in while the shrunk wall fades out, so nothing pops into view.
+  const css = getComputedStyle(boxEl);
+  const full = css.getPropertyValue('--tile-back').trim() || '#2f7d5b';
+  const light = css.getPropertyValue('--tile-back-light').trim() || '#6aa88b';
+  const B = 100;
+  const W = 7;
+  const seg = (B - 2 * W) / c.perWall;
+  const kx = target.width / B;
+  const ky = target.height / B;
+  const stackCount = new Map<string, number>();
+  for (const t of c.tiles) if (t.el.style.visibility !== 'hidden') stackCount.set(`${t.seat}-${t.position}`, (stackCount.get(`${t.seat}-${t.position}`) ?? 0) + 1);
   document.body.classList.add('intro-arriving');
-  const SHRINK = WALL_SHRINK_MS - 100;
+  const SHRINK = WALL_SHRINK_MS - INTRO_FADE_MS;
   for (const t of c.tiles) {
     if (t.el.style.visibility === 'hidden') continue;
-    const nx = tx + (t.x + g.tw / 2 - g.cx) * sx - g.tw / 2;
-    const ny = ty + (t.y + g.th / 2 - g.cy) * sy - g.th / 2;
+    const side = c.sideOf(t.seat);
+    let x = 0, y = 0, w = seg, h = W;
+    if (side === 'bottom') { x = W + (c.perWall - 1 - t.position) * seg; y = B - W; }
+    else if (side === 'top') { x = W + t.position * seg; y = 0; }
+    else if (side === 'right') { x = B - W; y = W + t.position * seg; w = W; h = seg; }
+    else { x = 0; y = W + (c.perWall - 1 - t.position) * seg; w = W; h = seg; }
+    const pw = w * kx;
+    const ph = h * ky;
+    const ncx = target.left + (x + w / 2) * kx;
+    const ncy = target.top + (y + h / 2) * ky;
+    const g = c.g;
+    // Scale in the tile's own direction: a tile turned 90° has its width running up the screen.
+    const turned = t.r === 90;
+    const scX = turned ? ph / g.tw : pw / g.tw;
+    const scY = turned ? pw / g.th : ph / g.th;
+    const colour = (stackCount.get(`${t.seat}-${t.position}`) ?? 0) >= 2 ? full : light;
     t.el.getAnimations().forEach((a) => a.cancel());
     t.el.animate(
       [
-        { transform: T(t.x, t.y, t.r), opacity: 1, easing: 'ease-in-out' },
-        { transform: T(nx, ny, t.r, scale), opacity: 1, offset: 0.88 },
-        { transform: T(nx, ny, t.r, scale), opacity: 0 },
+        { transform: T(t.x, t.y, t.r), borderRadius: '3px' },
+        { transform: `translate(${ncx - g.tw / 2}px, ${ncy - g.th / 2}px) rotate(${t.r}deg) scale(${scX}, ${scY})`, borderRadius: '0px', backgroundColor: colour, boxShadow: 'none', borderColor: 'transparent' },
       ],
-      { duration: SHRINK, fill: 'forwards' },
+      { duration: SHRINK, easing: 'ease-in-out', fill: 'forwards' },
     );
   }
   c.timers.push(
-    setTimeout(() => document.body.classList.remove('intro-arriving'), SHRINK * 0.88),
-    setTimeout(() => current === c && clear(), SHRINK + 50),
+    setTimeout(() => {
+      if (current !== c) return;
+      // The small box fades in exactly where the shrunk wall is, as the wall fades out.
+      document.body.classList.remove('intro-arriving');
+      document.body.classList.add('intro-fading');
+      c.box.animate([{ opacity: 1 }, { opacity: 0 }], { duration: INTRO_FADE_MS, fill: 'forwards' });
+    }, SHRINK),
+    setTimeout(() => {
+      document.body.classList.remove('intro-fading');
+      if (current === c) clear();
+    }, SHRINK + INTRO_FADE_MS + 30),
   );
+}
+
+// ---------- the shared pile between hands (shuffling) ----------
+// The server moves the pile and sends where every tile is about 15 times a second;
+// in between, each tile glides smoothly from where it was to where it is now.
+
+interface PileView {
+  id: number;
+  perWall: number;
+  layer: HTMLElement;
+  els: HTMLElement[];
+  from: number[];
+  to: number[];
+  at: number;
+  raf: number;
+}
+let pileView: PileView | null = null;
+const FRAME_MS = 66;
+
+function drawPile(): void {
+  const p = pileView;
+  if (!p) return;
+  const g = geometry(p.perWall);
+  const k = Math.min(1, (performance.now() - p.at) / FRAME_MS);
+  for (let i = 0; i < p.els.length; i++) {
+    const lerp = (j: number): number => p.from[i * 3 + j]! + (p.to[i * 3 + j]! - p.from[i * 3 + j]!) * k;
+    const x = g.cx + (lerp(0) / 10000) * g.S - g.tw / 2;
+    const y = g.cy + (lerp(1) / 10000) * g.S - g.th / 2;
+    p.els[i]!.style.transform = T(x, y, (lerp(2) / 1000) * (180 / Math.PI));
+  }
+  p.raf = k < 1 ? requestAnimationFrame(drawPile) : 0;
+}
+
+/** A new frame of the pile from the server. */
+export function showPile(id: number, perWall: number, tiles: number[]): void {
+  if (current) return; // the wall is being built or is standing: the pile is gone
+  if (!pileView || pileView.id !== id || pileView.els.length * 3 !== tiles.length) {
+    hidePile();
+    const g = geometry(perWall);
+    const layer = document.createElement('div');
+    layer.className = 'intro-layer pile-layer';
+    layer.setAttribute('aria-hidden', 'true');
+    const els: HTMLElement[] = [];
+    for (let i = 0; i < tiles.length / 3; i++) {
+      const el = document.createElement('div');
+      el.className = 'intro-tile';
+      el.style.width = `${g.tw}px`;
+      el.style.height = `${g.th}px`;
+      layer.appendChild(el);
+      els.push(el);
+    }
+    document.body.appendChild(layer);
+    pileView = { id, perWall, layer, els, from: tiles.slice(), to: tiles.slice(), at: 0, raf: 0 };
+  } else {
+    // Glide on from wherever each tile is drawn right now.
+    const k = Math.min(1, (performance.now() - pileView.at) / FRAME_MS);
+    pileView.from = pileView.from.map((f, j) => f + (pileView!.to[j]! - f) * k);
+    pileView.to = tiles.slice();
+  }
+  pileView.at = performance.now();
+  if (!pileView.raf) pileView.raf = requestAnimationFrame(drawPile);
+}
+
+export function hidePile(): void {
+  if (!pileView) return;
+  cancelAnimationFrame(pileView.raf);
+  pileView.layer.remove();
+  pileView = null;
+}
+
+export function pileShowing(): boolean {
+  return !!pileView;
+}
+
+/** Screen point → the pile's units (the wall square is 1 wide, centred on 0, 0). */
+export function pileUnits(clientX: number, clientY: number, perWall: number): { x: number; y: number } {
+  const g = geometry(perWall);
+  return { x: (clientX - g.cx) / g.S, y: (clientY - g.cy) / g.S };
+}
+
+/**
+ * The 6 shoves are over: each tile glides from where it lies in the pile to the nearest
+ * place in the wall (all four walls at once). Calls `onBuilt` when the wall is standing.
+ * Returns false if there is no pile on screen (then use startIntro instead).
+ */
+export function buildFromPile(key: string, perWall: number, sideOf: (seat: number) => Side, onBuilt: () => void): boolean {
+  const p = pileView;
+  if (current?.key === key) {
+    if (current.built) onBuilt();
+    return true;
+  }
+  if (!p || p.perWall !== perWall) return false;
+  const g0 = geometry(perWall);
+  const k = Math.min(1, (performance.now() - p.at) / FRAME_MS);
+  const now = p.from.map((f, j) => f + (p.to[j]! - f) * k);
+  const pos = p.els.map((_, i) => ({ x: g0.cx + (now[i * 3]! / 10000) * g0.S, y: g0.cy + (now[i * 3 + 1]! / 10000) * g0.S, a: (now[i * 3 + 2]! / 1000) * (180 / Math.PI) }));
+  hidePile();
+  const c = create(key, perWall, sideOf);
+  const g = c.g;
+  if (reducedMotion() || pos.length !== c.tiles.length) {
+    showBuilt(c);
+    onBuilt();
+    return true;
+  }
+  // Each tile goes to the wall place nearest to where it lies (both sorted round the middle).
+  const angle = (x: number, y: number): number => Math.atan2(y - g.cy, x - g.cx);
+  const pileOrder = pos.map((_, i) => i).sort((i, j) => angle(pos[i]!.x, pos[i]!.y) - angle(pos[j]!.x, pos[j]!.y));
+  const wallOrder = c.tiles.map((_, i) => i).sort((i, j) => angle(c.tiles[i]!.x + g.tw / 2, c.tiles[i]!.y + g.th / 2) - angle(c.tiles[j]!.x + g.tw / 2, c.tiles[j]!.y + g.th / 2));
+  const anims: Animation[] = [];
+  wallOrder.forEach((ti, n) => {
+    const t = c.tiles[ti]!;
+    const q = pos[pileOrder[n]!]!;
+    const sx = q.x - g.tw / 2;
+    const sy = q.y - g.th / 2;
+    const target = t.r + 180 * Math.round((q.a - t.r) / 180);
+    const delay = (t.position * 0.02 + t.layer * 0.04) * 1000;
+    t.el.style.transform = T(sx, sy, q.a);
+    anims.push(
+      t.el.animate([{ transform: T(sx, sy, q.a) }, { transform: T(t.x, t.y, target) }], {
+        duration: PULL_S * 1000,
+        delay,
+        easing: 'ease-in-out',
+        fill: 'both',
+      }),
+    );
+  });
+  Promise.all(anims.map((a) => a.finished)).then(
+    () => {
+      if (current !== c) return;
+      showBuilt(c);
+      onBuilt();
+    },
+    () => undefined,
+  );
+  return true;
+}
+
+/** The space inside the big wall (screen pixels), for the dice to bounce in; null if no wall. */
+export function introInnerBox(): { l: number; t: number; r: number; b: number } | null {
+  if (!current) return null;
+  const g = current.g;
+  const half = g.S / 2;
+  const pad = g.th / 2 + 4;
+  return { l: g.cx - half + pad, t: g.cy - half + pad, r: g.cx + half - pad, b: g.cy + half - pad };
 }
 
 /** Remove the wall drawing (a hand was stopped, the page changes, ...). */

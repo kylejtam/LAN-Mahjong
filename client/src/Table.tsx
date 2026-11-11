@@ -25,7 +25,9 @@ import { DragSource, Drop, useDrag } from './drag';
 import { HelpPanel } from './HelpPanel';
 import { ChipIcon } from './ChipIcon';
 import { DICE_MS, DiceRoll, DieFace } from './DiceRoll';
-import { countIntro, countMs, finishIntro, introStackPoint, prepareMix, setIntroStacks, startIntro, stopIntro } from './TableIntro';
+import { buildFromPile, countIntro, countMs, finishIntro, hidePile, introKeyIs, introStackPoint, pileShowing, pileUnits, setIntroStacks, showPile, startIntro, stopIntro } from './TableIntro';
+import { latestPile, onPile } from './pileBus';
+import { TutorialGuide } from './Tutorial';
 import { APP_VERSION } from './version';
 import { CELEBRATION_STYLES, celebrate } from './celebrate';
 import { ResultPanel } from './ResultPanel';
@@ -136,8 +138,9 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
   const screen = useScreenSize();
   /** After the win summary, players continue to the "Ready / Leave seat" popup. */
   const [showReady, setShowReady] = useState<string | null>(null);
+  /** After the last hand: this player has left the summary and sees the final scores. */
+  const [showFinal, setShowFinal] = useState<string | null>(null);
   /** Spectators can close the seat picker and just watch. */
-  const [justWatching, setJustWatching] = useState(false);
   const [chooser, setChooser] = useState<Chooser>(null);
   /**
    * Choosing which Soeng (when there is more than one): the tiles you could use glow
@@ -165,6 +168,12 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
       return null;
     }
   });
+  /** The tutorial needs to know when you rearrange your hand (normally only this device knows). */
+  const tellTutorialReordered = (ids: number[]): void => {
+    if (!view.tutorial || !serverHand) return;
+    const rest = serverHand.map((t) => t.id).filter((id) => !ids.includes(id));
+    command({ type: 'reorderHand', tileIds: [...ids, ...rest] });
+  };
   const setManual = (m: { key: string; ids: number[] }): void => {
     setManualState(m);
     try {
@@ -238,6 +247,7 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
         const ids = [...gap.otherIds];
         ids.splice(gap.target, 0, src.tileId);
         setManual({ key: roundKey, ids });
+        tellTutorialReordered(ids);
       } else if (drop.zone === 'hand') {
         // Reorder (on this device only): put the tile where it was dropped.
         const els = [...document.querySelectorAll<HTMLElement>('[data-hand-tile]')].filter(
@@ -252,6 +262,7 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
         const ids = others.map((el) => Number(el.dataset.handTile));
         ids.splice(index, 0, src.tileId);
         setManual({ key: roundKey, ids });
+        tellTutorialReordered(ids);
       }
     } else if (src.kind === 'wallFront' && drop.zone === 'hand' && a?.draw) {
       command({ type: 'draw' });
@@ -397,10 +408,31 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
   }, [showMoment]);
 
   // ---------- action buttons ----------
-  const onWin = (): void => (a?.selfDrawWin ? command({ type: 'selfDrawWin' }) : doClaim({ kind: 'win' }));
-  const onPong = (): void => doClaim({ kind: 'pong' });
+  // Claiming a discard is two taps: the first holds the tile (the next player has to wait,
+  // and everyone sees your bubble), the second (Confirm) claims it. Cancel lets it go.
+  const myHold = mySeat !== null ? round?.holds.find((h) => h.seat === mySeat) ?? null : null;
+  const hold = (kind: 'chow' | 'pong' | 'gong' | 'win'): void => command({ type: 'hold', kind });
+  const cancelHold = (): void => {
+    setChowPick(null);
+    setChosenChow(null);
+    command({ type: 'releaseHold' });
+  };
+  const [chosenChow, setChosenChow] = useState<[number, number] | null>(null);
+  const onConfirm = (): void => {
+    if (!myHold?.kind) return;
+    if (myHold.kind === 'chow') {
+      const ids = a?.chow.length === 1 ? a.chow[0]! : chosenChow;
+      if (!ids) return;
+      setChosenChow(null);
+      setChowPick(null);
+      return doClaim({ kind: 'chow', tileIds: ids });
+    }
+    doClaim({ kind: myHold.kind } as Claim);
+  };
+  const onWin = (): void => (a?.selfDrawWin ? command({ type: 'selfDrawWin' }) : hold('win'));
+  const onPong = (): void => hold('pong');
   const onGong = (): void => {
-    if (a?.gong) return doClaim({ kind: 'gong' });
+    if (a?.gong && claimable) return hold('gong');
     if (!a) return;
     if (ownGongs === 1) {
       const t = a.concealedGongs[0] ?? a.addedGongs[0]!;
@@ -408,10 +440,11 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
     } else setChooser({ kind: 'ownGong', concealed: a.concealedGongs, added: a.addedGongs });
   };
   const onChow = (): void => {
-    if (!a) return;
-    if (a.chow.length === 1) doClaim({ kind: 'chow', tileIds: a.chow[0]! });
-    else if (chowPick) setChowPick(null); // tapping Soeng again stops choosing
-    else if (round?.offered) setChowPick({ offerId: round.offered.tile.id, first: null });
+    if (!a || !round?.offered) return;
+    hold('chow');
+    setChosenChow(null);
+    // Several ways to Soeng: the possible tiles glow, and you tap the ones you want.
+    if (a.chow.length > 1) setChowPick({ offerId: round.offered.tile.id, first: null });
   };
   /** Each Soeng you could make: the two tile ids and their types. */
   const chowOptions = (a?.chow ?? []).map((ids) => ({ ids, types: ids.map((id) => serverHand?.find((t) => t.id === id)?.type) as TileType[] }));
@@ -428,13 +461,15 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
     const first = chowPick.first;
     const matches = chowOptions.filter((o) => o.types.includes(type) && (!first || o.types.includes(first)));
     if (matches.length === 1) {
+      // Chosen: these two glow until you press Confirm.
       setChowPick(null);
-      doClaim({ kind: 'chow', tileIds: matches[0]!.ids });
+      setChosenChow(matches[0]!.ids);
     } else setChowPick({ ...chowPick, first: type }); // in two runs: keep only its partners lit
   };
   // Stop choosing when the chance to claim has gone (or a different tile is offered).
   useEffect(() => {
     if (chowPick && (!claimable || !a?.chow.length || round?.offered?.tile.id !== chowPick.offerId)) setChowPick(null);
+    if (chosenChow && myHold?.kind !== 'chow') setChosenChow(null);
   });
   // Tapping anywhere outside your hand starts the choice again.
   useEffect(() => {
@@ -445,6 +480,19 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
     window.addEventListener('pointerdown', away);
     return () => window.removeEventListener('pointerdown', away);
   }, [chowPick?.first]);
+  /** While holding a claim: the tiles in your hand it would use glow in its colour. */
+  const holdGlow = ((): Set<number> => {
+    const out = new Set<number>();
+    if (!myHold?.kind || !serverHand || !round?.offered) return out;
+    const type = round.offered.tile.type;
+    if (myHold.kind === 'pong' || myHold.kind === 'gong') {
+      serverHand.filter((t) => t.type === type).slice(0, myHold.kind === 'pong' ? 2 : 3).forEach((t) => out.add(t.id));
+    } else if (myHold.kind === 'chow') {
+      const ids = a?.chow.length === 1 ? a.chow[0]! : chosenChow;
+      ids?.forEach((id) => out.add(id));
+    } else serverHand.forEach((t) => out.add(t.id)); // Wu: your whole hand
+    return out;
+  })();
   /** Tapping the offered discard claims it (or shows the choices). */
   const onTapOffered = (): void => {
     if (!a || !claimOptions) return;
@@ -459,11 +507,21 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
   };
 
   // ---------- hints ----------
+  // At the table between hands.
+  const notReady = view.seats.filter((sv) => sv.name && !sv.cpu && !(view.phase === 'betweenRounds' ? sv.startPressed : sv.confirmed)).map((sv) => personName(sv.name, lang));
+  const tableHint =
+    view.phase === 'rolling' ? ''
+    : mySeat === null ? (view.seats.some((sv) => !sv.name) && view.phase === 'betweenRounds' ? tr('hintSitHere') : tr('hintSeatsFull'))
+    : (view.phase === 'betweenRounds' ? me?.startPressed : me?.confirmed) ? (notReady.length ? tr('waitingFor', { names: notReady.join(lang === 'zh' ? '、' : ', ') }) : '')
+    : tr('hintShuffle');
   const turnName = round ? personName(view.seats[round.turn]?.name, lang) : '';
   const waitingOnEmptySeat = !!round && round.phase !== 'ended' && !turnName;
   let hint = '';
   if (view.phase === 'playing' && round && round.phase !== 'ended') {
+    const otherHold = round.holds.find((h) => h.seat !== mySeat);
     if (chowPick) hint = tr('hintPickChow');
+    else if (myHold?.kind) hint = tr('hintHolding');
+    else if (otherHold && round.turn === mySeat) hint = tr('hintWaitClaim', { name: personName(view.seats[otherHold.seat]?.name, lang) });
     else if (a?.draw) hint = tr('hintDraw');
     else if (a?.drawReplacement) hint = tr('hintReplace');
     else if (a?.discard) hint = tr('hintDiscard');
@@ -476,22 +534,24 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
   }
 
   // ---------- pieces ----------
-  const renderMelds = (melds: Meld[], flowers: Tile[], size: string, sideways?: 'left' | 'right'): ReactElement => (
+  // Flowers come first: on that player's left (for the right player, whose row runs
+  // bottom to top, that is the bottom; for the left player, the top).
+  const renderMelds = (melds: Meld[], flowers: Tile[], size: string, wind: number, sideways?: 'left' | 'right'): ReactElement => (
     <div className={`melds${sideways ? ' melds-sideways' : ''}`}>
-      {melds.map((m, i) => (
-        <span className="meld" key={i}>
-          {m.tiles.map((t, j) => (
-            <TileView key={t.id} type={t.type} back={m.concealed && (j === 0 || j === 3)} width={size} sideways={sideways} className={newFlowerIds.has(t.id) ? 'flower-new' : undefined} />
-          ))}
-        </span>
-      ))}
       {flowers.length > 0 && (
         <span className="meld flowers">
           {flowers.map((t) => (
-            <TileView key={t.id} type={t.type} width={size} sideways={sideways} className={newFlowerIds.has(t.id) ? 'flower-new' : undefined} />
+            <TileView key={t.id} type={t.type} width={size} sideways={sideways} className={newFlowerIds.has(t.id) ? `flower-new ${flowerScores(t.type, wind) ? 'scores' : 'no-score'}` : undefined} />
           ))}
         </span>
       )}
+      {melds.map((m, i) => (
+        <span className="meld" key={i}>
+          {m.tiles.map((t, j) => (
+            <TileView key={t.id} type={t.type} back={m.concealed && (j === 0 || j === 3)} width={size} sideways={sideways} />
+          ))}
+        </span>
+      ))}
     </div>
   );
 
@@ -596,24 +656,28 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
   };
 
   const nameTag = (sv: SeatView, hideChips = false): ReactElement => (
-    <div className={`nametag${round && round.turn === sv.seat && round.phase !== 'ended' ? ' nametag-turn' : ''}`}>
+    <div className={`nametag${round && round.turn === sv.seat && round.phase !== 'ended' ? ' nametag-turn' : ''}${view.pausedSeats.includes(sv.seat) ? ' gone' : ''}`}>
       <span className="wind-badge">{WIND_SHORT[lang][sv.wind]}</span>
       <span className="nametag-name">{sv.name ? personName(sv.name, lang) : tr('empty')}</span>
       {/* CPU names already end in "(CPU)"; older names don't. */}
       {sv.cpu && !sv.name?.startsWith('CPU') && !sv.name?.endsWith('(CPU)') && <span className="cpu-badge">{tr('cpu')}</span>}
-      {sv.name && !sv.connected && !sv.cpu && <span className="offline">{tr('offline')}</span>}
+      {sv.name && !sv.connected && !sv.cpu && (view.pausedSeats.includes(sv.seat) ? <span className="lost-tag">{tr('disconnectedTag')}</span> : <span className="offline">{tr('offline')}</span>)}
       {sv.balance !== null && !hideChips && <span className="chips">{sv.balance}</span>}
       {round && sv.isDealer && (
         <span className="dice dice-small" title="dice">
           {round.dice.map((d, i) => <span key={i} className="die">{d}</span>)}
         </span>
       )}
-      {mySeat === null && !sv.name && round && (
+      {/* Ready for the next hand (CPUs always are). */}
+      {atTable && view.phase !== 'rolling' && sv.name && (sv.cpu || (view.phase === 'betweenRounds' ? sv.startPressed : sv.confirmed)) && (
+        <span className="ready-tag">{tr('ready')}</span>
+      )}
+      {mySeat === null && !sv.name && (round || (atTable && view.phase === 'betweenRounds')) && (
         <button className="btn sit-here" onClick={(e) => { e.stopPropagation(); command({ type: 'takeSeat', seat: sv.seat }); }}>
           {tr('sitHere')}
         </button>
       )}
-      {mySeat === null && sv.name && (
+      {mySeat === null && sv.name && !atTable && (
         <button
           className={`btn show-hide${sv.watched ? ' on' : ''}`}
           onClick={(e) => { e.stopPropagation(); command({ type: 'setWatchedSeat', seat: sv.seat, visible: !sv.watched }); }}
@@ -632,7 +696,7 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
         {nameTag(sv)}
         {/* Public tiles (shown sets and flowers); hidden tiles only when a spectator chose "Show". */}
         <div className="opp-tiles">
-          {renderMelds(sv.melds, dealAnim ? [] : sv.flowers, 'var(--public-w)', sideways)}
+          {renderMelds(sv.melds, dealAnim ? [] : sv.flowers, 'var(--public-w)', sv.wind, sideways)}
           {sv.hand && (
             <div className={`opp-hand${sideways ? ' melds-sideways' : ''}`}>
               {sortHand(sv.hand).map((t) => <TileView key={t.id} type={t.type} width="var(--opp-w)" sideways={sideways} />)}
@@ -649,17 +713,88 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
   // One key per hand (the same while the dice are being rolled and while it is dealt).
   const introKey = `${view.id}|${view.match.handsPlayed}|${view.match.roundWind}|${view.match.dealer}`;
   const [introBuilt, setIntroBuilt] = useState<string | null>(null);
-  useEffect(() => {
-    // Work out the next mixing ahead of time, a little at a time, while the table is quiet.
-    if (view.phase === 'betweenRounds') {
-      stopIntro();
-      prepareMix(8 * perWall, perWall);
-    }
-    if (view.phase === 'rolling') startIntro(introKey, perWall, sideOf, () => setIntroBuilt(introKey));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [view.phase, introKey]);
-  useEffect(() => () => stopIntro(), []);
   const wallStanding = introBuilt === introKey;
+  // At the table between hands: the shared pile is on show (and you can shuffle it).
+  const roundOver = view.phase === 'playing' && round?.phase === 'ended';
+  const atTable = view.phase === 'betweenRounds' || (view.phase === 'rolling' && !wallStanding) || (roundOver && showReady === roundKey);
+  const tableRef = useRef({ atTable, phase: view.phase, introKey });
+  tableRef.current = { atTable, phase: view.phase, introKey };
+  const build = (): void => {
+    const k = tableRef.current.introKey;
+    buildFromPile(k, perWall, sideOf, () => setIntroBuilt(k));
+  };
+  // The pile arrives from the server about 15 times a second.
+  useEffect(
+    () =>
+      onPile((m) => {
+        const { atTable: shown, phase } = tableRef.current;
+        if (phase === 'rolling' && m.done) return build();
+        if (shown) showPile(m.id, m.perWall, m.tiles);
+        else hidePile();
+      }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [],
+  );
+  useEffect(() => {
+    // Back at the table between hands: the old wall goes, and the pile shows instead.
+    if (view.phase === 'betweenRounds' || (atTable && view.phase !== 'rolling')) stopIntro();
+    if (atTable) {
+      const m = latestPile();
+      if (m && !m.done) showPile(m.id, m.perWall, m.tiles);
+    } else if (view.phase !== 'rolling') hidePile();
+    if (view.phase === 'rolling') {
+      const m = latestPile();
+      if (m?.done && pileShowing()) build();
+      // No pile on screen (the page was just opened): mix and build the wall by itself.
+      const t = setTimeout(() => {
+        if (!pileShowing() && !introKeyIs(introKey)) startIntro(introKey, perWall, sideOf, () => setIntroBuilt(introKey));
+      }, 1500);
+      return () => clearTimeout(t);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [view.phase, introKey, atTable]);
+  useEffect(() => () => { stopIntro(); hidePile(); }, []);
+  // Shuffling: where your mouse is (or your finger, while it's down) pushes the tiles.
+  const canShuffle = atTable && mySeat !== null && view.phase !== 'rolling';
+  useEffect(() => {
+    if (!canShuffle) return;
+    let last = 0;
+    let down = false;
+    let lastOn = false;
+    const sendAt = (e: PointerEvent, on: boolean): void => {
+      const t = performance.now();
+      if (on === lastOn && t - last < 45) return;
+      last = t;
+      lastOn = on;
+      const u = pileUnits(e.clientX, e.clientY, perWall);
+      send({ type: 'shove', x: u.x, y: u.y, on });
+    };
+    const overTable = (e: PointerEvent): boolean => !(e.target as Element | null)?.closest?.('button, .panel, .topbar, .me, .overlay');
+    const move = (e: PointerEvent): void => sendAt(e, overTable(e) && (e.pointerType === 'mouse' || down));
+    const press = (e: PointerEvent): void => {
+      down = true;
+      sendAt(e, overTable(e));
+    };
+    const lift = (e: PointerEvent): void => {
+      down = false;
+      if (e.pointerType !== 'mouse') sendAt(e, false);
+    };
+    const leave = (): void => send({ type: 'shove', x: 0, y: 0, on: false });
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerdown', press);
+    window.addEventListener('pointerup', lift);
+    window.addEventListener('pointercancel', lift);
+    document.addEventListener('pointerleave', leave);
+    return () => {
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerdown', press);
+      window.removeEventListener('pointerup', lift);
+      window.removeEventListener('pointercancel', lift);
+      document.removeEventListener('pointerleave', leave);
+      leave();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [canShuffle]);
   const dealAnim = useDealAnimation(round, roundKey, perWall, sideOf, introKey);
 
   // ---------- the last discard, shown big in the middle ----------
@@ -751,6 +886,38 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [flowerSig, roundKey, !!dealAnim]);
 
+  // ---------- opening flowers: after the deal, each player's flowers pop up in front of them ----------
+  const [openingFlowers, setOpeningFlowers] = useState<{ key: string; items: { seat: number; types: TileType[]; x: number; y: number }[] } | null>(null);
+  const hadDealAnim = useRef(false);
+  useEffect(() => {
+    if (dealAnim) {
+      hadDealAnim.current = true;
+      return;
+    }
+    if (!hadDealAnim.current || !round || round.discards.length > 0) return;
+    hadDealAnim.current = false;
+    const mid = document.querySelector('.centre')?.getBoundingClientRect();
+    if (!mid) return;
+    const cx = mid.left + mid.width / 2;
+    const cy = mid.top + mid.height / 2;
+    const items = view.seats
+      .filter((sv) => sv.flowers.length > 0)
+      .map((sv) => {
+        const side = sideOf(sv.seat);
+        const tag = (side === 'bottom' ? document.querySelector('.me-row') : document.querySelector(`.opp-${side} .nametag`))?.getBoundingClientRect();
+        const tx = tag ? tag.left + tag.width / 2 : cx;
+        const ty = tag ? (side === 'bottom' ? tag.top : tag.top + tag.height / 2) : cy;
+        // Halfway between that player and the middle of the table.
+        return { seat: sv.seat, types: sv.flowers.map((f) => f.type), x: (tx + cx) / 2, y: (ty + cy) / 2 };
+      });
+    if (items.length === 0) return;
+    const key = roundKey;
+    setOpeningFlowers({ key, items });
+    const t = setTimeout(() => setOpeningFlowers((o) => (o?.key === key ? null : o)), OPENING_FLOWERS_MS);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [!!dealAnim, roundKey]);
+
   /** Where a claim bubble goes: just beside that player's name tag (left of it for the right player). */
   const bubbleBeside = (seat: number): Pop['bubble'] => {
     const side = sideOf(seat);
@@ -818,7 +985,16 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
   const rowW = screen.w * 0.76 - 16;
   const maxHand = Math.min(screen.w * 0.059, screen.h * 0.11);
   const PUBLIC_RATIO = 0.72;
-  const handW = Math.max(14, Math.min(maxHand, rowW / (handCount + publicCount * PUBLIC_RATIO + groups * 0.3 + 0.6)));
+  // Room for a full hand (14 tiles, minus 3 for each shown set, plus the gap before a new
+  // tile), so drawing, discarding and claiming never change the size. Worked out once per
+  // hand; it only ever gets smaller (lots of flowers and Gongs) until the next hand.
+  void handCount;
+  const handSlots = 14 - 3 * bottom.melds.length + 0.35;
+  const fitW = Math.max(14, Math.min(maxHand, rowW / (handSlots + publicCount * PUBLIC_RATIO + groups * 0.3 + 0.6)));
+  const sizeRef = useRef<{ key: string; w: number } | null>(null);
+  const sizeKey = `${roundKey}|${screen.w}x${screen.h}`;
+  if (!sizeRef.current || sizeRef.current.key !== sizeKey || fitW < sizeRef.current.w) sizeRef.current = { key: sizeKey, w: fitW };
+  const handW = sizeRef.current.w;
   // --hand-max: the biggest your tiles can be, so your row keeps the same height all hand.
   const rowSizes = {
     '--hand-w': `${handW.toFixed(1)}px`,
@@ -832,7 +1008,7 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
   const canUndo = !!a?.undo || (!!lastWin && mySeat !== null);
 
   return (
-    <div className={`table-screen felt-${view.tableColour}`}>
+    <div className={`table-screen felt-${view.tableColour}${atTable ? ' at-table' : ''}`}>
       <header className="topbar">
         <div className="topbar-left">
           {me && nameTag(me, true)}
@@ -847,14 +1023,13 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
               {round && (
                 <button className="btn" onClick={() => command({ type: 'setWatchAll', visible: true })}>{tr('allHands')}</button>
               )}
-              {view.phase === 'betweenRounds' && justWatching && (
-                <button className="btn" onClick={() => setJustWatching(false)}>{tr('takeSeat')}</button>
-              )}
+
             </>
           )}
         </div>
         <div className="topbar-centre">
-          <span className="round-label">{view.label[lang]}</span>
+          <span className="round-label">{view.tutorial ? `${tr('tutorial')} · ` : ''}{(showReady === roundKey && view.nextLabel ? view.nextLabel : view.label)[lang]}</span>
+          {view.tutorial && <button className="btn leave-tutorial" onClick={onLeave}>{tr('leaveTutorial')}</button>}
           <span className="min-fan" title={tr('minFanTitle')}>{tr('minFanShort', { n: view.settings.minFan })}</span>
           <span className="compass">
             {SIDES.map((side) => {
@@ -871,8 +1046,9 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
           {me && (
             <span className="chip-total"><ChipIcon size="1.05em" />{me.balance}</span>
           )}
-          <button className="btn icon" title={tr('help')} onClick={() => setPanel('help')}>?</button>
-          <button className="btn icon" title={tr('settings')} onClick={() => setPanel('settings')}>⚙</button>
+          <FullscreenButton title={tr('fullscreen')} />
+          <button className="btn icon help-btn" title={tr('help')} onClick={() => setPanel('help')}>?</button>
+          <button className="btn icon settings-btn" title={tr('settings')} onClick={() => setPanel('settings')}>⚙</button>
         </div>
       </header>
 
@@ -912,7 +1088,7 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
                 <div className="flower-pop-tiles">
                   {fp.kind !== 'flower' && <span className={`act pop-badge act-${fp.kind}`}>{labels[fp.kind]}</span>}
                   {fp.types.map((type, i) => (
-                    <TileView key={i} type={type} back={!!fp.concealed && (i === 0 || i === 3)} width="clamp(40px, 6vw, 72px)" />
+                    <TileView key={i} type={type} back={!!fp.concealed && (i === 0 || i === 3)} width="clamp(40px, 6vw, 72px)" className={fp.kind === 'flower' ? (flowerScores(type, view.seats[fp.seat]!.wind) ? 'ring-scores' : 'ring-no-score') : undefined} />
                   ))}
                 </div>
                 <div className="flower-pop-text">
@@ -929,6 +1105,41 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
             ))}
           </div>
         )}
+        {/* Someone is holding the offered tile: their bubble stays by their name until they
+            confirm (then the usual claim pop-up) or cancel. Not chosen yet: no words, and it
+            fades through all the claim colours. */}
+        {round?.holds.map((h) => {
+          const b = bubbleBeside(h.seat);
+          if (!b) return null;
+          return (
+            <div key={`hold-${h.seat}`} className="claim-bubble-at hold-at" style={b.anchor === 'left' ? { left: b.x, top: b.y } : { right: window.innerWidth - b.x, top: b.y }}>
+              <span className={`claim-bubble hold-bubble ${h.kind ? `act-${h.kind}` : 'hold-any'}${b.anchor === 'right' ? ' from-right' : ''}`}>
+                {h.kind ? (h.kind === 'win' ? labels.win : labels[h.kind]) : ''}
+              </span>
+            </div>
+          );
+        })}
+        <PausedCard view={view} lang={lang} />
+        {view.tutorial && (
+          <TutorialGuide
+            view={view}
+            lang={lang}
+            panel={panel}
+            dealing={!!dealAnim}
+            openingFlowers={openingFlowers?.key === roundKey}
+            winMoment={showMoment}
+            finished={roundOver && showReady === roundKey}
+            onDone={onLeave}
+          />
+        )}
+        {openingFlowers?.key === roundKey &&
+          openingFlowers.items.map((o) => (
+            <div key={o.seat} className="opening-flowers" style={{ left: o.x, top: o.y }} aria-label={personName(view.seats[o.seat]?.name, lang)}>
+              {o.types.map((type, i) => (
+                <TileView key={i} type={type} width="clamp(30px, 4.4vw, 54px)" className={flowerScores(type, view.seats[o.seat]!.wind) ? 'ring-scores' : 'ring-no-score'} />
+              ))}
+            </div>
+          ))}
         {renderOpponent('top')}
         {renderOpponent('left')}
         <section className="centre" data-drop="centre">
@@ -991,34 +1202,24 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
       <footer className={`me${dealAnim?.rolling ? ' dealing' : ''}`} style={rowSizes}>
         <div className="me-row">
           {/* Your public tiles (shown sets and flowers) sit to the left of your hand. */}
-          {renderMelds(bottom.melds, dealAnim ? [] : bottom.flowers, 'var(--mine-w)')}
+          {renderMelds(bottom.melds, dealAnim ? [] : bottom.flowers, 'var(--mine-w)', bottom.wind)}
           <div className={`hand${handGap?.over ? ' reordering' : ''}`} data-drop="hand" ref={handRef}>
           {dealAnim && serverHand && bottomSeat !== null ? (
-            // During the deal: your tiles arrive 4 at a time and are sorted as they come in.
-            // The dealer's 14th tile sits apart on the right, as it will after the deal.
-            (() => {
-              const dealtSoFar = serverHand.slice(0, Math.min(serverHand.length, dealAnim.dealt[bottomSeat] ?? 0));
-              const extra = dealtSoFar.find((t) => t.id === drawnId);
-              return [
-                ...sortHand(dealtSoFar.filter((t) => t.id !== drawnId)).map((t) => (
-                  <span key={t.id} className="hand-tile dealt-tile">
-                    <TileView type={t.type} width="var(--hand-w)" />
-                  </span>
-                )),
-                extra && (
-                  <span key={extra.id} className="hand-tile drawn-tile dealt-tile">
-                    <TileView type={extra.type} width="var(--hand-w)" />
-                  </span>
-                ),
-              ];
-            })()
+            // During the deal: your tiles arrive and are sorted as they come in (the dealer's
+            // 14th tile is sorted in with the rest).
+            sortHand(serverHand.slice(0, Math.min(serverHand.length, dealAnim.dealt[bottomSeat] ?? 0))).map((t) => (
+              <span key={t.id} className="hand-tile dealt-tile">
+                <TileView type={t.type} width="var(--hand-w)" />
+              </span>
+            ))
           ) : serverHand
             ? hand.map((t, i) => (
                 <span
                   key={t.id}
                   data-hand-tile={t.id}
+                  data-type={t.type}
                   className={`hand-tile${drag?.moved && drag.src.kind === 'hand' && drag.src.tileId === t.id ? (handGap?.over ? ' dragging gap' : ' dragging') : ''}${
-                    chowLit ? (chowLit.has(t.type) ? (t.type === chowPick?.first ? ' chow-pick chow-first' : ' chow-pick') : ' chow-faded') : ''
+                    chowLit ? (chowLit.has(t.type) ? (t.type === chowPick?.first ? ' chow-pick chow-first' : ' chow-pick') : ' chow-faded') : holdGlow.has(t.id) ? ` hold-glow hold-${myHold!.kind}` : ''
                   }`}
                   style={slideOf(t.id, i) ? { transform: `translateX(${slideOf(t.id, i)}px)` } : undefined}
                   onPointerDown={mySeat !== null ? start({ kind: 'hand', tileId: t.id, type: t.type }) : undefined}
@@ -1033,6 +1234,7 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
               key={drawnTile.id}
               ref={drawnRef}
               data-hand-tile={drawnTile.id}
+              data-type={drawnTile.type}
               data-drawn="true"
               className={`hand-tile drawn-tile${drag?.moved && drag.src.kind === 'hand' && drag.src.tileId === drawnTile.id ? ' dragging' : ''}`}
               onPointerDown={start({ kind: 'hand', tileId: drawnTile.id, type: drawnTile.type })}
@@ -1042,17 +1244,36 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
           )}
           </div>
         </div>
-        <div className={`actions${claimable ? ' actions-claim' : ''}`}>
-          {showButtons && claimable && a.chow.length > 0 && <button className="act act-chow" onClick={onChow}>{labels.chow}</button>}
-          {showButtons && claimable && a.pong && <button className="act act-pong" onClick={onPong}>{labels.pong}</button>}
-          {showButtons && ((claimable && a.gong) || ownGongs > 0) && <button className="act act-gong" onClick={onGong}>{labels.gong}</button>}
-          {a && (a.selfDrawWin || (a.win && (claimable || round?.phase === 'ended'))) && <button className="act act-win" onClick={onWin}>{winLabel}</button>}
+        <div className={`actions${claimable && !myHold ? ' actions-claim' : ''}`}>
+          {/* At the table between hands: Ready (green), then a plain Unready if you change your mind. */}
+          {atTable && view.phase !== 'rolling' && me && (
+            (view.phase === 'betweenRounds' ? me.startPressed : me.confirmed) ? (
+              <button className="btn unready-btn" onClick={() => command({ type: 'unready' })}>{tr('unready')}</button>
+            ) : (
+              <button className="btn ready-btn" onClick={() => command(view.phase === 'betweenRounds' ? { type: 'pressStart' } : { type: 'confirmRound' })}>{tr('ready')}</button>
+            )
+          )}
+          {/* Holding a tile: Cancel (no colour) to its left, and Confirm in the claim's colour. */}
+          {showButtons && myHold && <button className="act act-pass" onClick={cancelHold}>{tr('cancel')}</button>}
+          {showButtons && myHold?.kind ? (
+            <button className={`act act-${myHold.kind} act-confirm`} disabled={myHold.kind === 'chow' && (a.chow.length > 1 && !chosenChow)} onClick={onConfirm}>{tr('confirm')}</button>
+          ) : (
+            <>
+              {showButtons && claimable && a.chow.length > 0 && <button className="act act-chow" onClick={onChow}>{labels.chow}</button>}
+              {showButtons && claimable && a.pong && <button className="act act-pong" onClick={onPong}>{labels.pong}</button>}
+              {showButtons && ((claimable && a.gong) || ownGongs > 0) && <button className="act act-gong" onClick={onGong}>{labels.gong}</button>}
+              {a && (a.selfDrawWin || (a.win && (claimable || round?.phase === 'ended'))) && <button className="act act-win" onClick={onWin}>{winLabel}</button>}
+            </>
+          )}
           {/* Wall empty: say no to the last tile. Plain (no colour) so it isn't pressed by mistake. */}
           {a?.pass && round?.phase !== 'ended' && <button className="act act-pass" onClick={() => command({ type: 'pass' })}>{tr('pass')}</button>}
         </div>
         <div className="me-bottom">
           {mySeat === null && nameTag(bottom)}
-          <span className="hint">{dealAnim ? '' : hint}</span>
+          <span className="hint">{dealAnim ? '' : atTable ? tableHint : hint}</span>
+          {atTable && roundOver && (
+            <button className="btn back-to-summary" onClick={() => setShowReady(null)}>{tr('returnToSummary')}</button>
+          )}
         </div>
       </footer>
 
@@ -1069,18 +1290,7 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
         </div>
       )}
 
-      {view.phase === 'betweenRounds' && !(mySeat === null && justWatching) && (
-        <SeatPicker
-          view={view}
-          tr={tr}
-          lang={lang}
-          command={command}
-          onSpectate={() => {
-            if (mySeat !== null) command({ type: 'leaveSeat' });
-            setJustWatching(true);
-          }}
-        />
-      )}
+
       {view.you.watchAll && mySeat === null && round && (
         <AllHands view={view} tr={tr} newFlowerIds={newFlowerIds} hideFlowers={!!dealAnim} onClose={() => command({ type: 'setWatchAll', visible: false })} />
       )}
@@ -1106,9 +1316,7 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
         </div>
       )}
       {(round?.phase === 'ended' || view.phase === 'finished') && !showMoment && (
-        showReady === roundKey && mySeat !== null && view.phase !== 'finished' ? (
-          <ReadyPanel view={view} tr={tr} lang={lang} command={command} onBack={() => setShowReady(null)} />
-        ) : (
+        showReady === roundKey && mySeat !== null && view.phase !== 'finished' ? null : (
           <ResultPanel
             view={view}
             lang={lang}
@@ -1116,7 +1324,14 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
             canClaimWin={!!a?.win}
             onWin={onWin}
             winLabel={winLabel}
-            onContinue={() => setShowReady(roundKey)}
+            onContinue={() => {
+              if (view.lastHand) {
+                // The last hand: leaving the summary counts as done, and the final scores show straight away.
+                if (mySeat !== null || view.spectatorsConfirm) command({ type: 'confirmRound' });
+                setShowFinal(roundKey);
+              } else setShowReady(roundKey);
+            }}
+            finalPreview={showFinal === roundKey && view.lastHand}
           />
         )
       )}
@@ -1224,7 +1439,7 @@ function AllHands({ view, tr, newFlowerIds, hideFlowers, onClose }: { view: Room
               ))}
               {!hideFlowers && s.flowers.length > 0 && (
                 <span className="meld flowers">
-                  {s.flowers.map((t) => <TileView key={t.id} type={t.type} width="var(--allhands-w)" className={newFlowerIds.has(t.id) ? 'flower-new' : undefined} />)}
+                  {s.flowers.map((t) => <TileView key={t.id} type={t.type} width="var(--allhands-w)" className={newFlowerIds.has(t.id) ? `flower-new ${flowerScores(t.type, s.wind) ? 'scores' : 'no-score'}` : undefined} />)}
                 </span>
               )}
             </span>
@@ -1236,64 +1451,6 @@ function AllHands({ view, tr, newFlowerIds, hideFlowers, onClose }: { view: Room
   );
 }
 
-/** Between rounds: choose a seat and press Start, or tap Spectate in the middle to just watch. */
-function SeatPicker({
-  view,
-  tr,
-  lang,
-  command,
-  onSpectate,
-}: {
-  view: RoomView;
-  tr: Tr;
-  lang: Prefs['lang'];
-  command: (c: Extract<ClientMessage, { type: 'command' }>['command']) => void;
-  onSpectate: () => void;
-}): ReactElement {
-  const mySeat = view.you.seat;
-  const me = mySeat !== null ? view.seats[mySeat] : null;
-  const filled = view.seats.filter((s) => s.name).length;
-  return (
-    <div className="overlay">
-      <div className="panel seat-picker">
-        <h3>{view.name} · {view.label[lang]}</h3>
-        <div className="seat-square">
-          {view.seats.map((s) => {
-            const mine = s.seat === mySeat;
-            const canTake = !mine && (!s.name || !!s.cpu);
-            return (
-              <button
-                key={s.seat}
-                className={`seat seat-${s.seat}${mine ? ' seat-mine' : ''}${s.name && !s.cpu ? ' seat-taken' : ''}`}
-                disabled={!canTake}
-                onClick={() => command({ type: 'takeSeat', seat: s.seat })}
-              >
-                <span className="seat-wind">{WIND_NAMES[lang][s.wind]}</span>
-                <span className="seat-name">{s.name ? personName(s.name, lang) : tr('empty')}</span>
-                {s.startPressed && <span className="seat-ready">{tr('ready')}</span>}
-              </button>
-            );
-          })}
-          <button className="seat seat-spectate" onClick={onSpectate}>
-            <span className="seat-name">{tr('spectate')}</span>
-            <span className="seat-wind">{tr('justWatch')}</span>
-          </button>
-        </div>
-        {me ? (
-          <div className="row">
-            <button className="btn primary big" disabled={me.startPressed} onClick={() => command({ type: 'pressStart' })}>
-              {me.startPressed ? tr('waitingOthers') : tr('start')}
-            </button>
-            <button className="btn" onClick={() => command({ type: 'leaveSeat' })}>{tr('leaveSeat')}</button>
-          </div>
-        ) : (
-          <p className="muted">{tr('tapSeat')}</p>
-        )}
-        {filled < 4 && <p className="muted">{tr('startRule')}</p>}
-      </div>
-    </div>
-  );
-}
 
 type Tr = (key: StringKey, vars?: Record<string, string | number>) => string;
 type Cmd = (c: Extract<ClientMessage, { type: 'command' }>['command']) => void;
@@ -1330,6 +1487,7 @@ function SettingsPanel({
           <label htmlFor="name-input">{tr('yourName')}</label>
           <form
             className="name-row"
+            data-tut="name"
             onSubmit={(e) => {
               e.preventDefault();
               if (nameChanged) command({ type: 'rename', newName: name.trim() });
@@ -1340,13 +1498,19 @@ function SettingsPanel({
           </form>
 
           <span>{tr('language')}</span>
-          <div className="segmented">
+          <div className="segmented" data-tut="lang">
             <button className={prefs.lang === 'en' ? 'on' : ''} onClick={() => setPrefs({ ...prefs, lang: 'en' })}>English</button>
             <button className={prefs.lang === 'zh' ? 'on' : ''} onClick={() => setPrefs({ ...prefs, lang: 'zh' })}>中文</button>
           </div>
 
+          <span>{tr('callAll')}</span>
+          <div className="segmented" title={tr('callAllNote')} data-tut="callAll">
+            <button className={!prefs.callAll ? 'on' : ''} onClick={() => setPrefs({ ...prefs, callAll: false })}>{tr('no')}</button>
+            <button className={prefs.callAll ? 'on' : ''} onClick={() => setPrefs({ ...prefs, callAll: true })}>{tr('yes')}</button>
+          </div>
+
           <span>{tr('celebration')}</span>
-          <div className="segmented celebration-choice">
+          <div className="segmented celebration-choice" data-tut="cele">
             {CELEBRATION_STYLES.map((style) => (
               <button
                 key={style}
@@ -1362,7 +1526,7 @@ function SettingsPanel({
           </div>
         </div>
 
-        <div className="row">
+        <div className="row" data-tut="leave">
           {mySeat !== null && (
             <button className="btn" onClick={() => { command({ type: 'dropOut', replacement: { none: true } }); onClose(); }}>
               {tr('leaveMySeat')}
@@ -1473,6 +1637,13 @@ export function flyBacks(from: { x: number; y: number }, to: { x: number; y: num
 }
 
 const DEAL_MS = DEAL_ANIM_MS;
+/** How long the opening flowers stay in front of each player after the deal. */
+const OPENING_FLOWERS_MS = 2500;
+
+/** Does this flower score for a player with this seat wind (0 East ... 3 North)? Its number matches the seat. */
+function flowerScores(type: TileType, wind: number): boolean {
+  return Number(type[1]) === wind + 1;
+}
 
 /**
  * At the start of each hand, replay the deal in about 5 seconds: tiles slide from
@@ -1491,7 +1662,7 @@ function useDealAnimation(
   const [plan, setPlan] = useState<null | {
     key: string;
     start: number;
-    steps: { seat: number; n: number; from: 'front' | 'back' }[];
+    steps: { seat: number; n: number; from: 'front' | 'back'; jump?: boolean }[];
     order: { seat: number; position: number }[];
     total: number;
     from: { x: number; y: number };
@@ -1501,7 +1672,7 @@ function useDealAnimation(
   const lastFlown = useRef('');
 
   useEffect(() => {
-    if (!round || round.discards.length > 0 || done.current === roundKey || round.wall.length === 0) return;
+    if (!round || round.phase === 'ended' || round.discards.length > 0 || done.current === roundKey || round.wall.length === 0) return;
     done.current = roundKey;
     // Rebuild the wall's full draw order from the stacks that are left.
     const N = 4 * perWall;
@@ -1517,10 +1688,11 @@ function useDealAnimation(
     const order = [...F.slice(N - frontFull), ...F.slice(0, N - frontFull)];
     const dealer = round.turn; // the dealer is to move at the start of a hand
     const seats = [0, 1, 2, 3].map((i) => (dealer + i) % 4);
-    const steps: { seat: number; n: number; from: 'front' | 'back' }[] = [];
+    const steps: { seat: number; n: number; from: 'front' | 'back'; jump?: boolean }[] = [];
     for (let r = 0; r < 3; r++) for (const s of seats) steps.push({ seat: s, n: 4, from: 'front' });
-    for (const s of seats) steps.push({ seat: s, n: 1, from: 'front' });
-    steps.push({ seat: dealer, n: 1, from: 'front' });
+    // The dealer takes the next 1st and 5th tiles together, then the others take one each.
+    steps.push({ seat: dealer, n: 2, from: 'front', jump: true });
+    for (const s of seats.slice(1)) steps.push({ seat: s, n: 1, from: 'front' });
     // Flower replacements came from the back of the wall.
     const total = round.wallCount + 53 + round.flowersDealt.reduce((a, b) => a + b, 0);
     for (const s of seats) for (let i = 0; i < round.flowersDealt[s]!; i++) steps.push({ seat: s, n: 1, from: 'back' });
@@ -1587,7 +1759,13 @@ function useDealAnimation(
     const taken = step.from === 'front' ? Math.floor((f - step.n) / 2) : N - 1 - Math.floor((b - step.n) / 2);
     const st = plan.order[Math.max(0, Math.min(N - 1, taken))]!;
     const from = introStackPoint(introKey, st.seat, st.position) ?? plan.from;
-    flyBacks(from, plan.to[sideOf(step.seat)], step.n, Math.max(150, stepMs * 0.9));
+    if (step.jump) {
+      // One tile from this stack and one from two stacks further on (the 1st and 5th tiles).
+      const st5 = plan.order[Math.max(0, Math.min(N - 1, taken + 2))]!;
+      const from5 = introStackPoint(introKey, st5.seat, st5.position) ?? plan.from;
+      flyBacks(from, plan.to[sideOf(step.seat)], 1, Math.max(150, stepMs * 0.9));
+      flyBacks(from5, plan.to[sideOf(step.seat)], 1, Math.max(150, stepMs * 0.9));
+    } else flyBacks(from, plan.to[sideOf(step.seat)], step.n, Math.max(150, stepMs * 0.9));
   }
   return { wall: { stacks, count: plan.total - f - b }, dealt };
 }
@@ -1604,52 +1782,6 @@ function glide(el: HTMLElement, dx: number, dy: number): void {
   }, 400);
 }
 
-/**
- * After the win summary: press Ready for the next round, or Leave seat to watch.
- * The same square of seats as the seat picker shows who is ready.
- */
-function ReadyPanel({
-  view,
-  tr,
-  lang,
-  command,
-  onBack,
-}: {
-  view: RoomView;
-  tr: Tr;
-  lang: Prefs['lang'];
-  command: Cmd;
-  onBack: () => void;
-}): ReactElement {
-  const me = view.you.seat !== null ? view.seats[view.you.seat]! : null;
-  return (
-    <div className="overlay">
-      <div className="panel seat-picker">
-        <h3>{view.name} · {view.label[lang]}</h3>
-        <div className="seat-square">
-          {view.seats.map((s) => (
-            <div key={s.seat} className={`seat seat-${s.seat}${s.seat === view.you.seat ? ' seat-mine' : ''}`}>
-              <span className="seat-wind">{WIND_NAMES[lang][s.wind]}</span>
-              <span className="seat-name">{s.name ? personName(s.name, lang) : tr('empty')}</span>
-              {s.cpu ? <span className="seat-ready">{tr('ready')}</span> : s.name && (s.confirmed ? <span className="seat-ready">{tr('ready')}</span> : <span className="seat-wind">…</span>)}
-            </div>
-          ))}
-        </div>
-        <div className="row">
-          {me && (
-            <button className="btn primary big" disabled={me.confirmed} onClick={() => command({ type: 'confirmRound' })}>
-              {me.confirmed ? `${tr('ready')} ✓` : tr('ready')}
-            </button>
-          )}
-          {me && (
-            <button className="btn" onClick={() => command({ type: 'dropOut', replacement: { none: true } })}>{tr('leaveSeat')}</button>
-          )}
-          <button className="btn" onClick={onBack}>{tr('backToSummary')}</button>
-        </div>
-      </div>
-    </div>
-  );
-}
 
 /** The winner's whole hand in the middle of the table: hidden tiles, then face-up sets, then the winning tile glowing. */
 function WinningHand({ seat, winningTileId, name }: { seat: SeatView; winningTileId?: number; name: string }): ReactElement {
@@ -1676,3 +1808,96 @@ function WinningHand({ seat, winningTileId, name }: { seat: SeatView; winningTil
   );
 }
 
+
+/**
+ * Fills the whole screen (hides the browser bar). Not shown where the browser can't do it
+ * (iPhone Safari only allows videos to go fullscreen).
+ */
+function FullscreenButton({ title }: { title: string }): ReactElement | null {
+  type Doc = Document & { webkitFullscreenEnabled?: boolean; webkitFullscreenElement?: Element | null; webkitExitFullscreen?: () => void };
+  type El = HTMLElement & { webkitRequestFullscreen?: () => void };
+  const doc = document as Doc;
+  const supported = !!(doc.fullscreenEnabled || doc.webkitFullscreenEnabled);
+  const [on, setOn] = useState(() => !!(doc.fullscreenElement || doc.webkitFullscreenElement));
+  useEffect(() => {
+    const update = (): void => setOn(!!(doc.fullscreenElement || doc.webkitFullscreenElement));
+    document.addEventListener('fullscreenchange', update);
+    document.addEventListener('webkitfullscreenchange', update);
+    return () => {
+      document.removeEventListener('fullscreenchange', update);
+      document.removeEventListener('webkitfullscreenchange', update);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  if (!supported) return null;
+  const toggle = (): void => {
+    try {
+      if (doc.fullscreenElement || doc.webkitFullscreenElement) {
+        if (doc.exitFullscreen) void doc.exitFullscreen().catch(() => undefined);
+        else doc.webkitExitFullscreen?.();
+      } else {
+        const el = document.documentElement as El;
+        if (el.requestFullscreen) void el.requestFullscreen().catch(() => undefined);
+        else el.webkitRequestFullscreen?.();
+      }
+    } catch {
+      /* not allowed here: nothing happens */
+    }
+  };
+  return (
+    <button className="btn icon fullscreen-btn" title={title} aria-pressed={on} onClick={toggle}>
+      <svg viewBox="0 0 24 24" width="1em" height="1em" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+        {on ? (
+          <path d="M9 3v6H3M15 3v6h6M9 21v-6H3M15 21v-6h6" />
+        ) : (
+          <path d="M3 9V3h6M21 9V3h-6M3 15v6h6M21 15v6h-6" />
+        )}
+      </svg>
+    </button>
+  );
+}
+
+/**
+ * Someone at the table lost their connection mid-hand: the game is paused, and a card in
+ * the middle says who and how long ago. When they're back, a short "… is back" shows.
+ */
+function PausedCard({ view, lang }: { view: RoomView; lang: Prefs['lang'] }): ReactElement | null {
+  const tr = (k: StringKey, v?: Record<string, string | number>): string => t(lang, k, v);
+  const seat = view.pausedSeats.find((s) => s !== view.you.seat);
+  const sv = seat !== undefined ? view.seats[seat] : undefined;
+  const [, tick] = useState(0);
+  const [back, setBack] = useState<string | null>(null);
+  const was = useRef<string | null>(null);
+  useEffect(() => {
+    if (!sv) return;
+    const i = setInterval(() => tick((n) => n + 1), 1000);
+    return () => clearInterval(i);
+  }, [sv?.seat]);
+  useEffect(() => {
+    const name = sv?.name ? personName(sv.name, lang) : null;
+    if (!name && was.current) {
+      setBack(was.current);
+      const tm = setTimeout(() => setBack(null), 2600);
+      was.current = null;
+      return () => clearTimeout(tm);
+    }
+    was.current = name;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sv?.name]);
+  if (!sv) return back ? <div className="back-toast">{tr('isBack', { name: back })}</div> : null;
+  // How long ago, using the server's clock (devices' clocks may differ).
+  const offset = view.serverNow - Date.now();
+  const secs = sv.offlineSince ? Math.max(0, Math.floor((Date.now() + offset - sv.offlineSince) / 1000)) : 0;
+  const ago = secs < 60 ? tr('secondsAgo', { n: secs }) : tr('minutesAgo', { m: Math.floor(secs / 60), s: secs % 60 });
+  const name = personName(sv.name, lang);
+  const [before, after] = tr('disconnectedTitle', { name: '\u0001' }).split('\u0001');
+  return (
+    <div className="paused-layer" role="status">
+      <div className="paused-card">
+        <div className="title">{before}<b>{name}</b>{after}</div>
+        <div className="sub">{tr('pausedUntil')}</div>
+        <div className="time">{ago}</div>
+      </div>
+    </div>
+  );
+}

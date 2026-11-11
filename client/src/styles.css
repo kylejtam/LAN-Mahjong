@@ -626,7 +626,7 @@ input { font: inherit; }
   padding: 0.6em 1em; box-shadow: 0 0 22px 4px rgba(245, 197, 66, 0.55), 0 8px 18px rgba(0, 0, 0, 0.5);
   animation: flower-pop 3s ease-out forwards;
 }
-.flower-pop-tiles { display: flex; gap: 0.3em; }
+.flower-pop-tiles { display: flex; gap: 0.3em; isolation: isolate; }
 .flower-pop-text { color: #fff; font-weight: 700; font-size: 1.05em; white-space: nowrap; }
 .flower-pop-wind { font-family: serif; margin-right: 0.4em; color: #f5c542; }
 @keyframes flower-pop {
@@ -636,11 +636,30 @@ input { font: inherit; }
   85% { opacity: 1; transform: scale(1); }
   100% { opacity: 0; transform: scale(0.92); }
 }
-.flower-new::before { animation: flower-glow 0.6s ease-in-out 8 alternate; }
-@keyframes flower-glow {
-  from { box-shadow: 0 0 0 2px #f5c542, 0 0 4px 2px rgba(245, 197, 66, 0.4); }
-  to { box-shadow: 0 0 0 3px #f5c542, 0 0 16px 6px rgba(245, 197, 66, 0.9); }
+/* A new flower glows green if it scores for that player (matches their seat), red if not. */
+.flower-new::before { animation: flower-glow-ok 0.6s ease-in-out 8 alternate; }
+.flower-new.no-score::before { animation-name: flower-glow-no; }
+@keyframes flower-glow-ok {
+  from { box-shadow: 0 0 0 2px #3fd97a, 0 0 4px 2px rgba(63, 217, 122, 0.4); }
+  to { box-shadow: 0 0 0 3px #3fd97a, 0 0 16px 6px rgba(63, 217, 122, 0.9); }
 }
+@keyframes flower-glow-no {
+  from { box-shadow: 0 0 0 2px #e5484d, 0 0 4px 2px rgba(229, 72, 77, 0.4); }
+  to { box-shadow: 0 0 0 3px #e5484d, 0 0 16px 6px rgba(229, 72, 77, 0.9); }
+}
+/* A plain ring: green = this flower scores for its owner, red = it doesn't. */
+.ring-scores::before, .ring-no-score::before { content: ''; position: absolute; inset: -3px; border-radius: 6px; z-index: -1; }
+.ring-scores::before { background: #3fd97a; }
+.ring-no-score::before { background: #e5484d; }
+/* Opening flowers: in front of each player for a moment after the deal. */
+.opening-flowers { position: fixed; z-index: 25; transform: translate(-50%, -50%); display: flex; gap: 7px; isolation: isolate; pointer-events: none; animation: opening-flowers 2.5s ease-out forwards; }
+@keyframes opening-flowers {
+  0% { opacity: 0; transform: translate(-50%, -50%) scale(0.6); }
+  10% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  85% { opacity: 1; }
+  100% { opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) { .opening-flowers { animation: none; } }
 
 /* Host page: "Stop this hand" above the settings. */
 .stop-hand { display: flex; align-items: center; gap: 0.8em; flex-wrap: wrap; margin: 0 0 0.8em; }
@@ -896,7 +915,9 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; }
 
 /* The start of each hand (TableIntro): the big wall drawn over the table. */
 /* While the big wall shrinks into the small box, the box waits for it. */
-.intro-arriving .wall-box { visibility: hidden; }
+.intro-arriving .wall-box { opacity: 0; }
+.intro-fading .wall-box { animation: wall-box-in 0.45s ease forwards; }
+@keyframes wall-box-in { from { opacity: 0; } to { opacity: 1; } }
 .intro-layer { position: fixed; inset: 0; pointer-events: none; z-index: 14; }
 .intro-tile {
   position: absolute; left: 0; top: 0; border-radius: 3px; background: var(--tile-back);
@@ -912,3 +933,69 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; }
 @media (prefers-reduced-motion: reduce) { .roll-btn { animation: none; } }
 /* The dice sit in the middle of the wall (inside the square), clear of the tiles. */
 .dice-tray.in-wall { bottom: auto; top: 46%; transform: translate(-50%, -50%); z-index: 16; font-size: 1.2em; }
+
+/* Game summary: the tiles left in the wall, in drawing order (a small gap between stacks). */
+.remaining-overlay { z-index: 30; }
+.remaining-panel { max-width: min(46rem, 94vw); --result-w: clamp(22px, 3.2vw, 38px); }
+.remaining-head { display: flex; align-items: center; gap: 0.8em; }
+.remaining-head h3 { margin: 0; }
+.remaining-count { margin-left: auto; font-weight: 800; color: #f5c542; font-variant-numeric: tabular-nums; }
+.remaining-head .panel-close { position: static; }
+.remaining-tiles { display: flex; flex-wrap: wrap; gap: 0.5em 0.4em; max-height: 60vh; overflow-y: auto; }
+.remaining-stack { display: flex; gap: 1px; }
+
+/* Holding a claim: the tiles it would use glow in the claim's colour (behind the tile). */
+.hand-tile.hold-glow .tile::before, .hold-glow::before { content: ''; position: absolute; inset: -4px; border-radius: 7px; z-index: -1; pointer-events: none; }
+.hold-glow.hold-chow .tile::before, .hold-glow.hold-chow::before { background: #2f8f5b; box-shadow: 0 0 10px 3px rgba(47, 143, 91, 0.8); }
+.hold-glow.hold-pong .tile::before, .hold-glow.hold-pong::before { background: #2f6fbf; box-shadow: 0 0 10px 3px rgba(47, 111, 191, 0.8); }
+.hold-glow.hold-gong .tile::before, .hold-glow.hold-gong::before { background: #8a4fc0; box-shadow: 0 0 10px 3px rgba(138, 79, 192, 0.8); }
+.hold-glow.hold-win .tile::before, .hold-glow.hold-win::before { background: #d23b3b; box-shadow: 0 0 10px 3px rgba(210, 59, 59, 0.8); }
+/* A held claim's bubble stays (no pop-in-and-out); "not chosen yet" cycles through the colours. */
+.hold-at { z-index: 26; }
+.claim-bubble.hold-bubble { animation: none; }
+.claim-bubble.hold-any { min-width: 3em; min-height: 1.7em; animation: hold-cycle 3.2s linear infinite; }
+@keyframes hold-cycle { 0%, 100% { background: #2f8f5b; } 25% { background: #2f6fbf; } 50% { background: #8a4fc0; } 75% { background: #d23b3b; } }
+@media (prefers-reduced-motion: reduce) { .claim-bubble.hold-any { animation-duration: 12s; } }
+.act-confirm { font-size: 0.85em; }
+.act:disabled { opacity: 0.45; }
+
+/* Lost connection: the whole screen dims, with a huge "Reconnecting…". */
+.reconnecting { position: fixed; inset: 0; z-index: 100; background: rgba(0, 0, 0, 0.78); display: grid; place-items: center; text-align: center; padding: 1rem; }
+.reconnecting-big { font-size: clamp(2.2rem, 9vw, 4.6rem); font-weight: 900; color: #fff; }
+.reconnecting-small { color: #c9ced6; font-size: clamp(0.95rem, 2.4vw, 1.2rem); margin-top: 0.4em; }
+.reconnecting .dots span { animation: dots-blink 1.4s infinite; }
+.reconnecting .dots span:nth-child(2) { animation-delay: 0.2s; }
+.reconnecting .dots span:nth-child(3) { animation-delay: 0.4s; }
+@keyframes dots-blink { 0%, 100% { opacity: 0.2; } 30% { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .reconnecting .dots span { animation: none; } }
+/* Someone else lost their connection: the game pauses, with a card saying who. */
+.paused-layer { position: fixed; inset: 0; z-index: 35; background: rgba(0, 0, 0, 0.45); display: grid; place-items: center; padding: 1rem; pointer-events: none; }
+.paused-card { background: var(--panel, #1c1f26); border: 2px solid #e5484d; border-radius: 12px; padding: 1em 1.4em; text-align: center; display: grid; gap: 0.35em; max-width: 26em; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5); }
+.paused-card .title { font-size: 1.4em; font-weight: 900; }
+.paused-card .title b { color: #e5484d; }
+.paused-card .sub { color: var(--muted, #9aa3ad); }
+.paused-card .time { font-weight: 700; font-variant-numeric: tabular-nums; }
+.nametag.gone { background: #3a1416 !important; box-shadow: 0 0 0 2px #e5484d; }
+.lost-tag { background: #e5484d; color: #fff; border-radius: 999px; padding: 0.05em 0.6em; font-size: 0.85em; font-weight: 800; }
+.back-toast { position: fixed; left: 50%; top: 18%; transform: translateX(-50%); z-index: 36; background: var(--panel, #1c1f26); border: 2px solid #f5c542; border-radius: 999px; padding: 0.4em 1.1em; font-weight: 700; animation: back-toast 2.5s ease-out forwards; pointer-events: none; }
+@keyframes back-toast { 0%, 70% { opacity: 1; } 100% { opacity: 0; } }
+
+/* At the table between hands: only the pile, the name tags and the buttons show. */
+.at-table .pond, .at-table .melds, .at-table .opp-hand, .at-table .hand, .at-table .wall-box, .at-table .turn-edge, .at-table .last-discard, .at-table .hub { visibility: hidden; }
+.at-table .board { touch-action: none; }
+.ready-btn { background: #3fb56f; color: #08210f; border: none; font-weight: 800; border-radius: 999px; padding: 0.6em 1.4em; font-size: 1.05em; box-shadow: 0 3px 0 rgba(0, 0, 0, 0.35); }
+.unready-btn { background: none; border: 2px solid #59616d; color: var(--fg); border-radius: 999px; padding: 0.55em 1.3em; font-size: 1.05em; }
+.back-to-summary { position: fixed; left: 50%; bottom: calc(max(10px, var(--safe-b, 0px)) + 2.4em); transform: translateX(-50%); z-index: 30; white-space: nowrap; }
+.ready-tag { background: #3fb56f; color: #08210f; border-radius: 999px; padding: 0 0.5em; font-size: 0.8em; font-weight: 800; margin-left: 0.3em; }
+
+/* The tutorial: a small, quiet note in the corner of the table, and a soft glow on the control to use. */
+.tutorial-guide { position: fixed; left: max(12px, var(--safe-l, 0px)); bottom: 24vh; z-index: 60; max-width: min(22em, 46vw); background: rgba(10, 24, 16, 0.86); color: #fff; border-radius: 8px; padding: 0.45em 0.75em; display: grid; gap: 0.1em; font-size: 0.92rem; box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35); }
+.tutorial-guide .count { color: #aab3bd; font-size: 0.78em; }
+.tutorial-guide .say { font-weight: 600; }
+.tutorial-guide .why { color: #c3cbd3; font-size: 0.86em; }
+.tutorial-guide .tut-next { justify-self: end; margin-top: 0.3em; }
+.tut-target { outline: 2px solid rgba(255, 255, 255, 0.65); outline-offset: 3px; border-radius: 8px; animation: tut-pulse 1.6s ease-in-out infinite alternate; }
+@keyframes tut-pulse { from { outline-color: rgba(255, 255, 255, 0.7); } to { outline-color: rgba(255, 255, 255, 0.1); } }
+@media (prefers-reduced-motion: reduce) { .tut-target { animation: none; } }
+.leave-tutorial { font-size: 0.85em; padding: 0.25em 0.8em; background: none; border: 1px solid #59616d; border-radius: 999px; }
+.tutorial-done { z-index: 70; }

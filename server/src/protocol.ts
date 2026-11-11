@@ -21,14 +21,23 @@ export interface GameListEntry {
 export type ClientMessage =
   | { type: 'listGames' }
   | { type: 'joinGame'; gameId: string; name: string }
+  /** Start a private tutorial game (with 3 computer players). */
+  | { type: 'startTutorial'; name: string }
   | { type: 'command'; command: Command }
+  /** Check-in every few seconds: proves the connection works. rev = the last state this device has. */
+  | { type: 'ping'; rev?: number }
+  /** Shuffling between hands: where this player's mouse or finger is over the pile (wall square = 1 wide, centred). */
+  | { type: 'shove'; x: number; y: number; on: boolean }
   | { type: 'leaveGame' };
 
 /** Server → device. */
 export type ServerMessage =
   | { type: 'games'; games: GameListEntry[] }
   | { type: 'joined'; gameId: string; name: string }
-  | { type: 'state'; view: RoomView }
+  | { type: 'state'; view: RoomView; rev?: number }
+  | { type: 'pong'; rev: number | null }
+  /** The shared pile between hands: [x, y, angle] for each tile (see pile.ts). done = the 6 shoves are over. */
+  | { type: 'pile'; id: number; perWall: number; tiles: number[]; done: boolean }
   | { type: 'error'; message: string }
   | { type: 'gameEnded'; gameId: string };
 
