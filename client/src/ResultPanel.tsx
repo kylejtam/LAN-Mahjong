@@ -195,9 +195,16 @@ export function ResultPanel({ view, lang, command, canClaimWin, onWin, winLabel,
               <span className="remaining-count">{wallCount}</span>
               <button className="panel-close" aria-label={tr('close')} onClick={() => setShowWall(false)}>×</button>
             </div>
+            <div className="remaining-ends">
+              <span className="remaining-start-label">▶ {tr('remainingStart')}</span>
+              <span className="remaining-end-label">{tr('remainingEnd')} ◀</span>
+            </div>
             <div className="remaining-tiles">
               {wall.map((st, i) => (
-                <span key={i} className="remaining-stack">
+                <span
+                  key={i}
+                  className={`remaining-stack${i === 0 ? ' is-start' : ''}${i === wall.length - 1 ? ' is-end' : ''}`}
+                >
                   {st.map((tile) => <TileView key={tile.id} type={tile.type} width="var(--result-w)" />)}
                 </span>
               ))}
