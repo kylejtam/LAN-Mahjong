@@ -18,7 +18,7 @@
  * else is happening (between hands), so it never makes the screen stutter.
  */
 
-import { INTRO_FADE_MS, WALL_SHRINK_MS, wallCountMs } from '@lan-mahjong/shared';
+import { INTRO_FADE_MS, WALL_SHRINK_MS, pileForViewer, turnToTable, wallCountMs } from '@lan-mahjong/shared';
 
 export type Side = 'bottom' | 'right' | 'top' | 'left';
 const SEATS = 4;
@@ -502,6 +502,8 @@ export function finishIntro(key: string): void {
 
 interface PileView {
   id: number;
+  /** The seat this player is at (the pile is turned for it). */
+  seat: number;
   perWall: number;
   layer: HTMLElement;
   els: HTMLElement[];
@@ -528,9 +530,11 @@ function drawPile(): void {
 }
 
 /** A new frame of the pile from the server. */
-export function showPile(id: number, perWall: number, tiles: number[]): void {
+export function showPile(id: number, perWall: number, sharedTiles: number[], seat: number): void {
   if (current) return; // the wall is being built or is standing: the pile is gone
-  if (!pileView || pileView.id !== id || pileView.els.length * 3 !== tiles.length) {
+  // The pile is shared in the table's frame; this player sees it turned to their own seat.
+  const tiles = pileForViewer(sharedTiles, seat);
+  if (!pileView || pileView.id !== id || pileView.seat !== seat || pileView.els.length * 3 !== tiles.length) {
     hidePile();
     const g = geometry(perWall);
     const layer = document.createElement('div');
@@ -546,7 +550,7 @@ export function showPile(id: number, perWall: number, tiles: number[]): void {
       els.push(el);
     }
     document.body.appendChild(layer);
-    pileView = { id, perWall, layer, els, from: tiles.slice(), to: tiles.slice(), at: 0, raf: 0 };
+    pileView = { id, seat, perWall, layer, els, from: tiles.slice(), to: tiles.slice(), at: 0, raf: 0 };
   } else {
     // Glide on from wherever each tile is drawn right now.
     const k = Math.min(1, (performance.now() - pileView.at) / FRAME_MS);
@@ -569,9 +573,10 @@ export function pileShowing(): boolean {
 }
 
 /** Screen point → the pile's units (the wall square is 1 wide, centred on 0, 0). */
-export function pileUnits(clientX: number, clientY: number, perWall: number): { x: number; y: number } {
+export function pileUnits(clientX: number, clientY: number, perWall: number, seat: number): { x: number; y: number } {
   const g = geometry(perWall);
-  return { x: (clientX - g.cx) / g.S, y: (clientY - g.cy) / g.S };
+  // Your finger's movement, turned back into the table's frame (the one the server uses).
+  return turnToTable((clientX - g.cx) / g.S, (clientY - g.cy) / g.S, seat);
 }
 
 /**

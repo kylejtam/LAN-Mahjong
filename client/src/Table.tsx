@@ -730,8 +730,8 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
   // At the table between hands: the shared pile is on show (and you can shuffle it).
   const roundOver = view.phase === 'playing' && round?.phase === 'ended';
   const atTable = view.phase === 'betweenRounds' || (view.phase === 'rolling' && !wallStanding) || (roundOver && showReady === roundKey);
-  const tableRef = useRef({ atTable, phase: view.phase, introKey });
-  tableRef.current = { atTable, phase: view.phase, introKey };
+  const tableRef = useRef({ atTable, phase: view.phase, introKey, seat: 0 });
+  tableRef.current = { atTable, phase: view.phase, introKey, seat: bottomSeat ?? 0 };
   const build = (): void => {
     const k = tableRef.current.introKey;
     buildFromPile(k, perWall, sideOf, () => setIntroBuilt(k));
@@ -742,7 +742,7 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
       onPile((m) => {
         const { atTable: shown, phase } = tableRef.current;
         if (phase === 'rolling' && m.done) return build();
-        if (shown) showPile(m.id, m.perWall, m.tiles);
+        if (shown) showPile(m.id, m.perWall, m.tiles, tableRef.current.seat);
         else hidePile();
       }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -753,7 +753,7 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
     if (view.phase === 'betweenRounds' || (atTable && view.phase !== 'rolling')) stopIntro();
     if (atTable) {
       const m = latestPile();
-      if (m && !m.done) showPile(m.id, m.perWall, m.tiles);
+      if (m && !m.done) showPile(m.id, m.perWall, m.tiles, bottomSeat ?? 0);
     } else if (view.phase !== 'rolling') hidePile();
     if (view.phase === 'rolling') {
       const m = latestPile();
@@ -779,7 +779,7 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
       if (on === lastOn && t - last < 45) return;
       last = t;
       lastOn = on;
-      const u = pileUnits(e.clientX, e.clientY, perWall);
+      const u = pileUnits(e.clientX, e.clientY, perWall, bottomSeat ?? 0);
       send({ type: 'shove', x: u.x, y: u.y, on });
     };
     const overTable = (e: PointerEvent): boolean => !(e.target as Element | null)?.closest?.('button, .panel, .topbar, .me, .overlay');
