@@ -197,13 +197,12 @@ export function ResultPanel({ view, lang, command, canClaimWin, onWin, winLabel,
             </div>
             <div className="remaining-ends">
               <span className="remaining-start-label">▶ {tr('remainingStart')}</span>
-              <span className="remaining-end-label">{tr('remainingEnd')} ◀</span>
             </div>
             <div className="remaining-tiles">
               {wall.map((st, i) => (
                 <span
                   key={i}
-                  className={`remaining-stack${i === 0 ? ' is-start' : ''}${i === wall.length - 1 ? ' is-end' : ''}`}
+                  className={`remaining-stack${i === 0 ? ' is-start' : ''}`}
                 >
                   {st.map((tile) => <TileView key={tile.id} type={tile.type} width="var(--result-w)" />)}
                 </span>

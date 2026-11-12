@@ -959,9 +959,8 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; }
 .remaining-tiles { display: flex; flex-wrap: wrap; gap: 0.5em 0.4em; max-height: 60vh; overflow-y: auto; }
 .remaining-stack { display: flex; gap: 1px; border-radius: 6px; padding: 2px; }
 /* The two ends of the wall: where the draw starts, and where flowers and replacements come from. */
-.remaining-stack.is-start, .remaining-stack.is-end { outline: 2px solid #f5c542; outline-offset: 2px; }
+.remaining-stack.is-start { outline: 2px solid #f5c542; outline-offset: 2px; }
 .remaining-ends { display: flex; justify-content: space-between; gap: 1em; font-size: 0.85em; font-weight: 800; color: #f5c542; letter-spacing: 0.02em; }
-.remaining-end-label { text-align: right; }
 
 /* Holding a claim: the tiles it would use glow in the claim's colour (behind the tile). */
 /* Only the tile itself glows (the glow sits on the tile, never around the whole hand). */
