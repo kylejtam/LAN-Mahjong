@@ -212,3 +212,12 @@ Write down which devices worked: ☐ iPhone ☐ iPad ☐ Samsung tablet ☐ lapt
 - [ ] The first flower in a hand that doesn't score for whoever drew it plays a window breaking on every device (not for opening flowers, only once per hand).
 - [ ] Host page: Close host → Click again to close → LAN Mahjong stops and the page says it has closed.
 
+## 1.19.2
+- [ ] Window-break sound plays once per player per hand: their first flower in play, if it doesn't score. Not for the deal's flowers, a second flower, or a scoring first flower. Check on an iPad (tap once; silent switch off).
+- [ ] Full screen icon is centred in its button in full screen.
+- [ ] Shuffle: East pushes up, South sees the tiles move left to right.
+- [ ] Empty seat: the whole name tag is a blue, pulsing Sit here button.
+- [ ] Leave your seat after a hand: close the summary to see the table, press Sit here to sit again.
+- [ ] Remaining tiles shows Draw starts here on the first tile.
+- [ ] The game's name shows left of the round in the top bar.
+
