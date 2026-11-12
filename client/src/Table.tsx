@@ -965,6 +965,10 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
   // When a new set appears in front of a player (claimed from a discard, or a
   // gong from their own tiles), show it big in the middle and make it glow.
   const seenMelds = useRef<{ key: string; sigs: string[][]; counts: number[] }>({ key: '', sigs: [], counts: [] });
+  /** The claim bubble a player started by holding a tile stays on until the claim pop-up ends (no second bubble). */
+  const [kept, setKept] = useState<{ seat: number; kind: 'chow' | 'pong' | 'gong' | 'win'; t: number } | null>(null);
+  /** Seats that were holding a tile at the last screen (read before the claim is applied). */
+  const heldBefore = useRef<Set<number>>(new Set());
   const meldSigs = view.seats.map((sv) => sv.melds.map((m) => `${m.kind}:${m.tiles.map((t) => t.id).join('.')}`));
   useEffect(() => {
     const before = seenMelds.current;
@@ -979,13 +983,24 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
         // A brand-new set, or a pong that became a gong (robbing a gong turns
         // a gong back into a pong: that is not a claim, so it is skipped).
         if (sv.melds.length <= (before.counts[sv.seat] ?? 0) && m.kind !== 'gong') return;
-        pops.push({ key: `${roundKey}-m-${sig}`, kind: m.kind, seat: sv.seat, types: m.tiles.map((t) => t.type), concealed: m.concealed, bubble: bubbleBeside(sv.seat) });
+        // Confirmed after holding: the bubble they already have stays (no second one).
+        const wasHeld = heldBefore.current.has(sv.seat);
+        if (wasHeld) {
+          const t = Date.now();
+          setKept({ seat: sv.seat, kind: m.kind as 'chow' | 'pong' | 'gong' | 'win', t });
+          window.setTimeout(() => setKept((k) => (k && k.t === t ? null : k)), POP_MS);
+        }
+        pops.push({ key: `${roundKey}-m-${sig}`, kind: m.kind, seat: sv.seat, types: m.tiles.map((t) => t.type), concealed: m.concealed, bubble: wasHeld ? undefined : bubbleBeside(sv.seat) });
         ids.push(...m.tiles.map((t) => t.id));
       });
     });
     showPops(pops, ids);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [JSON.stringify(meldSigs), roundKey]);
+  // Remember who is holding, for the next screen (declared after the claim pop-up above, so it reads the old value first).
+  useEffect(() => {
+    heldBefore.current = new Set((round?.holds ?? []).map((h) => h.seat));
+  });
 
   useEffect(() => {
     const counts = view.seats.map((sv) => sv.handCount);
@@ -1140,17 +1155,22 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
         {/* Someone is holding the offered tile: their bubble stays by their name until they
             confirm (then the usual claim pop-up) or cancel. Not chosen yet: no words, and it
             fades through all the claim colours. */}
-        {round?.holds.map((h) => {
-          const b = bubbleBeside(h.seat);
-          if (!b) return null;
-          return (
-            <div key={`hold-${h.seat}`} className="claim-bubble-at hold-at" style={b.anchor === 'left' ? { left: b.x, top: b.y } : { right: window.innerWidth - b.x, top: b.y }}>
-              <span className={`claim-bubble hold-bubble ${h.kind ? `act-${h.kind}` : 'hold-any'}${b.anchor === 'right' ? ' from-right' : ''}`}>
-                {h.kind ? (h.kind === 'win' ? labels.win : labels[h.kind]) : ''}
-              </span>
-            </div>
-          );
-        })}
+        {(() => {
+          // The bubble of a holding player, or of a claim they just confirmed (kept until its pop-up ends).
+          const shown = (round?.holds ?? []).map((h) => ({ seat: h.seat, kind: h.kind as 'chow' | 'pong' | 'gong' | 'win' | null }));
+          if (kept && !shown.some((h) => h.seat === kept.seat)) shown.push({ seat: kept.seat, kind: kept.kind });
+          return shown.map((h) => {
+            const b = bubbleBeside(h.seat);
+            if (!b) return null;
+            return (
+              <div key={`hold-${h.seat}`} className="claim-bubble-at hold-at" style={b.anchor === 'left' ? { left: b.x, top: b.y } : { right: window.innerWidth - b.x, top: b.y }}>
+                <span className={`claim-bubble hold-bubble ${h.kind ? `act-${h.kind}` : 'hold-any'}${b.anchor === 'right' ? ' from-right' : ''}`}>
+                  {h.kind ? (h.kind === 'win' ? labels.win : labels[h.kind]) : ''}
+                </span>
+              </div>
+            );
+          });
+        })()}
         <PausedCard view={view} lang={lang} />
         {view.tutorial && (
           <TutorialGuide
