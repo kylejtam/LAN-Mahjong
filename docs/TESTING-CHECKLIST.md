@@ -221,3 +221,7 @@ Write down which devices worked: ☐ iPhone ☐ iPad ☐ Samsung tablet ☐ lapt
 - [ ] Remaining tiles shows Draw starts here on the first tile.
 - [ ] The game's name shows left of the round in the top bar.
 
+## 1.19.3
+- [ ] Tap Pung (or any claim): the bubble by your name appears once and stays. Confirm: the bubble stays and the claimed tiles pop up; no second bubble appears.
+- [ ] Tap a claim then Cancel: the bubble disappears and nothing is claimed.
+
