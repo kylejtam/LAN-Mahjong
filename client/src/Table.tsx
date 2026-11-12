@@ -1058,6 +1058,8 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
           )}
         </div>
         <div className="topbar-centre">
+          {/* The game's name, then the round (e.g. "East, game 2"). The tutorial's label already says what it is. */}
+          {!view.tutorial && <span className="game-name">{view.name}</span>}
           <span className="round-label">{view.tutorial ? `${tr('tutorial')} · ` : ''}{(showReady === roundKey && view.nextLabel ? view.nextLabel : view.label)[lang]}</span>
           {view.tutorial && <button className="btn leave-tutorial" onClick={onLeave}>{tr('leaveTutorial')}</button>}
           <span className="min-fan" title={tr('minFanTitle')}>{tr('minFanShort', { n: view.settings.minFan })}</span>
