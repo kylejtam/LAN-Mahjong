@@ -17,7 +17,7 @@ type Text = { en: [string, string]; zh: [string, string] };
 
 /** What each step says ([instruction, a little more]), what to press, and whether it has a Next button. */
 const STEPS: Record<string, { text: Text; target?: string; next?: boolean }> = {
-  sit: { text: { en: ['Tap Sit here to take the empty seat.', 'Until you sit down you are only watching.'], zh: ['撳「坐呢度」坐低。', '未坐低之前你只係喺度睇。'] }, target: '.sit-here' },
+  sit: { text: { en: ['Tap Sit here to take the empty seat.', 'Until you sit down you are only watching.'], zh: ['撳「坐呢度」坐低。', '未坐低之前你只係喺度睇。'] }, target: '.nametag-open' },
   help: { text: { en: ['Press ? to see the scoring.', 'It lists every fan and how many chips each fan is worth.'], zh: ['撳 ? 睇計分。', '入面有齊所有番種，同每番值幾多籌碼。'] }, target: '.help-btn' },
   helpClose: { text: { en: ['Press Close when you are done.', ''], zh: ['睇完撳「關閉」。', ''] }, target: '.help-close' },
   full: { text: { en: ['Press the fullscreen button for more room, then press it again to go back.', 'It hides the browser bar.'], zh: ['撳全螢幕掣，畫面會大啲；再撳一次就返返轉頭。', '會收埋瀏覽器嘅網址列。'] }, target: '.fullscreen-btn' },

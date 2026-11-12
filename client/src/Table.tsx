@@ -668,10 +668,15 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
     );
   };
 
+  // An empty seat you can sit in: the whole name tag is the blue "Sit here" button.
+  const canSitHere = (sv: SeatView): boolean => mySeat === null && !sv.name && !!(round || (atTable && view.phase === 'betweenRounds'));
   const nameTag = (sv: SeatView, hideChips = false): ReactElement => (
-    <div className={`nametag${round && round.turn === sv.seat && round.phase !== 'ended' ? ' nametag-turn' : ''}${view.pausedSeats.includes(sv.seat) ? ' gone' : ''}`}>
+    <div
+      className={`nametag${canSitHere(sv) ? ' nametag-open' : ''}${round && round.turn === sv.seat && round.phase !== 'ended' ? ' nametag-turn' : ''}${view.pausedSeats.includes(sv.seat) ? ' gone' : ''}`}
+      {...(canSitHere(sv) ? { role: 'button', tabIndex: 0, onClick: (e: React.MouseEvent) => { e.stopPropagation(); command({ type: 'takeSeat', seat: sv.seat }); } } : {})}
+    >
       <span className="wind-badge">{WIND_SHORT[lang][sv.wind]}</span>
-      <span className="nametag-name">{sv.name ? personName(sv.name, lang) : tr('empty')}</span>
+      <span className="nametag-name">{sv.name ? personName(sv.name, lang) : canSitHere(sv) ? tr('sitHere') : tr('empty')}</span>
       {/* CPU names already end in "(CPU)"; older names don't. */}
       {sv.cpu && !sv.name?.startsWith('CPU') && !sv.name?.endsWith('(CPU)') && <span className="cpu-badge">{tr('cpu')}</span>}
       {sv.name && !sv.connected && !sv.cpu && (view.pausedSeats.includes(sv.seat) ? <span className="lost-tag">{tr('disconnectedTag')}</span> : <span className="offline">{tr('offline')}</span>)}
@@ -684,11 +689,6 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
       {/* Ready for the next hand (CPUs always are). */}
       {atTable && view.phase !== 'rolling' && sv.name && (sv.cpu || (view.phase === 'betweenRounds' ? sv.startPressed : sv.confirmed)) && (
         <span className="ready-tag">{tr('ready')}</span>
-      )}
-      {mySeat === null && !sv.name && (round || (atTable && view.phase === 'betweenRounds')) && (
-        <button className="btn sit-here" onClick={(e) => { e.stopPropagation(); command({ type: 'takeSeat', seat: sv.seat }); }}>
-          {tr('sitHere')}
-        </button>
       )}
       {mySeat === null && sv.name && !atTable && (
         <button
