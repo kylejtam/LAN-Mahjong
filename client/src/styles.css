@@ -496,7 +496,18 @@ input { font: inherit; }
 /* Dice next to the dealer. */
 .dice-small { margin: 0; gap: 0.12em; }
 .dice-small .die { width: 1.2em; height: 1.2em; font-size: 0.75em; }
-.sit-here { font-size: 0.8em; padding: 0.15em 0.6em; background: var(--accent); border-color: var(--accent); color: #fff; }
+.sit-here {
+  font-size: 1.25em; font-weight: 800; padding: 0.55em 1.4em; border-radius: 999px;
+  background: var(--accent); border: 2px solid #fff; color: #fff;
+  box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.18), 0 4px 14px rgba(0, 0, 0, 0.45);
+  animation: sit-pulse 1.6s ease-in-out infinite; white-space: nowrap;
+}
+/* Empty seats invite you to sit: the button gently pulses. */
+@keyframes sit-pulse {
+  0%, 100% { box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.18), 0 4px 14px rgba(0, 0, 0, 0.45); }
+  50% { box-shadow: 0 0 0 10px rgba(255, 255, 255, 0.08), 0 4px 18px rgba(0, 0, 0, 0.45); }
+}
+@media (prefers-reduced-motion: reduce) { .sit-here { animation: none; } }
 .swap-banner {
   position: fixed; left: 50%; top: 3.2em; transform: translateX(-50%); z-index: 30;
   display: flex; gap: 0.8em; align-items: center; background: var(--panel); border: 1px solid var(--accent);
