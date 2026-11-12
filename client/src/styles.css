@@ -112,6 +112,9 @@ input { font: inherit; }
 .topbar-right { display: flex; gap: 0.5em; justify-content: flex-end; align-items: center; padding-right: var(--safe-r); }
 /* Help and Settings stay tappable above the pop-ups (win summary, Ready / Start), whose dark layer is z-index 20. */
 .topbar-right .btn.icon { position: relative; z-index: 21; }
+/* The full screen icon sits in the exact middle of its button (not on the text line). */
+.fullscreen-btn { display: grid; place-items: center; line-height: 0; }
+.fullscreen-btn svg { display: block; margin: 0; }
 .topbar-centre { display: flex; align-items: center; gap: 0.6em; }
 .round-wind { font-size: 1.5em; font-weight: 700; }
 .compass {
@@ -493,7 +496,19 @@ input { font: inherit; }
 /* Dice next to the dealer. */
 .dice-small { margin: 0; gap: 0.12em; }
 .dice-small .die { width: 1.2em; height: 1.2em; font-size: 0.75em; }
-.sit-here { font-size: 0.8em; padding: 0.15em 0.6em; background: var(--accent); border-color: var(--accent); color: #fff; }
+.nametag-open {
+  background: #1f5fae; border: 2px solid #fff; color: #fff; font-size: 1.25em; font-weight: 800;
+  padding: 0.55em 1.2em; cursor: pointer; border-radius: 999px;
+  box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.18), 0 4px 14px rgba(0, 0, 0, 0.45);
+  animation: sit-pulse 1.6s ease-in-out infinite;
+}
+.nametag-open .wind-badge { background: rgba(255, 255, 255, 0.2); }
+/* Empty seats invite you to sit: the blue tag gently pulses. */
+@keyframes sit-pulse {
+  0%, 100% { box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.18), 0 4px 14px rgba(0, 0, 0, 0.45); }
+  50% { box-shadow: 0 0 0 10px rgba(255, 255, 255, 0.08), 0 4px 18px rgba(0, 0, 0, 0.45); }
+}
+@media (prefers-reduced-motion: reduce) { .nametag-open { animation: none; } }
 .swap-banner {
   position: fixed; left: 50%; top: 3.2em; transform: translateX(-50%); z-index: 30;
   display: flex; gap: 0.8em; align-items: center; background: var(--panel); border: 1px solid var(--accent);
@@ -942,7 +957,10 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; }
 .remaining-count { margin-left: auto; font-weight: 800; color: #f5c542; font-variant-numeric: tabular-nums; }
 .remaining-head .panel-close { position: static; }
 .remaining-tiles { display: flex; flex-wrap: wrap; gap: 0.5em 0.4em; max-height: 60vh; overflow-y: auto; }
-.remaining-stack { display: flex; gap: 1px; }
+.remaining-stack { display: flex; gap: 1px; border-radius: 6px; padding: 2px; }
+/* The two ends of the wall: where the draw starts, and where flowers and replacements come from. */
+.remaining-stack.is-start { outline: 2px solid #f5c542; outline-offset: 2px; }
+.remaining-ends { display: flex; justify-content: space-between; gap: 1em; font-size: 0.85em; font-weight: 800; color: #f5c542; letter-spacing: 0.02em; }
 
 /* Holding a claim: the tiles it would use glow in the claim's colour (behind the tile). */
 /* Only the tile itself glows (the glow sits on the tile, never around the whole hand). */
@@ -1012,3 +1030,7 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; }
 /* Host page: close LAN Mahjong (two clicks). */
 .close-host { font-size: 0.8rem; padding: 0.3em 0.9em; margin-left: 0.6em; vertical-align: middle; }
 .close-host.danger { background: #a3302d; border-color: #a3302d; color: #fff; }
+
+/* The game's name sits to the left of the round label in the top bar. */
+.game-name { font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 14em; }
+.game-name + .round-label::before { content: '·'; margin: 0 0.5em; opacity: 0.6; }

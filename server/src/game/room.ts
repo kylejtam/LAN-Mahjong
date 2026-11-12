@@ -45,6 +45,7 @@ import {
   undo,
 } from './round.js';
 import { cpuMove } from './cpu.js';
+import { GlassState, newGlass, noteFlower } from './glass.js';
 import { ALWAYS_OK, STAGES, TUTORIAL_CPUS, TUTORIAL_CPU_GAP_MS, TutorialCmd, tutorialRound } from './tutorial.js';
 
 export type CpuDifficulty = 'easy' | 'medium' | 'hard';
@@ -144,6 +145,8 @@ export interface Room {
    * in that step, when it may happen, and how many times Ready was pressed.
    */
   tutorial?: { stage: number; step: number; nextAt: number; readyPresses: number };
+  /** The window-breaking sound for flowers drawn in play (see glass.ts). */
+  glass?: GlassState;
   /** Finished hands, oldest first (may be missing in old save files). */
   history?: HandRecord[];
   /** Seconds each CPU waits before a move (missing in old save files = default). */
@@ -628,7 +631,9 @@ function handleCommandInner(prev: Room, key: string, cmd: Command, now: number, 
       const round = requireRound(room);
       const s = requireSeated(room, key);
       failIfPaused(room, key);
-      setRound(room, autoHolds(room, applyRoundMove(round, s, cmd, now), now));
+      const next = applyRoundMove(round, s, cmd, now);
+      if (cmd.type === 'draw' || cmd.type === 'drawReplacement') noteNewFlowers(room, round, next);
+      setRound(room, autoHolds(room, next, now));
       break;
     }
     case 'hold': {
@@ -988,6 +993,20 @@ function autoHolds(room: Room, round: RoundState, now: number): RoundState {
     }
   });
   return out;
+}
+
+/** A draw may have put flowers in front of a player: work out whether the sound should play. */
+function noteNewFlowers(room: Room, before: RoundState, after: RoundState): void {
+  const hand = room.match.handsPlayed;
+  let glass = room.glass ?? newGlass();
+  for (let seat = 0; seat < SEATS; seat++) {
+    const added = after.core.flowers[seat]!.slice(before.core.flowers[seat]!.length);
+    const key = room.seats[seat];
+    if (!key) continue;
+    const wind = (seat - after.core.dealer + SEATS) % SEATS;
+    for (const f of added) glass = noteFlower(glass, hand, key, seat, f.type, wind);
+  }
+  room.glass = glass;
 }
 
 function applyRoundMove(round: RoundState, seat: number, cmd: Command, now: number): RoundState {

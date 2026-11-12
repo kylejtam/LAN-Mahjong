@@ -10,3 +10,4 @@ export * from './settings.js';
 export * from './fanTable.js';
 export * from './sort.js';
 export * from './intro.js';
+export * from './pileFrame.js';

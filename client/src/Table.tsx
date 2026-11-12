@@ -139,6 +139,8 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
   const screen = useScreenSize();
   /** After the win summary, players continue to the "Ready / Leave seat" popup. */
   const [showReady, setShowReady] = useState<string | null>(null);
+  /** Someone who isn't sitting closed this hand's summary to see the table (Sit here stays on show). */
+  const [hiddenSummary, setHiddenSummary] = useState<string | null>(null);
   /** After the last hand: this player has left the summary and sees the final scores. */
   const [showFinal, setShowFinal] = useState<string | null>(null);
   /** Spectators can close the seat picker and just watch. */
@@ -668,10 +670,15 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
     );
   };
 
+  // An empty seat you can sit in: the whole name tag is the blue "Sit here" button.
+  const canSitHere = (sv: SeatView): boolean => mySeat === null && !sv.name && !!(round || (atTable && view.phase === 'betweenRounds'));
   const nameTag = (sv: SeatView, hideChips = false): ReactElement => (
-    <div className={`nametag${round && round.turn === sv.seat && round.phase !== 'ended' ? ' nametag-turn' : ''}${view.pausedSeats.includes(sv.seat) ? ' gone' : ''}`}>
+    <div
+      className={`nametag${canSitHere(sv) ? ' nametag-open' : ''}${round && round.turn === sv.seat && round.phase !== 'ended' ? ' nametag-turn' : ''}${view.pausedSeats.includes(sv.seat) ? ' gone' : ''}`}
+      {...(canSitHere(sv) ? { role: 'button', tabIndex: 0, onClick: (e: React.MouseEvent) => { e.stopPropagation(); command({ type: 'takeSeat', seat: sv.seat }); } } : {})}
+    >
       <span className="wind-badge">{WIND_SHORT[lang][sv.wind]}</span>
-      <span className="nametag-name">{sv.name ? personName(sv.name, lang) : tr('empty')}</span>
+      <span className="nametag-name">{sv.name ? personName(sv.name, lang) : canSitHere(sv) ? tr('sitHere') : tr('empty')}</span>
       {/* CPU names already end in "(CPU)"; older names don't. */}
       {sv.cpu && !sv.name?.startsWith('CPU') && !sv.name?.endsWith('(CPU)') && <span className="cpu-badge">{tr('cpu')}</span>}
       {sv.name && !sv.connected && !sv.cpu && (view.pausedSeats.includes(sv.seat) ? <span className="lost-tag">{tr('disconnectedTag')}</span> : <span className="offline">{tr('offline')}</span>)}
@@ -684,11 +691,6 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
       {/* Ready for the next hand (CPUs always are). */}
       {atTable && view.phase !== 'rolling' && sv.name && (sv.cpu || (view.phase === 'betweenRounds' ? sv.startPressed : sv.confirmed)) && (
         <span className="ready-tag">{tr('ready')}</span>
-      )}
-      {mySeat === null && !sv.name && (round || (atTable && view.phase === 'betweenRounds')) && (
-        <button className="btn sit-here" onClick={(e) => { e.stopPropagation(); command({ type: 'takeSeat', seat: sv.seat }); }}>
-          {tr('sitHere')}
-        </button>
       )}
       {mySeat === null && sv.name && !atTable && (
         <button
@@ -730,8 +732,8 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
   // At the table between hands: the shared pile is on show (and you can shuffle it).
   const roundOver = view.phase === 'playing' && round?.phase === 'ended';
   const atTable = view.phase === 'betweenRounds' || (view.phase === 'rolling' && !wallStanding) || (roundOver && showReady === roundKey);
-  const tableRef = useRef({ atTable, phase: view.phase, introKey });
-  tableRef.current = { atTable, phase: view.phase, introKey };
+  const tableRef = useRef({ atTable, phase: view.phase, introKey, seat: 0 });
+  tableRef.current = { atTable, phase: view.phase, introKey, seat: bottomSeat ?? 0 };
   const build = (): void => {
     const k = tableRef.current.introKey;
     buildFromPile(k, perWall, sideOf, () => setIntroBuilt(k));
@@ -742,7 +744,7 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
       onPile((m) => {
         const { atTable: shown, phase } = tableRef.current;
         if (phase === 'rolling' && m.done) return build();
-        if (shown) showPile(m.id, m.perWall, m.tiles);
+        if (shown) showPile(m.id, m.perWall, m.tiles, tableRef.current.seat);
         else hidePile();
       }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -753,7 +755,7 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
     if (view.phase === 'betweenRounds' || (atTable && view.phase !== 'rolling')) stopIntro();
     if (atTable) {
       const m = latestPile();
-      if (m && !m.done) showPile(m.id, m.perWall, m.tiles);
+      if (m && !m.done) showPile(m.id, m.perWall, m.tiles, bottomSeat ?? 0);
     } else if (view.phase !== 'rolling') hidePile();
     if (view.phase === 'rolling') {
       const m = latestPile();
@@ -779,7 +781,7 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
       if (on === lastOn && t - last < 45) return;
       last = t;
       lastOn = on;
-      const u = pileUnits(e.clientX, e.clientY, perWall);
+      const u = pileUnits(e.clientX, e.clientY, perWall, bottomSeat ?? 0);
       send({ type: 'shove', x: u.x, y: u.y, on });
     };
     const overTable = (e: PointerEvent): boolean => !(e.target as Element | null)?.closest?.('button, .panel, .topbar, .me, .overlay');
@@ -883,8 +885,20 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
   };
   const [newFlowerIds, setNewFlowerIds] = useState<Set<number>>(() => new Set());
   const seenFlowers = useRef<{ key: string; ids: Set<number> }>({ key: '', ids: new Set() });
-  /** The hand in which the window-break sound has already played (once per hand). */
-  const glassPlayedFor = useRef('');
+  // The window-break sound: the server says when (view.glass.seq goes up). The first view
+  // after joining only sets the starting point, so an old sound never plays again.
+  const lastGlass = useRef<number | null>(null);
+  useEffect(() => {
+    const seq = view.glass?.seq ?? 0;
+    if (lastGlass.current === null) {
+      lastGlass.current = seq;
+      return;
+    }
+    if (seq > lastGlass.current) {
+      lastGlass.current = seq;
+      playWindowBreak();
+    }
+  }, [view.glass?.seq]);
   const flowerSig = view.seats.map((sv) => sv.flowers.map((f) => f.id).join(',')).join('|');
   useEffect(() => {
     const seen = seenFlowers.current;
@@ -898,12 +912,7 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
       .map((x): Pop => ({ key: `${roundKey}-f-${x.tiles.map((t) => t.id).join('-')}`, kind: 'flower', seat: x.seat, types: x.tiles.map((t) => t.type) }));
     const ids = pops.length ? view.seats.flatMap((sv) => sv.flowers.filter((f) => !seen.ids.has(f.id)).map((f) => f.id)) : [];
     showPops(pops, ids);
-    // The first flower this hand that doesn't score for whoever drew it: a window breaks.
-    const dud = pops.some((p) => p.types.some((type) => !flowerScores(type, view.seats[p.seat]!.wind)));
-    if (dud && glassPlayedFor.current !== roundKey) {
-      glassPlayedFor.current = roundKey;
-      playWindowBreak();
-    }
+
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [flowerSig, roundKey, !!dealAnim]);
 
@@ -1049,6 +1058,8 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
           )}
         </div>
         <div className="topbar-centre">
+          {/* The game's name, then the round (e.g. "East, game 2"). The tutorial's label already says what it is. */}
+          {!view.tutorial && <span className="game-name">{view.name}</span>}
           <span className="round-label">{view.tutorial ? `${tr('tutorial')} · ` : ''}{(showReady === roundKey && view.nextLabel ? view.nextLabel : view.label)[lang]}</span>
           {view.tutorial && <button className="btn leave-tutorial" onClick={onLeave}>{tr('leaveTutorial')}</button>}
           <span className="min-fan" title={tr('minFanTitle')}>{tr('minFanShort', { n: view.settings.minFan })}</span>
@@ -1291,6 +1302,9 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
         </div>
         <div className="me-bottom">
           {mySeat === null && nameTag(bottom)}
+          {mySeat === null && roundOver && hiddenSummary === roundKey && view.phase !== 'finished' && (
+            <button className="btn back-to-summary" onClick={() => setHiddenSummary(null)}>{tr('backToSummary')}</button>
+          )}
           <span className="hint">{dealAnim ? '' : atTable ? tableHint : hint}</span>
           {atTable && roundOver && (
             <button className="btn back-to-summary" onClick={() => setShowReady(null)}>{tr('returnToSummary')}</button>
@@ -1336,9 +1350,10 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
           <WinningHand seat={view.seats[res.winner]!} winningTileId={res.winningTileId} name={res.winner === mySeat ? tr('you') : personName(view.seats[res.winner]?.name, lang)} />
         </div>
       )}
-      {(round?.phase === 'ended' || view.phase === 'finished') && !showMoment && (
+      {(round?.phase === 'ended' || view.phase === 'finished') && !showMoment && !(mySeat === null && hiddenSummary === roundKey && view.phase !== 'finished') && (
         showReady === roundKey && mySeat !== null && view.phase !== 'finished' ? null : (
           <ResultPanel
+            onClose={mySeat === null && view.phase !== 'finished' ? () => setHiddenSummary(roundKey) : undefined}
             view={view}
             lang={lang}
             command={command}

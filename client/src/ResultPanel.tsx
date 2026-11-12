@@ -46,9 +46,11 @@ interface Props {
   onContinue: () => void;
   /** After the last hand: show the final scores now (this hand's chips included). */
   finalPreview?: boolean;
+  /** Someone who isn't sitting can close the summary to see the table. */
+  onClose?: () => void;
 }
 
-export function ResultPanel({ view, lang, command, canClaimWin, onWin, winLabel, onContinue, finalPreview }: Props): ReactElement {
+export function ResultPanel({ view, lang, command, canClaimWin, onWin, winLabel, onContinue, finalPreview, onClose }: Props): ReactElement {
   const tr = (k: Parameters<typeof t>[1], v?: Record<string, string | number>): string => t(lang, k, v);
   const [showWall, setShowWall] = useState(false);
   if (view.phase === 'finished' || finalPreview) {
@@ -160,6 +162,9 @@ export function ResultPanel({ view, lang, command, canClaimWin, onWin, winLabel,
         </div>
         <div className="row">
           {canClaimWin && <button className="act act-win" onClick={onWin}>{winLabel}</button>}
+          {!me && onClose && (
+            <button className="btn close-summary" onClick={onClose}>{tr('close')}</button>
+          )}
           {wallCount > 0 && (
             <button className="btn remaining-btn" onClick={() => setShowWall(true)}>{tr('remainingTiles')}</button>
           )}
@@ -190,9 +195,15 @@ export function ResultPanel({ view, lang, command, canClaimWin, onWin, winLabel,
               <span className="remaining-count">{wallCount}</span>
               <button className="panel-close" aria-label={tr('close')} onClick={() => setShowWall(false)}>×</button>
             </div>
+            <div className="remaining-ends">
+              <span className="remaining-start-label">▶ {tr('remainingStart')}</span>
+            </div>
             <div className="remaining-tiles">
               {wall.map((st, i) => (
-                <span key={i} className="remaining-stack">
+                <span
+                  key={i}
+                  className={`remaining-stack${i === 0 ? ' is-start' : ''}`}
+                >
                   {st.map((tile) => <TileView key={tile.id} type={tile.type} width="var(--result-w)" />)}
                 </span>
               ))}
