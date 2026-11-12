@@ -30,7 +30,7 @@ function audio(): AudioContext | null {
       master.gain.value = 0.8;
       master.connect(comp).connect(ctx.destination);
     }
-    if (ctx.state === 'suspended') void ctx.resume();
+    if (ctx.state !== 'running') void ctx.resume().catch(() => undefined);
     return ctx;
   } catch {
     return null;

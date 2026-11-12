@@ -43,6 +43,7 @@ export interface SeatView {
 
 export interface RoomView {
   id: string;
+  glass: { seq: number; seat: number | null };
   name: string;
   label: { en: string; zh: string };
   you: { name: string; seat: number | null; watchingSeats: number[]; watchAll: boolean; prefs: Record<string, unknown> };
@@ -222,6 +223,8 @@ export function viewFor(room: Room, viewerKey: string, now: number): RoomView {
         ? round.core.hands[mySeat]!.at(-1)?.id ?? null
         : null,
     ended: room.ended,
+    /** The window-breaking sound: plays once for each new seq (see glass.ts). */
+    glass: { seq: room.glass?.seq ?? 0, seat: room.glass?.seat ?? null },
   };
 }
 

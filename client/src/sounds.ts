@@ -19,22 +19,36 @@ function audio(): AudioContext | null {
     const AC = window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
     if (!AC) return null;
     ctx ??= new AC();
-    if (ctx.state === 'suspended') void ctx.resume();
+    // 'interrupted' (iPad, after the screen locks) also needs waking, not just 'suspended'.
+    if (ctx.state !== 'running') void ctx.resume().catch(() => undefined);
     return ctx;
   } catch {
     return null;
   }
 }
 
-/** Switch sound on at the first tap or click (phones need this). */
+/**
+ * Switch sound on at the first tap or click (phones need this). iPads and iPhones only
+ * allow sound to start from a touch, and they can pause it again after the screen locks
+ * or the app is switched away from. So: every tap tries to wake it, until it's running.
+ */
 export function unlockSoundOnFirstTap(): void {
-  const once = (): void => {
-    audio();
-    window.removeEventListener('pointerdown', once);
-    window.removeEventListener('keydown', once);
+  const wake = (): void => {
+    const a = audio();
+    if (!a) return;
+    // Playing a silent sound inside the touch is what iPad Safari needs to unlock audio.
+    const silent = a.createBuffer(1, 1, a.sampleRate);
+    const src = a.createBufferSource();
+    src.buffer = silent;
+    src.connect(a.destination);
+    src.start(0);
+    if (a.state === 'running') {
+      window.removeEventListener('pointerdown', wake);
+      window.removeEventListener('keydown', wake);
+    }
   };
-  window.addEventListener('pointerdown', once);
-  window.addEventListener('keydown', once);
+  window.addEventListener('pointerdown', wake);
+  window.addEventListener('keydown', wake);
 }
 
 const rnd = (a: number, b: number): number => a + Math.random() * (b - a);
@@ -139,6 +153,12 @@ function shower(a: AudioContext, out: AudioNode, t: number, len: number, count: 
 export function playWindowBreak(volume = 0.5): void {
   const a = audio();
   if (!a) return;
+  // If the sound was paused (e.g. the screen locked), wake it first, then play.
+  if (a.state === 'running') playOn(a, volume);
+  else void a.resume().then(() => playOn(a, volume)).catch(() => undefined);
+}
+
+function playOn(a: AudioContext, volume: number): void {
   const master = a.createGain();
   master.gain.value = volume;
   master.connect(a.destination);

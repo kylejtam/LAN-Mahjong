@@ -883,8 +883,20 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
   };
   const [newFlowerIds, setNewFlowerIds] = useState<Set<number>>(() => new Set());
   const seenFlowers = useRef<{ key: string; ids: Set<number> }>({ key: '', ids: new Set() });
-  /** The hand in which the window-break sound has already played (once per hand). */
-  const glassPlayedFor = useRef('');
+  // The window-break sound: the server says when (view.glass.seq goes up). The first view
+  // after joining only sets the starting point, so an old sound never plays again.
+  const lastGlass = useRef<number | null>(null);
+  useEffect(() => {
+    const seq = view.glass?.seq ?? 0;
+    if (lastGlass.current === null) {
+      lastGlass.current = seq;
+      return;
+    }
+    if (seq > lastGlass.current) {
+      lastGlass.current = seq;
+      playWindowBreak();
+    }
+  }, [view.glass?.seq]);
   const flowerSig = view.seats.map((sv) => sv.flowers.map((f) => f.id).join(',')).join('|');
   useEffect(() => {
     const seen = seenFlowers.current;
@@ -898,12 +910,7 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
       .map((x): Pop => ({ key: `${roundKey}-f-${x.tiles.map((t) => t.id).join('-')}`, kind: 'flower', seat: x.seat, types: x.tiles.map((t) => t.type) }));
     const ids = pops.length ? view.seats.flatMap((sv) => sv.flowers.filter((f) => !seen.ids.has(f.id)).map((f) => f.id)) : [];
     showPops(pops, ids);
-    // The first flower this hand that doesn't score for whoever drew it: a window breaks.
-    const dud = pops.some((p) => p.types.some((type) => !flowerScores(type, view.seats[p.seat]!.wind)));
-    if (dud && glassPlayedFor.current !== roundKey) {
-      glassPlayedFor.current = roundKey;
-      playWindowBreak();
-    }
+
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [flowerSig, roundKey, !!dealAnim]);
 
