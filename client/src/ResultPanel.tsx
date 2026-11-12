@@ -46,9 +46,11 @@ interface Props {
   onContinue: () => void;
   /** After the last hand: show the final scores now (this hand's chips included). */
   finalPreview?: boolean;
+  /** Someone who isn't sitting can close the summary to see the table. */
+  onClose?: () => void;
 }
 
-export function ResultPanel({ view, lang, command, canClaimWin, onWin, winLabel, onContinue, finalPreview }: Props): ReactElement {
+export function ResultPanel({ view, lang, command, canClaimWin, onWin, winLabel, onContinue, finalPreview, onClose }: Props): ReactElement {
   const tr = (k: Parameters<typeof t>[1], v?: Record<string, string | number>): string => t(lang, k, v);
   const [showWall, setShowWall] = useState(false);
   if (view.phase === 'finished' || finalPreview) {
@@ -160,6 +162,9 @@ export function ResultPanel({ view, lang, command, canClaimWin, onWin, winLabel,
         </div>
         <div className="row">
           {canClaimWin && <button className="act act-win" onClick={onWin}>{winLabel}</button>}
+          {!me && onClose && (
+            <button className="btn close-summary" onClick={onClose}>{tr('close')}</button>
+          )}
           {wallCount > 0 && (
             <button className="btn remaining-btn" onClick={() => setShowWall(true)}>{tr('remainingTiles')}</button>
           )}

@@ -139,6 +139,8 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
   const screen = useScreenSize();
   /** After the win summary, players continue to the "Ready / Leave seat" popup. */
   const [showReady, setShowReady] = useState<string | null>(null);
+  /** Someone who isn't sitting closed this hand's summary to see the table (Sit here stays on show). */
+  const [hiddenSummary, setHiddenSummary] = useState<string | null>(null);
   /** After the last hand: this player has left the summary and sees the final scores. */
   const [showFinal, setShowFinal] = useState<string | null>(null);
   /** Spectators can close the seat picker and just watch. */
@@ -1298,6 +1300,9 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
         </div>
         <div className="me-bottom">
           {mySeat === null && nameTag(bottom)}
+          {mySeat === null && roundOver && hiddenSummary === roundKey && view.phase !== 'finished' && (
+            <button className="btn back-to-summary" onClick={() => setHiddenSummary(null)}>{tr('backToSummary')}</button>
+          )}
           <span className="hint">{dealAnim ? '' : atTable ? tableHint : hint}</span>
           {atTable && roundOver && (
             <button className="btn back-to-summary" onClick={() => setShowReady(null)}>{tr('returnToSummary')}</button>
@@ -1343,9 +1348,10 @@ export function Table({ view, send, onLeave, prefs, setPrefs }: Props): ReactEle
           <WinningHand seat={view.seats[res.winner]!} winningTileId={res.winningTileId} name={res.winner === mySeat ? tr('you') : personName(view.seats[res.winner]?.name, lang)} />
         </div>
       )}
-      {(round?.phase === 'ended' || view.phase === 'finished') && !showMoment && (
+      {(round?.phase === 'ended' || view.phase === 'finished') && !showMoment && !(mySeat === null && hiddenSummary === roundKey && view.phase !== 'finished') && (
         showReady === roundKey && mySeat !== null && view.phase !== 'finished' ? null : (
           <ResultPanel
+            onClose={mySeat === null && view.phase !== 'finished' ? () => setHiddenSummary(roundKey) : undefined}
             view={view}
             lang={lang}
             command={command}
